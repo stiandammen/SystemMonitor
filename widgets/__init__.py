@@ -10,8 +10,11 @@ from .toggle import ToggleSwitch
 from .search import SearchBar
 from .alert import AlertBadge
 from .chip import StatChip
+from .core_graph import CoreGraphWidget
+from .cpu_info_panel import CpuInfoPanel
 
 __all__ = [
     'Card', 'Gauge', 'Graph', 'SortableTable',
-    'NavItem', 'ToggleSwitch', 'SearchBar', 'AlertBadge', 'StatChip'
+    'NavItem', 'ToggleSwitch', 'SearchBar', 'AlertBadge', 'StatChip',
+    'CoreGraphWidget', 'CpuInfoPanel'
 ]
