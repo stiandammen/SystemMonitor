@@ -1321,16 +1321,194 @@ class OverviewPage(QWidget):
                 padding: 4px 12px;
             }}
             QPushButton:hover {{
-                background-color: #1e2936;
+                background-color: {COLORS['bg_hover']};
                 color: {COLORS['text_primary']};
-                border-color: {COLORS['accent_red']};
+                border-color: {COLORS['accent_blue']};
             }}
         """)
+        btn.clicked.connect(self._show_all_alerts)
         layout.addWidget(btn)
 
         self._update_alerts([])
 
         return card
+
+    def _get_alert_color(self, level):
+        """Get color based on alert level"""
+        if level == "red":
+            return COLORS['accent_red']
+        elif level == "yellow":
+            return COLORS['accent_orange']
+        return COLORS['accent_green']
+
+    def _show_all_alerts(self):
+        """Show all alerts in a dialog"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton
+
+        dialog = QDialog(self)
+        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        dialog.setMinimumSize(750, 500)
+        dialog.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS['bg_primary']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+
+        _drag_pos = None
+
+        def mousePressEvent(event):
+            if event.button() == Qt.LeftButton:
+                nonlocal _drag_pos
+                _drag_pos = event.globalPos() - dialog.frameGeometry().topLeft()
+                event.accept()
+
+        def mouseMoveEvent(event):
+            if event.buttons() == Qt.LeftButton and _drag_pos:
+                dialog.move(event.globalPos() - _drag_pos)
+                event.accept()
+
+        def mouseReleaseEvent(event):
+            if event.button() == Qt.LeftButton:
+                _drag_pos = None
+                event.accept()
+
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        dialog.setLayout(main_layout)
+
+        # Header
+        header = QFrame()
+        header.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(20, 12, 12, 12)
+        header.setLayout(header_layout)
+        header.setCursor(Qt.SizeAllCursor)
+        header.mousePressEvent = mousePressEvent
+        header.mouseMoveEvent = mouseMoveEvent
+        header.mouseReleaseEvent = mouseReleaseEvent
+
+        title = QLabel("All Alerts")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        header_layout.addWidget(title)
+
+        header_layout.addStretch()
+
+        close_btn = QPushButton("×")
+        close_btn.setFont(QFont("Segoe UI", 16))
+        close_btn.setFixedSize(32, 32)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_muted']};
+                border: none;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_hover']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+        close_btn.clicked.connect(dialog.close)
+        header_layout.addWidget(close_btn)
+
+        main_layout.addWidget(header)
+
+        # Alerts container
+        alerts_container = QVBoxLayout()
+        alerts_container.setSpacing(14)
+        main_layout.addLayout(alerts_container)
+
+        # Generate current alerts
+        alerts = []
+        if hasattr(self, '_last_data'):
+            alerts = self._generate_alerts(self._last_data)
+
+        if not alerts:
+            alerts = [{"level": "green", "title": "All systems normal", "desc": "No issues detected"}]
+
+        for alert in alerts:
+            level = alert.get("level", "green")
+            title_text = alert.get("title", "")
+            desc = alert.get("desc", "")
+            color = self._get_alert_color(level)
+
+            alert_card = QFrame()
+            alert_card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_card']};
+                    border: 1px solid {COLORS['border']};
+                    border-radius: 12px;
+                    padding: 16px;
+                }}
+            """)
+            alert_layout = QHBoxLayout()
+            alert_layout.setSpacing(20)
+            alert_card.setLayout(alert_layout)
+
+            # Left color bar
+            color_bar = QFrame()
+            color_bar.setFixedWidth(4)
+            color_bar.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {color};
+                    border-radius: 2px;
+                }}
+            """)
+            alert_layout.addWidget(color_bar)
+
+            # Icon column
+            icon_col = QVBoxLayout()
+            icon_col.setAlignment(Qt.AlignCenter)
+            icon_lbl = QLabel("●")
+            icon_lbl.setFont(QFont("Segoe UI", 24))
+            icon_lbl.setStyleSheet(f"color: {color};")
+            icon_col.addWidget(icon_lbl)
+            alert_layout.addLayout(icon_col)
+
+            # Center info
+            info_layout = QVBoxLayout()
+            info_layout.setSpacing(4)
+
+            title_lbl = QLabel(title_text)
+            title_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
+            title_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+            info_layout.addWidget(title_lbl)
+
+            desc_lbl = QLabel(desc)
+            desc_lbl.setFont(QFont("Segoe UI", 10))
+            desc_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            info_layout.addWidget(desc_lbl)
+
+            alert_layout.addLayout(info_layout, stretch=1)
+
+            alerts_container.addWidget(alert_card)
+
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.setFont(QFont("Segoe UI", 11))
+        close_btn.setFixedHeight(36)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_card']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
+                padding: 6px 20px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_hover']};
+                border-color: {COLORS['accent_blue']};
+            }}
+        """)
+        close_btn.clicked.connect(dialog.close)
+        main_layout.addWidget(close_btn, 0, Qt.AlignRight)
+
+        dialog.exec_()
 
     def _update_alerts(self, alerts=None):
         """Repaint alerts list"""
@@ -1352,29 +1530,27 @@ class OverviewPage(QWidget):
             level = alert.get("level", "green")
             title = alert.get("title", "")
             desc = alert.get("desc", "")
+            color = self._get_alert_color(level)
 
             item = QFrame()
+            item.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_deeper']};
+                    border-left: 3px solid {color};
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                }}
+            """)
             item_layout = QHBoxLayout()
             item_layout.setSpacing(10)
-            item_layout.setContentsMargins(0, 0, 0, 0)
+            item_layout.setContentsMargins(8, 8, 8, 8)
             item.setLayout(item_layout)
-
-            # Dot indicator
-            dot = QLabel("●")
-            dot.setFont(QFont("Segoe UI", 12))
-            if level == "red":
-                dot.setStyleSheet(f"color: {COLORS['accent_red']};")
-            elif level == "yellow":
-                dot.setStyleSheet(f"color: {COLORS['accent_yellow']};")
-            else:
-                dot.setStyleSheet(f"color: {COLORS['accent_green']};")
-            item_layout.addWidget(dot)
 
             # Text
             txt_vbox = QVBoxLayout()
             txt_vbox.setSpacing(1)
             t = QLabel(title)
-            t.setFont(QFont("Segoe UI", 11))
+            t.setFont(QFont("Segoe UI", 11, QFont.Bold))
             t.setStyleSheet(f"color: {COLORS['text_primary']};")
             txt_vbox.addWidget(t)
             d = QLabel(desc)
