@@ -1,51 +1,467 @@
 """
-GPU View - GPU monitoring
+GPU View - GPU monitoring with gauges, charts, and real-time data
+Modern glassmorphism design with responsive layout
 """
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+    QFrame, QGridLayout, QGraphicsDropShadowEffect
+)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
+
+from styles.theme import theme_manager
+
+
+# Color palette
+COLORS = {
+    'bg_primary': '#0a0e14',
+    'bg_card': '#161f2a',
+    'bg_deeper': '#0d1117',
+    'bg_hover': '#1e2936',
+    'border': '#2a3441',
+    'border_card': '#1e2936',
+    'text_primary': '#f0f4f8',
+    'text_secondary': '#94a3b8',
+    'text_muted': '#64748b',
+    'accent_blue': '#3b82f6',
+    'accent_green': '#10b981',
+    'accent_purple': '#8b5cf6',
+    'accent_orange': '#f59e0b',
+    'accent_cyan': '#06b6d4',
+    'accent_red': '#ef4444',
+    'accent_yellow': '#ffd740',
+}
+
+
+class GlassCard(QFrame):
+    """Glass-effect card with shadow"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border_card']};
+                border-radius: 12px;
+            }}
+        """)
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+
+
+class GPUGauge(QFrame):
+    """
+    Circular gauge with glow effect, responsive sizing
+    """
+    def __init__(self, title: str = "", unit: str = "%",
+                 min_val: float = 0.0, max_val: float = 100.0,
+                 warn_threshold: float = 70.0, crit_threshold: float = 90.0,
+                 size: int = 120, parent=None):
+        super().__init__(parent)
+        self._title = title
+        self._unit = unit
+        self._min_val = min_val
+        self._max_val = max_val
+        self._warn_threshold = warn_threshold
+        self._crit_threshold = crit_threshold
+        self._size = size
+        self._display_value = 0.0
+        self._target_value = 0.0
+
+        self.setFixedSize(size, size)
+        self.setStyleSheet("background-color: transparent; border: none;")
+
+    def set_value(self, value: float):
+        """Update gauge value"""
+        self._target_value = max(self._min_val, min(value, self._max_val))
+        self.update()
+
+    def set_max_value(self, max_val: float):
+        self._max_val = max_val
+
+    def _get_color_for_value(self, percentage: float) -> str:
+        if percentage >= self._crit_threshold:
+            return COLORS['accent_red']
+        elif percentage >= self._warn_threshold:
+            return COLORS['accent_orange']
+        return COLORS['accent_green']
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.HighQualityAntialiasing)
+
+        size = self._size
+        center = size / 2
+
+        # Smooth animation
+        diff = self._target_value - self._display_value
+        if abs(diff) > 0.1:
+            self._display_value += diff * 0.12
+        else:
+            self._display_value = self._target_value
+
+        # Progress calculation
+        range_val = self._max_val - self._min_val
+        progress = (self._display_value - self._min_val) / range_val if range_val > 0 else 0
+        progress = max(0.0, min(1.0, progress))
+
+        pen_width = 8
+        arc_rect = 14
+
+        # Background track
+        painter.setPen(QPen(QColor(COLORS['border']), pen_width, Qt.SolidLine))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
+                       135 * 16, -270 * 16)
+
+        # Glow effect
+        glow_color = QColor(self._get_color_for_value(progress * 100))
+        glow_color.setAlpha(40)
+        glow_pen = QPen(glow_color, pen_width + 6, Qt.SolidLine)
+        glow_pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(glow_pen)
+        painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
+                       135 * 16, -270 * 16)
+
+        # Progress arc
+        progress_color = QColor(self._get_color_for_value(progress * 100))
+        progress_pen = QPen(progress_color, pen_width, Qt.SolidLine)
+        progress_pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(progress_pen)
+        painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
+                       135 * 16, int(-270 * 16 * progress))
+
+        # Center value
+        painter.setFont(QFont("Segoe UI", 18, QFont.Light))
+        painter.setPen(QColor(COLORS['text_primary']))
+        value_text = f"{self._display_value:.0f}{self._unit}"
+        fm = painter.fontMetrics()
+        text_width = fm.width(value_text)
+        painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
+
+        # Title
+        if self._title:
+            painter.setFont(QFont("Segoe UI", 8))
+            painter.setPen(QColor(COLORS['text_muted']))
+            title_width = fm.width(self._title)
+            painter.drawText(int(center - title_width / 2), int(center + 20), self._title)
+
+        painter.end()
+
+
+class StatTile(QFrame):
+    """Compact stat tile for info display"""
+    def __init__(self, label: str = "", value: str = "--", color: str = None, parent=None):
+        super().__init__(parent)
+        self._color = color or COLORS['accent_cyan']
+        self._setup_ui(label, value)
+
+    def _setup_ui(self, label, value):
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_deeper']};
+                border-radius: 8px;
+                padding: 10px 14px;
+            }}
+        """)
+        layout = QVBoxLayout()
+        layout.setSpacing(2)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        self._value_lbl = QLabel(value)
+        self._value_lbl.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        self._value_lbl.setStyleSheet(f"color: {self._color};")
+        layout.addWidget(self._value_lbl)
+
+        self._label_lbl = QLabel(label)
+        self._label_lbl.setFont(QFont("Segoe UI", 9))
+        self._label_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+        layout.addWidget(self._label_lbl)
+
+    def set_value(self, value: str):
+        self._value_lbl.setText(value)
+
+    def set_color(self, color: str):
+        self._color = color
+        self._value_lbl.setStyleSheet(f"color: {color};")
+
+
+class RealtimeGraph(QWidget):
+    """Real-time line graph with gradient fill"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._load_data = []
+        self._temp_data = []
+        self._max_points = 60
+        self.setMinimumHeight(160)
+
+    def update_chart(self, load: float, temp: float):
+        self._load_data.append(load)
+        self._temp_data.append(temp)
+        if len(self._load_data) > self._max_points:
+            self._load_data.pop(0)
+            self._temp_data.pop(0)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        w = self.width()
+        h = self.height()
+
+        # Background
+        painter.setBrush(QColor(COLORS['bg_card']))
+        painter.setPen(Qt.NoPen)
+        painter.drawRect(0, 0, w, h)
+
+        # Grid lines
+        painter.setPen(QPen(QColor(COLORS['border']), 1, Qt.DotLine))
+        for i in range(5):
+            y = h * i / 4
+            painter.drawLine(0, int(y), w, int(y))
+
+        # Draw load area
+        if len(self._load_data) > 1:
+            step = w / (self._max_points - 1)
+            points = [(i * step, h - (val / 100.0 * h)) for i, val in enumerate(self._load_data)]
+
+            # Fill
+            fill_pts = [(0, h)] + points + [(points[-1][0], h)]
+            gradient = QLinearGradient(0, 0, 0, h)
+            gradient.setColorAt(0, QColor(16, 185, 129, 100))
+            gradient.setColorAt(1, QColor(16, 185, 129, 5))
+            painter.setBrush(gradient)
+            painter.setPen(Qt.NoPen)
+            from PyQt5.QtCore import QPoint
+            qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
+            if len(qpoints) >= 3:
+                painter.drawPolygon(*qpoints)
+
+            # Load line
+            painter.setPen(QPen(QColor(COLORS['accent_green']), 2))
+            for i in range(len(points) - 1):
+                painter.drawLine(int(points[i][0]), int(points[i][1]),
+                               int(points[i + 1][0]), int(points[i + 1][1]))
+
+            # Temp line
+            temp_points = []
+            for i, val in enumerate(self._temp_data):
+                x = i * step
+                y = h - (min(val, 100) / 100.0 * h)
+                temp_points.append((x, y))
+
+            if temp_points and temp_points[-1][1] < h:
+                painter.setPen(QPen(QColor(COLORS['accent_blue']), 2))
+                for i in range(len(temp_points) - 1):
+                    painter.drawLine(int(temp_points[i][0]), int(temp_points[i][1]),
+                                   int(temp_points[i + 1][0]), int(temp_points[i + 1][1]))
+
+        # Legend
+        painter.setFont(QFont("Segoe UI", 9))
+        painter.setPen(QColor(COLORS['accent_green']))
+        painter.drawText(12, 16, "● Load")
+        painter.setPen(QColor(COLORS['accent_blue']))
+        painter.drawText(80, 16, "● Temp")
+
+        painter.end()
 
 
 class GPUView(QWidget):
-    """GPU monitoring view"""
+    """GPU monitoring view with modern responsive design"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._last_gpu_data = None
         self._setup_ui()
 
     def _setup_ui(self):
-        """Setup view UI"""
-        self._scroll_area = QScrollArea()
-        self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
-        content_widget = QWidget()
-        content_widget.setMaximumWidth(1200)
-
-        self._content_layout = QVBoxLayout()
-        self._content_layout.setContentsMargins(20, 20, 20, 20)
-        self._content_layout.setSpacing(20)
-        content_widget.setLayout(self._content_layout)
-
-        self._scroll_area.setWidget(content_widget)
-
+        """Setup GPU view UI"""
+        # Main layout - no scroll area, fits in content area
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(self._scroll_area)
+        main_layout.setContentsMargins(20, 16, 20, 16)
+        main_layout.setSpacing(16)
         self.setLayout(main_layout)
 
-        title = QLabel("GPU Monitoring")
-        font = QFont("Segoe UI", 24)
-        font.setBold(True)
-        title.setFont(font)
-        self._content_layout.addWidget(title)
+        # Header bar
+        header = self._create_header()
+        main_layout.addWidget(header)
 
-        self._info_label = QLabel("GPU information will be displayed here")
-        self._content_layout.addWidget(self._info_label)
+        # Main content area - responsive grid
+        content = QWidget()
+        content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+        content.setLayout(content_layout)
 
-        self._content_layout.addStretch()
-    
+        # Gauges section
+        gauges_section = self._create_gauges_section()
+        content_layout.addWidget(gauges_section)
+
+        # Info cards section
+        info_section = self._create_info_section()
+        content_layout.addWidget(info_section)
+
+        # Chart section
+        chart_section = self._create_chart_section()
+        content_layout.addWidget(chart_section, stretch=1)
+
+        main_layout.addWidget(content, stretch=1)
+
+    def _create_header(self):
+        """Header with title and GPU status"""
+        header = QFrame()
+        header.setFixedHeight(60)
+        header.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border-radius: 10px;
+                border: 1px solid {COLORS['border']};
+            }}
+        """)
+        layout = QHBoxLayout()
+        layout.setContentsMargins(16, 0, 16, 0)
+        header.setLayout(layout)
+
+        # Status indicator
+        self._status_dot = QLabel("●")
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px;")
+        layout.addWidget(self._status_dot)
+
+        # Title
+        title = QLabel("GPU Monitor")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        layout.addWidget(title)
+
+        # GPU name
+        self._gpu_name_label = QLabel("—")
+        self._gpu_name_label.setFont(QFont("Segoe UI", 11))
+        self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']};")
+        layout.addWidget(self._gpu_name_label)
+
+        layout.addStretch()
+
+        return header
+
+    def _create_gauges_section(self):
+        """Gauges in responsive grid"""
+        container = QWidget()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        container.setLayout(layout)
+
+        # Make gauges stretch to fill available space
+        self._gauge_load = GPUGauge(title="GPU Load", unit="%", max_val=100,
+                                   warn_threshold=50, crit_threshold=80, size=100)
+        self._gauge_temp = GPUGauge(title="Temp", unit="°C", max_val=100,
+                                   warn_threshold=60, crit_threshold=80, size=100)
+        self._gauge_vram = GPUGauge(title="VRAM", unit="GB", max_val=16,
+                                   warn_threshold=70, crit_threshold=90, size=100)
+        self._gauge_power = GPUGauge(title="Power", unit="W", max_val=300,
+                                    warn_threshold=200, crit_threshold=280, size=100)
+        self._gauge_fan = GPUGauge(title="Fan", unit="%", max_val=100,
+                                   warn_threshold=50, crit_threshold=80, size=100)
+
+        for gauge in [self._gauge_load, self._gauge_temp, self._gauge_vram,
+                      self._gauge_power, self._gauge_fan]:
+            layout.addWidget(gauge, stretch=1)
+
+        return container
+
+    def _create_info_section(self):
+        """Info tiles row"""
+        container = QWidget()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        container.setLayout(layout)
+
+        self._card_model = StatTile("GPU Model", "—", COLORS['accent_cyan'])
+        self._card_driver = StatTile("Driver", "—", COLORS['text_secondary'])
+        self._card_vram = StatTile("VRAM Total", "—", COLORS['accent_purple'])
+        self._card_vendor = StatTile("Vendor", "—", COLORS['accent_green'])
+
+        for card in [self._card_model, self._card_driver,
+                     self._card_vram, self._card_vendor]:
+            layout.addWidget(card, stretch=1)
+
+        return container
+
+    def _create_chart_section(self):
+        """Chart with legend"""
+        chart_card = QFrame()
+        chart_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border-radius: 10px;
+                border: 1px solid {COLORS['border']};
+            }}
+        """)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
+        chart_card.setLayout(layout)
+
+        chart_title = QLabel("Performance")
+        chart_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        chart_title.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        layout.addWidget(chart_title)
+
+        self._chart = RealtimeGraph()
+        layout.addWidget(self._chart)
+
+        return chart_card
+
     def update_data(self, data):
-        """Update view with new data"""
-        pass
+        """Update view with GPU data"""
+        if 'gpu' not in data:
+            return
+
+        gpu = data['gpu']
+        gpu_info = data.get('gpu_info', {})
+
+        if not gpu.get('available', False):
+            self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: 14px;")
+            return
+
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px;")
+
+        # Update GPU info
+        if gpu_info:
+            self._gpu_name_label.setText(gpu_info.get('name', '—'))
+            self._card_model.set_value(gpu_info.get('name', 'Unknown')[:35])
+            self._card_driver.set_value(gpu_info.get('driver_version', 'N/A'))
+            vram_gb = gpu_info.get('vram_mb', 0) / 1024
+            self._card_vram.set_value(f"{vram_gb:.1f} GB")
+            self._card_vendor.set_value(gpu_info.get('vendor', 'Unknown'))
+
+        # Update gauges
+        load = gpu.get('load', 0)
+        mem_used = gpu.get('memory_used', 0)
+        mem_total = gpu.get('memory_total', 1)
+        temp = gpu.get('temperature', 0) or 0
+        power = gpu.get('power', 0) or 0
+        fan = gpu.get('fan_speed', 0) or 0
+
+        self._gauge_load.set_value(load)
+        self._gauge_temp.set_value(temp)
+        self._gauge_vram.set_value(mem_used)
+        self._gauge_vram.set_max_value(mem_total if mem_total > 0 else 16)
+        self._gauge_power.set_value(power)
+        self._gauge_fan.set_value(fan)
+
+        # Update chart
+        self._chart.update_chart(load, temp)
+
+        self._last_gpu_data = gpu
+
+
+from PyQt5.QtWidgets import QSizePolicy

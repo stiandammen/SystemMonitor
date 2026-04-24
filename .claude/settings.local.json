@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile data/gpu.py data/collector.py views/gpu.py)",
+      "Bash(where python *)"
+    ]
+  }
+}

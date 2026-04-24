@@ -21,8 +21,8 @@ class MainWindow(QMainWindow):
         """Setup window UI"""
         # Window properties
         self.setWindowTitle("System Monitor")
-        self.setGeometry(100, 100, 1200, 800)
-        self.setMinimumSize(1000, 700)
+        self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(1200, 800)
         
         # Central widget
         central = QWidget()

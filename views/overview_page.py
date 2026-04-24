@@ -10,8 +10,8 @@ from PyQt5.QtWidgets import (
     QScrollArea, QTableWidget, QTableWidgetItem, QPushButton,
     QFormLayout, QProgressBar, QHeaderView, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtCore import Qt, QTimer, QRect
+from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
 
 from widgets.card import Card
 from widgets.donut_gauge import DonutGauge
@@ -58,6 +58,97 @@ def label_stylesheet(color=None, size=None, bold=False):
     if bold:
         style += "font-weight: bold;"
     return style
+
+
+class DiskIcon(QWidget):
+    """Modern SSD/NVMe drive icon drawn with QPainter"""
+    def __init__(self, size=48, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(size, size)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.HighQualityAntialiasing)
+
+        w = self.width()
+        h = self.height()
+        pad = w * 0.08
+        body_h = h * 0.72
+        body_y = h * 0.12
+
+        # Main body (dark PCB-like)
+        body_rect = QRect(int(pad), int(body_y), int(w - pad * 2), int(body_h))
+        body_grad = QLinearGradient(0, body_y, 0, body_y + body_h)
+        body_grad.setColorAt(0, QColor(55, 65, 80))
+        body_grad.setColorAt(1, QColor(30, 38, 52))
+        painter.setBrush(body_grad)
+        painter.setPen(QPen(QColor(20, 26, 36), 1.5))
+        painter.drawRoundedRect(body_rect, 3, 3)
+
+        # Notch cut on right side (M.2 style)
+        notch_w = w * 0.06
+        notch_h = h * 0.22
+        notch_x = w - pad - notch_w
+        notch_y = body_y + body_h * 0.4
+        painter.setBrush(QColor(COLORS['bg_primary']))
+        painter.setPen(Qt.NoPen)
+        painter.drawRect(int(notch_x), int(notch_y), int(notch_w), int(notch_h))
+
+        # Gold pins at bottom
+        pin_area_h = h * 0.1
+        pin_area_y = body_y + body_h
+        pin_area_rect = QRect(int(pad), int(pin_area_y), int(w - pad * 2), int(pin_area_h))
+        pin_grad = QLinearGradient(0, pin_area_y, 0, pin_area_y + pin_area_h)
+        pin_grad.setColorAt(0, QColor(200, 165, 90))
+        pin_grad.setColorAt(1, QColor(160, 130, 60))
+        painter.setBrush(pin_grad)
+        painter.setPen(QPen(QColor(130, 100, 40), 1))
+        painter.drawRect(pin_area_rect)
+
+        # Horizontal pin dividers
+        pin_count = 6
+        pin_w_step = (w - pad * 2) / pin_count
+        painter.setPen(QPen(QColor(130, 100, 40), 0.8))
+        for i in range(1, pin_count):
+            x = int(pad + i * pin_w_step)
+            painter.drawLine(x, int(pin_area_y), x, int(pin_area_y + pin_area_h))
+
+        # Label area (small rectangle on body)
+        label_pad = w * 0.12
+        label_w = w - pad * 2 - label_pad * 2
+        label_h = h * 0.18
+        label_y = body_y + body_h * 0.18
+        label_rect = QRect(int(pad + label_pad), int(label_y), int(label_w), int(label_h))
+        label_grad = QLinearGradient(0, label_y, 0, label_y + label_h)
+        label_grad.setColorAt(0, QColor(80, 90, 110))
+        label_grad.setColorAt(1, QColor(65, 75, 95))
+        painter.setBrush(label_grad)
+        painter.setPen(QPen(QColor(50, 60, 78), 1))
+        painter.drawRoundedRect(label_rect, 1, 1)
+
+        # Small chip on body (flash chip)
+        chip_w = w * 0.18
+        chip_h = h * 0.14
+        chip_x = w * 0.22
+        chip_y = body_y + body_h * 0.52
+        painter.setBrush(QColor(25, 30, 42))
+        painter.setPen(QPen(QColor(40, 48, 65), 1))
+        painter.drawRect(int(chip_x), int(chip_y), int(chip_w), int(chip_h))
+        # Tiny dot on chip (origin marker)
+        painter.setBrush(QColor(180, 140, 50))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(int(chip_x + 2), int(chip_y + 2), 3, 3)
+
+        # Controller chip (small square)
+        ctrl_size = w * 0.1
+        ctrl_x = w * 0.58
+        ctrl_y = body_y + body_h * 0.55
+        painter.setBrush(QColor(20, 24, 35))
+        painter.setPen(QPen(QColor(35, 42, 58), 1))
+        painter.drawRect(int(ctrl_x), int(ctrl_y), int(ctrl_size), int(ctrl_size))
+
+        painter.end()
 
 
 class OverviewPage(QWidget):
@@ -587,47 +678,95 @@ class OverviewPage(QWidget):
 
     def _create_system_info_card(self):
         card = QFrame()
-        card.setMinimumHeight(260)
+        card.setMinimumHeight(200)
         card.setStyleSheet(card_stylesheet())
         layout = QVBoxLayout()
-        layout.setSpacing(10)
+        layout.setSpacing(12)
         card.setLayout(layout)
+
+        # Header
+        header = QHBoxLayout()
+        header.setSpacing(8)
+
+        icon_lbl = QLabel("🖥️")
+        icon_lbl.setFont(QFont("Segoe UI", 14))
+        header.addWidget(icon_lbl)
 
         title = QLabel("System Info")
         title.setFont(QFont("Segoe UI", 13, QFont.Bold))
         title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        layout.addWidget(title)
+        header.addWidget(title)
 
-        form = QFormLayout()
-        form.setSpacing(10)
-        form.setLabelAlignment(Qt.AlignLeft)
+        header.addStretch()
+        layout.addLayout(header)
 
-        def make_val(text):
-            lbl = QLabel(text)
-            lbl.setFont(QFont("Segoe UI", 11))
-            lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
-            return lbl
+        # System info rows container
+        sys_container = QVBoxLayout()
+        sys_container.setSpacing(8)
+        layout.addLayout(sys_container)
 
-        def make_row(label, value):
-            lbl = QLabel(label)
-            lbl.setFont(QFont("Segoe UI", 11))
-            lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-            return (lbl, make_val(value))
-
-        rows = [
-            ("Motherboard", self._get_motherboard()),
-            ("CPU", (platform.processor() or "Unknown")[:40]),
-            ("GPU", self._short_gpu()),
-            ("RAM", self._get_ram_info()),
-            ("Storage", self._get_primary_disk()),
-            ("OS", self._short_os()),
+        # System info data
+        sys_info = [
+            ("Motherboard", self._get_motherboard(), "🖧"),
+            ("CPU", (platform.processor() or "Unknown")[:40], "⚙️"),
+            ("GPU", self._short_gpu(), "🎮"),
+            ("RAM", self._get_ram_info(), "💾"),
+            ("Storage", self._get_primary_disk(), "🖴"),
+            ("OS", self._short_os(), "🖥️"),
         ]
 
-        for label, value in rows:
-            lbl, val_lbl = make_row(label, value)
-            form.addRow(lbl, val_lbl)
+        for label, value, icon in sys_info:
+            row = QFrame()
+            row.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_deeper']};
+                    border-radius: 8px;
+                    padding: 10px 12px;
+                }}
+            """)
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(12)
+            row_layout.setContentsMargins(6, 6, 6, 6)
+            row.setLayout(row_layout)
 
-        layout.addLayout(form)
+            # Icon box
+            icon_box = QFrame()
+            icon_box.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_card']};
+                    border-radius: 8px;
+                    padding: 6px;
+                }}
+            """)
+            icon_box_layout = QVBoxLayout()
+            icon_box_layout.setContentsMargins(0, 0, 0, 0)
+            icon_box_layout.setSpacing(0)
+            icon_box.setLayout(icon_box_layout)
+
+            icon_lbl = QLabel(icon)
+            icon_lbl.setFont(QFont("Segoe UI", 16))
+            icon_lbl.setAlignment(Qt.AlignCenter)
+            icon_box_layout.addWidget(icon_lbl)
+
+            row_layout.addWidget(icon_box)
+
+            # Label
+            lbl = QLabel(label)
+            lbl.setFont(QFont("Segoe UI", 10))
+            lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            row_layout.addWidget(lbl)
+
+            row_layout.addStretch()
+
+            # Value
+            val_lbl = QLabel(value)
+            val_lbl.setFont(QFont("Segoe UI", 10))
+            val_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+            val_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            row_layout.addWidget(val_lbl)
+
+            sys_container.addWidget(row)
 
         return card
 
@@ -704,41 +843,53 @@ class OverviewPage(QWidget):
 
     def _create_storage_card(self):
         card = QFrame()
-        card.setMinimumHeight(260)
+        card.setMinimumHeight(200)
         card.setStyleSheet(card_stylesheet())
         layout = QVBoxLayout()
-        layout.setSpacing(10)
+        layout.setSpacing(12)
         card.setLayout(layout)
+
+        # Header
+        header = QHBoxLayout()
+        header.setSpacing(8)
+
+        icon_lbl = QLabel("💾")
+        icon_lbl.setFont(QFont("Segoe UI", 14))
+        header.addWidget(icon_lbl)
 
         title = QLabel("Storage")
         title.setFont(QFont("Segoe UI", 13, QFont.Bold))
         title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        layout.addWidget(title)
+        header.addWidget(title)
 
-        self._storage_container = QVBoxLayout()
-        self._storage_container.setSpacing(10)
-        layout.addLayout(self._storage_container)
+        header.addStretch()
 
         # View all button
-        btn = QPushButton("View all drives →")
-        btn.setFont(QFont("Segoe UI", 10))
-        btn.setFixedHeight(30)
+        btn = QPushButton("View all →")
+        btn.setFont(QFont("Segoe UI", 9))
+        btn.setFixedHeight(26)
         btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(lambda: self._show_all_drives())
         btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['bg_deeper']};
                 color: {COLORS['text_secondary']};
                 border: 1px solid {COLORS['border']};
-                border-radius: 6px;
-                padding: 4px 12px;
+                border-radius: 4px;
+                padding: 4px 10px;
             }}
             QPushButton:hover {{
-                background-color: #1e2936;
+                background-color: {COLORS['bg_hover']};
                 color: {COLORS['text_primary']};
                 border-color: {COLORS['accent_orange']};
             }}
         """)
-        layout.addWidget(btn)
+        header.addWidget(btn)
+        layout.addLayout(header)
+
+        self._storage_container = QVBoxLayout()
+        self._storage_container.setSpacing(8)
+        layout.addLayout(self._storage_container)
 
         self._update_storage()
 
@@ -760,31 +911,291 @@ class OverviewPage(QWidget):
             except PermissionError:
                 continue
 
+            # Get drive letter and label
+            drive_letter = partition.device
+            mountpoint = partition.mountpoint
+
+            # Try to get a friendly name
+            try:
+                import wmi
+                w = wmi.WMI()
+                for disk in w.Win32_LogicalDisk():
+                    if disk.DeviceID == drive_letter:
+                        vol_name = disk.VolumeName
+                        break
+                else:
+                    vol_name = ""
+            except:
+                vol_name = ""
+
+            # Calculate values
+            total_gb = usage.total / (1024**3)
+            used_gb = usage.used / (1024**3)
+            free_gb = usage.free / (1024**3)
+            pct = usage.percent
+
+            # Create storage row
             row = QFrame()
+            row.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_deeper']};
+                    border-radius: 8px;
+                    padding: 10px 12px;
+                }}
+            """)
             row_layout = QHBoxLayout()
-            row_layout.setSpacing(8)
-            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(12)
+            row_layout.setContentsMargins(4, 4, 4, 4)
             row.setLayout(row_layout)
 
-            # Drive label
-            name_lbl = QLabel(partition.device)
-            name_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
+            # Disk icon + drive letter
+            icon_col = QVBoxLayout()
+            icon_col.setSpacing(3)
+            icon_col.setAlignment(Qt.AlignCenter)
+            icon_label = DiskIcon(size=44)
+            icon_col.addWidget(icon_label)
+            drive_lbl = QLabel(drive_letter.replace("\\", ""))
+            drive_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
+            drive_lbl.setStyleSheet(f"color: {COLORS['accent_orange']};")
+            drive_lbl.setAlignment(Qt.AlignCenter)
+            icon_col.addWidget(drive_lbl)
+
+            row_layout.addLayout(icon_col)
+
+            # Drive info
+            info_box = QVBoxLayout()
+            info_box.setSpacing(2)
+
+            # Name/location
+            if vol_name:
+                name_text = f"{vol_name} ({mountpoint})"
+            else:
+                name_text = mountpoint if mountpoint else drive_letter
+
+            name_lbl = QLabel(name_text)
+            name_lbl.setFont(QFont("Segoe UI", 10, QFont.Bold))
             name_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
-            name_lbl.setFixedWidth(48)
-            row_layout.addWidget(name_lbl)
+            info_box.addWidget(name_lbl)
 
             # Progress bar
             bar = QProgressBar()
-            bar.setValue(int(usage.percent))
+            bar.setValue(int(pct))
+            bar.setFixedHeight(6)
+            bar.setTextVisible(False)
+            bar.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {COLORS['bg_card']};
+                    border: none;
+                    border-radius: 3px;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {self._get_storage_color(pct)};
+                    border-radius: 3px;
+                }}
+            """)
+            info_box.addWidget(bar)
+
+            row_layout.addLayout(info_box, stretch=1)
+
+            # Size info
+            size_box = QVBoxLayout()
+            size_box.setSpacing(0)
+            size_box.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+            used_lbl = QLabel(f"{used_gb:.0f} GB used")
+            used_lbl.setFont(QFont("Segoe UI", 9))
+            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            used_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            size_box.addWidget(used_lbl)
+
+            free_lbl = QLabel(f"{free_gb:.0f} GB free")
+            free_lbl.setFont(QFont("Segoe UI", 8))
+            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            free_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            size_box.addWidget(free_lbl)
+
+            row_layout.addLayout(size_box)
+
+            # Percentage badge
+            pct_box = QVBoxLayout()
+            pct_box.setSpacing(0)
+            pct_box.setAlignment(Qt.AlignCenter)
+
+            pct_lbl = QLabel(f"{pct:.0f}%")
+            pct_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
+            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)};")
+            pct_lbl.setAlignment(Qt.AlignCenter)
+            pct_box.addWidget(pct_lbl)
+
+            row_layout.addLayout(pct_box)
+
+            self._storage_container.addWidget(row)
+
+    def _get_storage_color(self, pct):
+        """Get color based on usage percentage"""
+        if pct > 90:
+            return COLORS['accent_red']
+        elif pct > 75:
+            return COLORS['accent_orange']
+        return COLORS['accent_green']
+
+    def _show_all_drives(self):
+        """Show all drives in a dialog"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QProgressBar, QPushButton
+
+        dialog = QDialog(self)
+        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        dialog.setMinimumSize(750, 450)
+        dialog.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS['bg_primary']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+
+        # Drag state
+        _drag_pos = None
+
+        def mousePressEvent(event):
+            if event.button() == Qt.LeftButton:
+                nonlocal _drag_pos
+                _drag_pos = event.globalPos() - dialog.frameGeometry().topLeft()
+                event.accept()
+
+        def mouseMoveEvent(event):
+            if event.buttons() == Qt.LeftButton and _drag_pos:
+                dialog.move(event.globalPos() - _drag_pos)
+                event.accept()
+
+        def mouseReleaseEvent(event):
+            if event.button() == Qt.LeftButton:
+                _drag_pos = None
+                event.accept()
+
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        dialog.setLayout(main_layout)
+
+        # Header with drag handle
+        header = QFrame()
+        header.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(20, 12, 12, 12)
+        header.setLayout(header_layout)
+        header.setCursor(Qt.SizeAllCursor)
+        header.mousePressEvent = mousePressEvent
+        header.mouseMoveEvent = mouseMoveEvent
+        header.mouseReleaseEvent = mouseReleaseEvent
+
+        title = QLabel("Storage Drives")
+        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        header_layout.addWidget(title)
+
+        header_layout.addStretch()
+
+        close_btn = QPushButton("×")
+        close_btn.setFont(QFont("Segoe UI", 16))
+        close_btn.setFixedSize(32, 32)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_muted']};
+                border: none;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_hover']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+        close_btn.clicked.connect(dialog.close)
+        header_layout.addWidget(close_btn)
+
+        main_layout.addWidget(header)
+
+        # Drives container
+        drives_container = QVBoxLayout()
+        drives_container.setSpacing(14)
+        main_layout.addLayout(drives_container)
+
+        for partition in psutil.disk_partitions():
+            if not partition.fstype:
+                continue
+            try:
+                usage = psutil.disk_usage(partition.mountpoint)
+            except PermissionError:
+                continue
+
+            drive_letter = partition.device
+            mountpoint = partition.mountpoint
+
+            try:
+                import wmi
+                w = wmi.WMI()
+                vol_name = ""
+                for disk in w.Win32_LogicalDisk():
+                    if disk.DeviceID == drive_letter:
+                        vol_name = disk.VolumeName or ""
+                        break
+            except:
+                vol_name = ""
+
+            total_gb = usage.total / (1024**3)
+            used_gb = usage.used / (1024**3)
+            free_gb = usage.free / (1024**3)
+            pct = usage.percent
+
+            # Drive card
+            drive_card = QFrame()
+            drive_card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_card']};
+                    border: 1px solid {COLORS['border']};
+                    border-radius: 12px;
+                    padding: 16px;
+                }}
+            """)
+            drive_layout = QHBoxLayout()
+            drive_layout.setSpacing(20)
+            drive_card.setLayout(drive_layout)
+
+            # Left icon + drive letter (no frame, just icon column)
+            icon_col = QVBoxLayout()
+            icon_col.setSpacing(3)
+            icon_col.setAlignment(Qt.AlignCenter)
+            disk_icon = DiskIcon(size=56)
+            icon_col.addWidget(disk_icon)
+            drive_lbl = QLabel(drive_letter.replace("\\", ""))
+            drive_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
+            drive_lbl.setStyleSheet(f"color: {COLORS['accent_orange']};")
+            drive_lbl.setAlignment(Qt.AlignCenter)
+            icon_col.addWidget(drive_lbl)
+
+            drive_layout.addLayout(icon_col)
+
+            # Center info
+            info_layout = QVBoxLayout()
+            info_layout.setSpacing(8)
+
+            # Drive name
+            if vol_name:
+                name_text = f"{vol_name} ({mountpoint})"
+            else:
+                name_text = mountpoint if mountpoint else drive_letter
+
+            name_lbl = QLabel(name_text)
+            name_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
+            name_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+            info_layout.addWidget(name_lbl)
+
+            # Progress bar
+            bar = QProgressBar()
+            bar.setValue(int(pct))
             bar.setFixedHeight(10)
             bar.setTextVisible(False)
-            # Color based on usage
-            if usage.percent > 90:
-                chunk_color = COLORS['accent_red']
-            elif usage.percent > 75:
-                chunk_color = COLORS['accent_orange']
-            else:
-                chunk_color = COLORS['accent_green']
             bar.setStyleSheet(f"""
                 QProgressBar {{
                     background-color: {COLORS['bg_deeper']};
@@ -792,20 +1203,90 @@ class OverviewPage(QWidget):
                     border-radius: 5px;
                 }}
                 QProgressBar::chunk {{
-                    background-color: {chunk_color};
+                    background-color: {self._get_storage_color(pct)};
                     border-radius: 5px;
                 }}
             """)
-            row_layout.addWidget(bar, stretch=1)
+            info_layout.addWidget(bar)
 
-            # Percent + size
-            pct_lbl = QLabel(f"{usage.percent:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", 10))
-            pct_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-            pct_lbl.setFixedWidth(38)
-            row_layout.addWidget(pct_lbl)
+            # Stats row
+            stats_row = QHBoxLayout()
+            stats_row.setSpacing(16)
 
-            self._storage_container.addWidget(row)
+            used_lbl = QLabel(f"{used_gb:.1f} GB used")
+            used_lbl.setFont(QFont("Segoe UI", 10))
+            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            stats_row.addWidget(used_lbl)
+
+            stats_row.addStretch()
+
+            free_lbl = QLabel(f"{free_gb:.1f} GB free")
+            free_lbl.setFont(QFont("Segoe UI", 10))
+            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            stats_row.addWidget(free_lbl)
+
+            total_lbl = QLabel(f"of {total_gb:.1f} GB total")
+            total_lbl.setFont(QFont("Segoe UI", 10))
+            total_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            stats_row.addWidget(total_lbl)
+
+            info_layout.addLayout(stats_row)
+
+            drive_layout.addLayout(info_layout, stretch=1)
+
+            # Right percentage badge
+            pct_box = QFrame()
+            pct_box.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['bg_deeper']};
+                    border-radius: 10px;
+                    padding: 12px 16px;
+                }}
+            """)
+            pct_box_layout = QVBoxLayout()
+            pct_box_layout.setSpacing(2)
+            pct_box_layout.setContentsMargins(8, 8, 8, 8)
+            pct_box_layout.setAlignment(Qt.AlignCenter)
+            pct_box.setLayout(pct_box_layout)
+
+            pct_lbl = QLabel(f"{pct:.0f}%")
+            pct_lbl.setFont(QFont("Segoe UI", 22, QFont.Bold))
+            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)};")
+            pct_lbl.setAlignment(Qt.AlignCenter)
+            pct_box_layout.addWidget(pct_lbl)
+
+            used_of = QLabel("used")
+            used_of.setFont(QFont("Segoe UI", 9))
+            used_of.setStyleSheet(f"color: {COLORS['text_muted']};")
+            used_of.setAlignment(Qt.AlignCenter)
+            pct_box_layout.addWidget(used_of)
+
+            drive_layout.addWidget(pct_box)
+
+            drives_container.addWidget(drive_card)
+
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.setFont(QFont("Segoe UI", 11))
+        close_btn.setFixedHeight(38)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['accent_blue']};
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 6px 28px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #2563eb;
+            }}
+        """)
+        close_btn.clicked.connect(dialog.close)
+        main_layout.addWidget(close_btn, 0, Qt.AlignRight)
+
+        dialog.exec_()
 
     # ── Alerts Card ──────────────────────────────────────────────────────────
 
