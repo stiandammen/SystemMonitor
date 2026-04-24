@@ -1368,25 +1368,11 @@ class OverviewPage(QWidget):
         btn_layout.addWidget(refresh_btn)
         btn_layout.addWidget(close_btn)
 
-        # Size grip layout row with visible resize indicator
-        grip_row = QHBoxLayout()
-        grip_row.setContentsMargins(0, 0, 6, 6)
-        grip_row.addStretch()
-
-        resize_indicator = QLabel("⤡")
-        resize_indicator.setFont(QFont("Segoe UI", 12))
-        resize_indicator.setStyleSheet(f"color: {COLORS['text_muted']};")
-        resize_indicator.setToolTip("Drag to resize")
-        resize_indicator.setCursor(Qt.SizeBDiagCursor)
-        grip_row.addWidget(resize_indicator, 0, Qt.AlignRight | Qt.AlignBottom)
-
-        # Create a size grip for actual resizing
+        # Size grip for resizing
         size_grip = QSizeGrip(dialog)
         size_grip.setFixedSize(16, 16)
-        grip_row.addWidget(size_grip, 0, Qt.AlignRight | Qt.AlignBottom)
 
         main_layout.addLayout(btn_layout)
-        main_layout.addLayout(grip_row)
 
         dialog.exec_()
 
