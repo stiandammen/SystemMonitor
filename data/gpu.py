@@ -30,7 +30,29 @@ class GPUCollector:
         self._gpu_info: Optional[GPUInfo] = None
         self._gpu_device_ids: List[str] = []  # Track GPU device IDs for change detection
         self._gpu_vendor: Optional[str] = None  # Track current GPU vendor
+        # Cache for WMI/PowerShell results (avoids expensive subprocess calls)
+        self._wmi_cache: Dict[str, Any] = {}
+        self._wmi_cache_time: float = 0
+        self._wmi_cache_ttl: float = 10.0  # Cache WMI for 10 seconds
         self._init_backends()
+
+    def _get_wmi_command(self, key: str, command: str, force_refresh: bool = False) -> str:
+        """Get WMI command result with caching"""
+        import time
+        now = time.time()
+        if not force_refresh and key in self._wmi_cache and (now - self._wmi_cache_time) < self._wmi_cache_ttl:
+            return self._wmi_cache[key]
+        try:
+            result = subprocess.run(
+                ["powershell", "-Command", command],
+                capture_output=True, text=True, timeout=10
+            )
+            output = result.stdout
+            self._wmi_cache[key] = output
+            self._wmi_cache_time = now
+            return output
+        except:
+            return self._wmi_cache.get(key, "")
 
     def _init_backends(self):
         """Initialize GPU backends - tries NVIDIA, AMD, then GPUtil"""
@@ -134,13 +156,12 @@ class GPUCollector:
         ids = []
         try:
             if platform.system() == "Windows":
-                # Use PowerShell to get AMD GPU device IDs (VEN_1002 = AMD)
-                result = subprocess.run(
-                    ["powershell", "-Command",
-                     "Get-CimInstance Win32_VideoController | Where-Object { $_.PNPDeviceID -match 'VEN_1002' } | Select-Object -ExpandProperty PNPDeviceID"],
-                    capture_output=True, text=True, timeout=10
+                # Use PowerShell to get AMD GPU device IDs (VEN_1002 = AMD) - cached
+                output = self._get_wmi_command(
+                    "adl_device_ids",
+                    "Get-CimInstance Win32_VideoController | Where-Object { $_.PNPDeviceID -match 'VEN_1002' } | Select-Object -ExpandProperty PNPDeviceID"
                 )
-                for line in result.stdout.strip().split("\n"):
+                for line in output.strip().split("\n"):
                     if line.strip():
                         ids.append(line.strip())
         except:
@@ -151,12 +172,11 @@ class GPUCollector:
         """Detect AMD GPU info via ADL or WMI"""
         try:
             if platform.system() == "Windows":
-                result = subprocess.run(
-                    ["powershell", "-Command",
-                     "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | ConvertTo-Csv -NoTypeInformation"],
-                    capture_output=True, text=True, timeout=10
+                output = self._get_wmi_command(
+                    "adl_detect",
+                    "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | ConvertTo-Csv -NoTypeInformation"
                 )
-                lines = [l.strip() for l in result.stdout.strip().split("\n") if l.strip()]
+                lines = [l.strip() for l in output.strip().split("\n") if l.strip()]
                 for line in lines[1:]:  # Skip header
                     parts = line.replace('"', '').split(",")
                     if len(parts) >= 3:
@@ -203,13 +223,12 @@ class GPUCollector:
             if platform.system() != "Windows":
                 return False
 
-            result = subprocess.run(
-                ["powershell", "-Command",
-                 "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | ConvertTo-Csv -NoTypeInformation"],
-                capture_output=True, text=True, timeout=10
+            output = self._get_wmi_command(
+                "wmi_basic",
+                "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | ConvertTo-Csv -NoTypeInformation"
             )
 
-            lines = [l.strip().replace('"', '') for l in result.stdout.strip().split("\n") if l.strip()]
+            lines = [l.strip().replace('"', '') for l in output.strip().split("\n") if l.strip()]
             for line in lines[1:]:  # Skip header
                 parts = line.split(",")
                 if len(parts) >= 2:
@@ -464,12 +483,11 @@ class GPUCollector:
     def _collect_wmi(self) -> Dict[str, Any]:
         """Collect basic GPU info via WMI"""
         try:
-            result = subprocess.run(
-                ["powershell", "-Command",
-                 "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM | ConvertTo-Csv -NoTypeInformation"],
-                capture_output=True, text=True, timeout=10
+            output = self._get_wmi_command(
+                "wmi_collect",
+                "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM | ConvertTo-Csv -NoTypeInformation"
             )
-            lines = [l.strip().replace('"', '') for l in result.stdout.strip().split("\n") if l.strip()]
+            lines = [l.strip().replace('"', '') for l in output.strip().split("\n") if l.strip()]
             for line in lines[1:]:  # Skip header
                 parts = line.split(",")
                 if len(parts) >= 2:

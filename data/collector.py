@@ -37,12 +37,21 @@ class DataCollector(QThread):
         """Collect all system data"""
         import psutil
 
-        # CPU
-        self._data['cpu'] = {
-            'percent': psutil.cpu_percent(interval=0.1),
-            'per_core': psutil.cpu_percent(percpu=True),
-            'count': psutil.cpu_count(),
-        }
+        # CPU - use non-blocking version (interval=None uses cached value since last call)
+        # For the first call, we need a short interval for accuracy
+        if not hasattr(self, '_cpu_initialized'):
+            self._data['cpu'] = {
+                'percent': psutil.cpu_percent(interval=0.1),
+                'per_core': psutil.cpu_percent(percpu=True),
+                'count': psutil.cpu_count(),
+            }
+            self._cpu_initialized = True
+        else:
+            self._data['cpu'] = {
+                'percent': psutil.cpu_percent(interval=None),
+                'per_core': psutil.cpu_percent(percpu=True, interval=None),
+                'count': psutil.cpu_count(),
+            }
 
         # Memory
         mem = psutil.virtual_memory()

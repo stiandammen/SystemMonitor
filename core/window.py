@@ -12,6 +12,7 @@ from PyQt5.QtGui import QFont, QMouseEvent
 COLORS = {
     'bg_primary': '#0a0e14',
     'bg_card': '#161f2a',
+    'bg_hover': '#1e2936',
     'text_primary': '#f0f4f8',
     'text_muted': '#64748b',
     'border': '#2a3441',
@@ -236,47 +237,84 @@ class MainWindow(QMainWindow):
     def _create_sidebar(self):
         """Create sidebar navigation"""
         sidebar = QFrame()
-        sidebar.setFixedWidth(200)
+        sidebar.setFixedWidth(220)
         sidebar.setStyleSheet(f"background-color: {COLORS['bg_primary']};")
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 20, 12, 12)
+        layout.setSpacing(6)
         sidebar.setLayout(layout)
 
         # Title
-        title = QLabel("⚙ SYSTEM MONITOR")
-        font = QFont("Segoe UI", 14)
-        font.setBold(True)
+        title = QLabel("⚙ System Monitor")
+        font = QFont("Segoe UI", 15, QFont.Bold)
         title.setFont(font)
         title.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(title)
 
-        layout.addSpacing(20)
+        layout.addSpacing(24)
 
-        # Navigation buttons
-        views = ["Overview", "CPU", "GPU", "Network", "Memory", "Disks", "Processes", "Settings"]
-        for view_name in views:
-            btn = QPushButton(view_name)
-            btn.setMinimumHeight(40)
+        # Navigation buttons with icons
+        nav_items = [
+            ("Overview", "◉", "overview"),
+            ("CPU", "◇", "cpu"),
+            ("GPU", "◈", "gpu"),
+            ("Network", "⬡", "network"),
+            ("Memory", "◐", "memory"),
+            ("Disks", "⬟", "disks"),
+            ("Processes", "◎", "processes"),
+        ]
+
+        for view_name, icon, view_key in nav_items:
+            btn = QPushButton(f"  {icon}  {view_name}")
+            btn.setMinimumHeight(44)
+            btn.setFont(QFont("Segoe UI", 11))
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: transparent;
                     color: {COLORS['text_primary']};
                     border: none;
-                    border-radius: 6px;
+                    border-radius: 10px;
                     text-align: left;
-                    padding-left: 12px;
+                    padding-left: 14px;
                     font-weight: 500;
                 }}
                 QPushButton:hover {{
+                    background-color: {COLORS['bg_hover']};
+                }}
+                QPushButton:pressed {{
                     background-color: {COLORS['border']};
                 }}
             """)
-            btn.clicked.connect(lambda checked, name=view_name.lower(): self._switch_view(name))
+            btn.clicked.connect(lambda checked, key=view_key: self._switch_view(key))
             layout.addWidget(btn)
 
         layout.addStretch()
+
+        # Settings button at bottom with distinct style
+        settings_btn = QPushButton("  ⚙  Settings")
+        settings_btn.setMinimumHeight(44)
+        settings_btn.setFont(QFont("Segoe UI", 11))
+        settings_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_card']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+                text-align: left;
+                padding-left: 14px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_hover']};
+                border-color: {COLORS['accent_blue']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['border']};
+            }}
+        """)
+        settings_btn.clicked.connect(lambda checked: self._switch_view("settings"))
+        layout.addWidget(settings_btn)
 
         return sidebar
 

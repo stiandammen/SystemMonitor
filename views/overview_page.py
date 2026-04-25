@@ -175,6 +175,11 @@ class OverviewPage(QWidget):
         self._net_down_history = deque(maxlen=60)
         self._net_up_history = deque(maxlen=60)
 
+        # Cache for expensive WMI/system calls (cache for 30 seconds)
+        self._system_info_cache = {}
+        self._system_info_cache_time = 0
+        self._system_info_cache_ttl = 30
+
         self._setup_ui()
         self._start_timers()
 
@@ -302,25 +307,37 @@ class OverviewPage(QWidget):
         return cpu
 
     def _get_cpu_name(self):
-        """Get CPU name via WMI"""
+        """Get CPU name via WMI with caching"""
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'cpu_name' in self._system_info_cache:
+            return self._system_info_cache['cpu_name']
         try:
             import wmi
             w = wmi.WMI()
             for cpu in w.Win32_Processor():
+                self._system_info_cache['cpu_name'] = cpu.Name
+                self._system_info_cache_time = now
                 return cpu.Name
         except:
             return None
 
     def _short_gpu(self):
-        """Get GPU name"""
+        """Get GPU name with caching"""
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'gpu_name' in self._system_info_cache:
+            return self._system_info_cache['gpu_name']
         try:
             import GPUtil
             gpus = GPUtil.getGPUs()
             if gpus:
                 name = gpus[0].name
                 if len(name) > 28:
-                    return name[:28] + "..."
-                return name
+                    result = name[:28] + "..."
+                else:
+                    result = name
+                self._system_info_cache['gpu_name'] = result
+                self._system_info_cache_time = now
+                return result
         except:
             pass
         return "N/A"
@@ -796,21 +813,38 @@ class OverviewPage(QWidget):
         return card
 
     def _get_motherboard(self):
+        """Get motherboard with caching"""
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'motherboard' in self._system_info_cache:
+            return self._system_info_cache['motherboard']
         try:
             import wmi
             w = wmi.WMI()
-            return w.Win32_BaseBoard()[0].Product
+            result = w.Win32_BaseBoard()[0].Product
+            self._system_info_cache['motherboard'] = result
+            self._system_info_cache_time = now
+            return result
         except:
             return "Unknown"
 
     def _get_primary_disk(self):
+        """Get primary disk with caching"""
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'primary_disk' in self._system_info_cache:
+            return self._system_info_cache['primary_disk']
         try:
-            return psutil.disk_partitions()[0].device
+            result = psutil.disk_partitions()[0].device
+            self._system_info_cache['primary_disk'] = result
+            self._system_info_cache_time = now
+            return result
         except:
             return "Unknown"
 
     def _get_ram_info(self):
-        """Get RAM info: size and type"""
+        """Get RAM info: size and type with caching"""
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_info' in self._system_info_cache:
+            return self._system_info_cache['ram_info']
         try:
             import psutil
             mem = psutil.virtual_memory()
@@ -857,12 +891,35 @@ class OverviewPage(QWidget):
                 print(f"WMI RAM detection error: {e}")
 
             if ram_type != "Unknown":
-                return f"{total_gb} GB {ram_type}"
+                result = f"{total_gb} GB {ram_type}"
             else:
-                return f"{total_gb} GB"
+                result = f"{total_gb} GB"
+            self._system_info_cache['ram_info'] = result
+            self._system_info_cache_time = now
+            return result
         except Exception as e:
             print(f"RAM info error: {e}")
             return "Unknown"
+
+    def _get_ram_speed(self):
+        """Get live RAM speed via WMI with caching"""
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_speed' in self._system_info_cache:
+            return self._system_info_cache['ram_speed']
+        try:
+            import wmi
+            w = wmi.WMI()
+            for mem_obj in w.Win32_PhysicalMemory():
+                if hasattr(mem_obj, 'Speed') and mem_obj.Speed:
+                    speed = int(mem_obj.Speed)
+                    if speed > 0:
+                        result = f"{speed} MHz"
+                        self._system_info_cache['ram_speed'] = result
+                        self._system_info_cache_time = now
+                        return result
+            return "-- MHz"
+        except:
+            return "-- MHz"
 
     # ── Storage Card ─────────────────────────────────────────────────────────
 
@@ -1649,7 +1706,7 @@ class OverviewPage(QWidget):
             self._ram_card.gauge.set_value(pct)
             self._ram_card.sparkline.push(pct)
 
-            for i, val in enumerate([f"{psutil.virtual_memory().speed} MHz" if hasattr(psutil.virtual_memory(), 'speed') else "-- MHz", f"{used_gb:.1f} GB", f"{avail_gb:.1f} GB"]):
+            for i, val in enumerate([self._get_ram_speed(), f"{used_gb:.1f} GB", f"{avail_gb:.1f} GB"]):
                 self._ram_card.stats[i].setText(val)
 
             self._ram_history.append(used_gb)
