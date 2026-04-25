@@ -1694,6 +1694,31 @@ class OverviewPage(QWidget):
 
             self._last_net = (bytes_sent, bytes_recv)
 
+        # GPU
+        if 'gpu' in data:
+            gpu = data['gpu']
+            if gpu.get('available'):
+                load = gpu.get('load')
+                temp = gpu.get('temperature')
+                fan = gpu.get('fan_speed')
+                power = gpu.get('power')
+
+                # Update gauge with load percentage
+                if load is not None:
+                    self._gpu_card.gauge.set_value(load)
+                    self._gpu_card.sparkline.push(load)
+                    self._gpu_history.append(load)
+                    # Update GPU detail chart
+                    self._gpu_detail_chart.sparkline.push(load)
+
+                # Update stats: Temp, Fan, Power
+                temp_str = f"{temp:.0f} °C" if temp is not None else "-- °C"
+                fan_str = f"{fan} RPM" if fan is not None else "-- RPM"
+                power_str = f"{power:.0f} W" if power is not None else "-- W"
+
+                for i, val in enumerate([temp_str, fan_str, power_str]):
+                    self._gpu_card.stats[i].setText(val)
+
         # Alerts
         self._update_alerts()
 
