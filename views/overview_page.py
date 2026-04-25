@@ -234,7 +234,7 @@ class OverviewPage(QWidget):
     def _create_page_header(self):
         header = QFrame()
         header.setFixedHeight(80)
-        header.setStyleSheet(f"background-color: #111820; border: none;")
+        header.setStyleSheet(f"background-color: {COLORS['bg_primary']}; border: none;")
         layout = QHBoxLayout()
         layout.setContentsMargins(24, 0, 24, 0)
         header.setLayout(layout)
@@ -274,6 +274,10 @@ class OverviewPage(QWidget):
         # Store uptime label ref for timer updates
         self._uptime_val_label = info_layout.itemAt(0).widget().layout().itemAt(1).widget()
 
+        # Store CPU info label ref for timer updates
+        self._cpu_val_label = info_layout.itemAt(4).widget().layout().itemAt(1).widget()
+        self._gpu_val_label = info_layout.itemAt(6).widget().layout().itemAt(1).widget()
+
         layout.addLayout(info_layout)
 
         return header
@@ -287,13 +291,25 @@ class OverviewPage(QWidget):
 
     def _short_cpu(self):
         """Short CPU string"""
-        cpu = platform.processor()
+        cpu = self._get_cpu_name()
+        if not cpu:
+            cpu = platform.processor()
         if not cpu:
             return "Unknown"
-        # Shorten common long names
-        if len(cpu) > 30:
-            return cpu[:30] + "..."
+        # Shorten only very long names
+        if len(cpu) > 35:
+            return cpu[:35] + "..."
         return cpu
+
+    def _get_cpu_name(self):
+        """Get CPU name via WMI"""
+        try:
+            import wmi
+            w = wmi.WMI()
+            for cpu in w.Win32_Processor():
+                return cpu.Name
+        except:
+            return None
 
     def _short_gpu(self):
         """Get GPU name"""
@@ -323,7 +339,7 @@ class OverviewPage(QWidget):
         layout.addWidget(lbl)
 
         val = QLabel(value)
-        val.setFont(QFont("Segoe UI", 12))
+        val.setFont(QFont("Segoe UI", 10))
         val.setStyleSheet(f"color: {COLORS['text_primary']};")
         val.setWordWrap(False)
         layout.addWidget(val)
@@ -360,9 +376,18 @@ class OverviewPage(QWidget):
         self._storage_timer.timeout.connect(self._update_storage)
         self._storage_timer.start(5000)
 
+        self._system_info_timer = QTimer(self)
+        self._system_info_timer.timeout.connect(self._update_system_info)
+        self._system_info_timer.start(10000)
+
     def _update_uptime(self):
         self._uptime_seconds = int(time.time() - self._start_time)
         self._uptime_val_label.setText(self._format_uptime(self._uptime_seconds))
+
+    def _update_system_info(self):
+        """Update CPU and GPU info in header periodically"""
+        self._cpu_val_label.setText(self._short_cpu())
+        self._gpu_val_label.setText(self._short_gpu())
 
     # ─── Row 1: Resource Cards ───────────────────────────────────────────────
 
@@ -1440,8 +1465,8 @@ class OverviewPage(QWidget):
             alert_card.setStyleSheet(f"""
                 QFrame {{
                     background-color: {COLORS['bg_card']};
-                    border: 1px solid {COLORS['border']};
-                    border-radius: 12px;
+                    border: 1px solid {COLORS['accent_green']};
+                    border-radius: 10px;
                     padding: 16px;
                 }}
             """)
@@ -1536,9 +1561,9 @@ class OverviewPage(QWidget):
             item.setStyleSheet(f"""
                 QFrame {{
                     background-color: {COLORS['bg_deeper']};
-                    border-left: 3px solid {color};
-                    border-radius: 6px;
-                    padding: 8px 12px;
+                    border: 1px solid {COLORS['accent_green']};
+                    border-radius: 8px;
+                    padding: 10px 12px;
                 }}
             """)
             item_layout = QHBoxLayout()

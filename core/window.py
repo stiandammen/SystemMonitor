@@ -2,81 +2,284 @@
 Main Window - Application main window
 """
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QStackedWidget
 )
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtCore import Qt, QPoint, QEvent
 from PyQt5.QtGui import QFont, QMouseEvent
+
+
+COLORS = {
+    'bg_primary': '#0a0e14',
+    'bg_card': '#161f2a',
+    'text_primary': '#f0f4f8',
+    'text_muted': '#64748b',
+    'border': '#2a3441',
+    'accent_green': '#10b981',
+    'accent_red': '#ef4444',
+    'accent_blue': '#3b82f6',
+}
+
+
+class TitleBar(QWidget):
+    """Custom dark title bar with window controls"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._parent = parent
+        self._maximized = False
+        self._drag_position = None
+        self._setup_ui()
+
+    def _setup_ui(self):
+        """Setup title bar UI"""
+        self.setFixedHeight(40)
+        self.setStyleSheet(f"background-color: {COLORS['bg_primary']}; border: none;")
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setSpacing(8)
+        self.setLayout(layout)
+
+        # App title
+        title = QLabel("⚙ System Monitor")
+        title.setFont(QFont("Segoe UI", 11))
+        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        layout.addWidget(title)
+
+        layout.addStretch()
+
+        # Window control buttons
+        self._create_buttons(layout)
+
+    def _create_buttons(self, layout):
+        """Create minimize, maximize, close buttons"""
+        # Minimize button
+        min_btn = QPushButton()
+        min_btn.setFixedSize(40, 32)
+        min_btn.setCursor(Qt.PointingHandCursor)
+        min_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: none;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(59, 130, 246, 0.2);
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(59, 130, 246, 0.3);
+            }}
+        """)
+        min_btn.setText("─")
+        min_btn.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        min_btn.setStyleSheet(f"""
+            color: {COLORS['text_muted']};
+        """ + f"""
+            QPushButton:hover {{
+                color: {COLORS['accent_blue']};
+            }}
+        """)
+        min_btn.clicked.connect(self._minimize_window)
+        layout.addWidget(min_btn)
+
+        # Maximize/Restore button
+        self._max_btn = QPushButton()
+        self._max_btn.setFixedSize(40, 32)
+        self._max_btn.setCursor(Qt.PointingHandCursor)
+        self._max_btn.setText("□")
+        self._max_btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        self._max_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_muted']};
+                border: none;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(16, 185, 129, 0.2);
+                color: {COLORS['accent_green']};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(16, 185, 129, 0.3);
+            }}
+        """)
+        self._max_btn.clicked.connect(self._toggle_maximize)
+        layout.addWidget(self._max_btn)
+
+        # Close button
+        close_btn = QPushButton()
+        close_btn.setFixedSize(40, 32)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setText("✕")
+        close_btn.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_muted']};
+                border: none;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(239, 68, 68, 0.2);
+                color: {COLORS['accent_red']};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(239, 68, 68, 0.3);
+            }}
+        """)
+        close_btn.clicked.connect(self._close_window)
+        layout.addWidget(close_btn)
+
+    def _minimize_window(self):
+        if self._parent:
+            self._parent.showMinimized()
+
+    def _toggle_maximize(self):
+        if self._parent:
+            if self._maximized:
+                self._parent.showNormal()
+                self._max_btn.setText("□")
+                self._maximized = False
+            else:
+                self._parent.showMaximized()
+                self._max_btn.setText("❐")
+                self._maximized = True
+
+    def _close_window(self):
+        if self._parent:
+            self._parent.close()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_position = event.globalPos() - self._parent.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and self._drag_position:
+            if self._maximized:
+                # If maximized, restore first then move
+                self._parent.showNormal()
+                self._max_btn.setText("□")
+                self._maximized = False
+                self._drag_position = event.globalPos() - self._parent.frameGeometry().topLeft()
+            self._parent.move(event.globalPos() - self._drag_position)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_position = None
+            event.accept()
+
+    def changeEvent(self, event):
+        """Handle window state changes"""
+        if event.type() == QEvent.WindowStateChange:
+            if self._parent:
+                if self._parent.isMaximized():
+                    self._max_btn.setText("❐")
+                    self._maximized = True
+                else:
+                    self._max_btn.setText("□")
+                    self._maximized = False
+        super().changeEvent(event)
 
 
 class MainWindow(QMainWindow):
     """Main application window"""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._drag_position = None
         self._setup_ui()
-    
+
     def _setup_ui(self):
         """Setup window UI"""
+        # Frameless window for custom title bar
+        self.setWindowFlags(Qt.FramelessWindowHint)
+
         # Window properties
         self.setWindowTitle("System Monitor")
-        self.setGeometry(100, 100, 1400, 900)
-        self.setMinimumSize(1200, 800)
-        
+        self.setGeometry(100, 100, 2870, 1721)
+        self.setMinimumSize(1400, 900)
+
         # Central widget
         central = QWidget()
         self.setCentralWidget(central)
-        
-        # Main layout
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        central.setLayout(layout)
-        
+
+        # Main layout (vertical: title bar + content)
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        central.setLayout(main_layout)
+
+        # Custom title bar
+        self._title_bar = TitleBar(self)
+        main_layout.addWidget(self._title_bar)
+
+        # Content area layout (horizontal: sidebar + content)
+        content_layout = QHBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+        main_layout.addLayout(content_layout)
+
         # Sidebar
         self._sidebar = self._create_sidebar()
-        layout.addWidget(self._sidebar)
-        
+        content_layout.addWidget(self._sidebar)
+
         # Content area
         self._content = QStackedWidget()
-        layout.addWidget(self._content, stretch=1)
-        
+        content_layout.addWidget(self._content, stretch=1)
+
         # Create views
         self._create_views()
-    
+
     def _create_sidebar(self):
         """Create sidebar navigation"""
         sidebar = QFrame()
         sidebar.setFixedWidth(200)
-        sidebar.setStyleSheet("background-color: #111820;")
-        
+        sidebar.setStyleSheet(f"background-color: {COLORS['bg_primary']};")
+
         layout = QVBoxLayout()
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
         sidebar.setLayout(layout)
-        
+
         # Title
         title = QLabel("⚙ SYSTEM MONITOR")
         font = QFont("Segoe UI", 14)
         font.setBold(True)
         title.setFont(font)
+        title.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(title)
-        
+
         layout.addSpacing(20)
-        
+
         # Navigation buttons
         views = ["Overview", "CPU", "GPU", "Network", "Memory", "Disks", "Processes", "Settings"]
         for view_name in views:
             btn = QPushButton(view_name)
             btn.setMinimumHeight(40)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {COLORS['text_primary']};
+                    border: none;
+                    border-radius: 6px;
+                    text-align: left;
+                    padding-left: 12px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['border']};
+                }}
+            """)
             btn.clicked.connect(lambda checked, name=view_name.lower(): self._switch_view(name))
             layout.addWidget(btn)
-        
+
         layout.addStretch()
-        
+
         return sidebar
-    
+
     def _create_views(self):
         """Create all views"""
         from views.overview_page import OverviewPage
@@ -104,14 +307,32 @@ class MainWindow(QMainWindow):
 
         # Set initial view
         self._content.setCurrentWidget(self._views["overview"])
-    
+
     def _switch_view(self, view_name):
         """Switch to different view"""
         if view_name in self._views:
             self._content.setCurrentWidget(self._views[view_name])
-    
+
     def update_data(self, data):
         """Update all views with new data"""
         for view in self._views.values():
             if hasattr(view, 'update_data'):
                 view.update_data(data)
+
+    def mousePressEvent(self, event):
+        """Handle window drag from content area"""
+        if event.button() == Qt.LeftButton and event.globalY() < self._title_bar.height():
+            self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        """Handle window move from content area"""
+        if event.buttons() == Qt.LeftButton and self._drag_position:
+            self.move(event.globalPos() - self._drag_position)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release"""
+        if event.button() == Qt.LeftButton:
+            self._drag_position = None
+            event.accept()
