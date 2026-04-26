@@ -22,7 +22,7 @@ def c():
 
 
 class CpuGraphWidget(QWidget):
-    """Individual CPU core graph that adapts to container size"""
+    """Individual CPU core graph that adapts to container size - optimized with throttled repaints"""
 
     def __init__(self, core_index: int = 0, parent=None):
         super().__init__(parent)
@@ -30,9 +30,19 @@ class CpuGraphWidget(QWidget):
         self._history = []
         self._max_points = 50
         self._display_value = 0.0
+        self._pending_update = False
 
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setMinimumSize(100, 80)
+
+        # Throttle updates to ~30fps max
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._do_update)
+
+    def _do_update(self):
+        self._pending_update = False
+        self.update()
 
     def set_value(self, value: float):
         """Set current CPU value with smooth animation"""
@@ -42,7 +52,10 @@ class CpuGraphWidget(QWidget):
             self._history.append(value)
             if len(self._history) > self._max_points:
                 self._history.pop(0)
-        self.update()
+
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)  # ~30fps throttle
 
     def paintEvent(self, event):
         """Paint the graph"""

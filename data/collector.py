@@ -4,7 +4,24 @@ Data Collector - System data collection
 import time
 import platform
 import subprocess
+import sys
 from PyQt5.QtCore import QThread, pyqtSignal
+
+# Logging function that works in packaged app
+def _log(msg):
+    """Log message - works both in dev and packaged mode"""
+    if getattr(sys, 'frozen', False):
+        try:
+            import os
+            log_file = os.path.join(os.environ.get('TEMP', ''), 'SystemMonitor', 'collector.log')
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            with open(log_file, 'a') as f:
+                from datetime import datetime
+                f.write(f"[{datetime.now()}] {msg}\n")
+        except:
+            pass
+    else:
+        print(msg)
 
 
 class DataCollector(QThread):
@@ -20,6 +37,7 @@ class DataCollector(QThread):
         self._running = False
         self._data = {}
         self._gpu_collector = None
+        self._gpu_init_error = None
 
         # Track collection intervals
         self._last_process_update = 0
@@ -37,33 +55,55 @@ class DataCollector(QThread):
     def run(self):
         """Main collection loop"""
         self._running = True
+        _log("DataCollector.run() started")
 
-        # Initialize GPU collector once
-        from data.gpu import GPUCollector
-        self._gpu_collector = GPUCollector()
+        # Initialize GPU collector - with error handling
+        try:
+            from data.gpu import GPUCollector
+            self._gpu_collector = GPUCollector()
+            _log("GPUCollector initialized OK")
+        except Exception as e:
+            self._gpu_init_error = str(e)
+            _log(f"GPUCollector init error: {e}")
+            self._gpu_collector = None
 
         while self._running:
             try:
                 current_time = time.time()
                 self._collect_data()
-                self.data_ready.emit(self._data.copy())
-
-                # Heavy operations - only collect at intervals
                 if current_time - self._last_process_update >= self._process_interval:
-                    self._collect_processes()
+                    try:
+                        _log("Starting process collection...")
+                        self._collect_processes()
+                        _log("Process collection OK")
+                    except Exception as e:
+                        _log(f"Process collection failed: {e}")
                     self._last_process_update = current_time
 
                 if current_time - self._last_storage_update >= self._storage_interval:
-                    self._collect_storage()
+                    try:
+                        _log("Starting storage collection...")
+                        self._collect_storage()
+                        _log("Storage collection OK")
+                    except Exception as e:
+                        _log(f"Storage collection failed: {e}")
                     self._last_storage_update = current_time
 
                 if current_time - self._last_system_info_update >= self._system_info_interval:
-                    self._collect_system_info()
+                    try:
+                        _log("Starting system info collection...")
+                        self._collect_system_info()
+                        _log("System info collection OK")
+                    except Exception as e:
+                        _log(f"System info collection failed: {e}")
                     self._last_system_info_update = current_time
 
+                self.data_ready.emit(self._data.copy())
                 time.sleep(1)  # Update every second
             except Exception as e:
-                print(f"Data collection error: {e}")
+                _log(f"Data collection error: {e}")
+                import traceback
+                _log(f"Traceback: {traceback.format_exc()}")
                 time.sleep(1)
     
     def _collect_data(self):
@@ -148,7 +188,7 @@ class DataCollector(QThread):
             processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
             self.processes_updated.emit(processes[:100])  # Emit top 100
         except Exception as e:
-            print(f"Process collection error: {e}")
+            _log(f"Process collection error: {e}")
 
     def _collect_storage(self):
         """Collect storage info - runs in background thread"""
@@ -173,7 +213,7 @@ class DataCollector(QThread):
                     continue
             self.storage_updated.emit(partitions)
         except Exception as e:
-            print(f"Storage collection error: {e}")
+            _log(f"Storage collection error: {e}")
 
     def _collect_system_info(self):
         """Collect system info - runs in background thread"""
@@ -217,7 +257,7 @@ class DataCollector(QThread):
             self._system_info_cache_time = now
             self.system_info_updated.emit(info)
         except Exception as e:
-            print(f"System info collection error: {e}")
+            _log(f"System info collection error: {e}")
 
     def _get_cpu_name(self):
         """Get CPU name via WMI with caching"""

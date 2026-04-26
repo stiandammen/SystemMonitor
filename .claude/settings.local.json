@@ -3,7 +3,11 @@
     "allow": [
       "Bash(python -m py_compile data/gpu.py data/collector.py views/gpu.py)",
       "Bash(where python *)",
-      "Bash(/c/Users/RSman/AppData/Local/Python/bin/python.exe *)"
+      "Bash(/c/Users/RSman/AppData/Local/Python/bin/python.exe *)",
+      "Bash(/c/Users/RSman/AppData/Local/Programs/Python/Python312/python.exe *)",
+      "Bash(\"/c/Users/RSman/AppData/Local/Programs/Python/Python312/python.exe\" -m PyInstaller SystemMonitor.spec --clean)",
+      "Bash(powershell *)",
+      "Bash(py -m PyInstaller test_main.spec --noconfirm)"
     ]
   }
 }

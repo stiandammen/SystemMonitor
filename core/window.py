@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QFrame, QStackedWidget
 )
 from PyQt5.QtCore import Qt, QPoint, QEvent
-from PyQt5.QtGui import QFont, QMouseEvent
+from PyQt5.QtGui import QFont, QPainter, QPen, QColor
 
 
 COLORS = {
@@ -59,19 +59,6 @@ class TitleBar(QWidget):
         min_btn = QPushButton()
         min_btn.setFixedSize(40, 32)
         min_btn.setCursor(Qt.PointingHandCursor)
-        min_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                border: none;
-                border-radius: 6px;
-            }}
-            QPushButton:hover {{
-                background-color: rgba(59, 130, 246, 0.2);
-            }}
-            QPushButton:pressed {{
-                background-color: rgba(59, 130, 246, 0.3);
-            }}
-        """)
         min_btn.setText("─")
         min_btn.setFont(QFont("Segoe UI", 14, QFont.Bold))
         min_btn.setStyleSheet(f"""
@@ -167,7 +154,6 @@ class TitleBar(QWidget):
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.LeftButton and self._drag_position:
             if self._maximized:
-                # If maximized, restore first then move
                 self._parent.showNormal()
                 self._max_btn.setText("□")
                 self._maximized = False
@@ -181,7 +167,6 @@ class TitleBar(QWidget):
             event.accept()
 
     def changeEvent(self, event):
-        """Handle window state changes"""
         if event.type() == QEvent.WindowStateChange:
             if self._parent:
                 if self._parent.isMaximized():
@@ -191,6 +176,51 @@ class TitleBar(QWidget):
                     self._max_btn.setText("□")
                     self._maximized = False
         super().changeEvent(event)
+
+
+class ResizeCorner(QWidget):
+    """Custom resize grip in bottom-right corner"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._parent = parent
+        self.setFixedWidth(20)
+        self.setMinimumHeight(20)
+        self._resize_dir = None
+        self._start_geometry = None
+        self._start_pos = None
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        # Draw diagonal lines to indicate resize area
+        painter.setPen(QPen(QColor(COLORS['border']), 1))
+        h = self.height()
+        w = self.width()
+        for i in range(3):
+            painter.drawLine(w - 6 - i * 5, h, w, h - 6 - i * 5)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._resize_dir = 'bottom_right'
+            self._start_geometry = self._parent.geometry()
+            self._start_pos = event.globalPos()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and self._start_geometry:
+            delta = event.globalPos() - self._start_pos
+            new_width = max(self._parent.minimumWidth(), self._start_geometry.width() + delta.x())
+            new_height = max(self._parent.minimumHeight(), self._start_geometry.height() + delta.y())
+            self._parent.resize(int(new_width), int(new_height))
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._resize_dir = None
+            self._start_geometry = None
+            self._start_pos = None
+            event.accept()
 
 
 class MainWindow(QMainWindow):
@@ -203,29 +233,27 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self):
         """Setup window UI"""
-        # Frameless window for custom title bar
         self.setWindowFlags(Qt.FramelessWindowHint)
 
-        # Window properties
         self.setWindowTitle("System Monitor")
-        self.setGeometry(100, 100, 2870, 1721)
-        self.setMinimumSize(1400, 900)
+        self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(900, 600)
 
         # Central widget
         central = QWidget()
         self.setCentralWidget(central)
 
-        # Main layout (vertical: title bar + content)
+        # Main layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         central.setLayout(main_layout)
 
-        # Custom title bar
+        # Title bar
         self._title_bar = TitleBar(self)
         main_layout.addWidget(self._title_bar)
 
-        # Content area layout (horizontal: sidebar + content)
+        # Content area
         content_layout = QHBoxLayout()
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
@@ -235,12 +263,21 @@ class MainWindow(QMainWindow):
         self._sidebar = self._create_sidebar()
         content_layout.addWidget(self._sidebar)
 
-        # Content area
+        # Content
         self._content = QStackedWidget()
         content_layout.addWidget(self._content, stretch=1)
 
         # Create views
         self._create_views()
+
+        # Resize corner in bottom-right
+        self._resize_corner = ResizeCorner(self)
+        self._update_resize_corner_position()
+
+    def _update_resize_corner_position(self):
+        """Position the resize corner widget"""
+        if hasattr(self, '_resize_corner'):
+            self._resize_corner.move(self.width() - 20, self.height() - 20)
 
     def _create_sidebar(self):
         """Create sidebar navigation"""
@@ -253,7 +290,6 @@ class MainWindow(QMainWindow):
         layout.setSpacing(6)
         sidebar.setLayout(layout)
 
-        # Title
         title = QLabel("⚙ System Monitor")
         font = QFont("Segoe UI", 15, QFont.Bold)
         title.setFont(font)
@@ -262,7 +298,6 @@ class MainWindow(QMainWindow):
 
         layout.addSpacing(24)
 
-        # Navigation buttons with icons
         nav_items = [
             ("Overview", "◉", "overview"),
             ("CPU", "◇", "cpu"),
@@ -299,7 +334,6 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
-        # Settings button at bottom with distinct style
         settings_btn = QPushButton("  ⚙  Settings")
         settings_btn.setMinimumHeight(44)
         settings_btn.setFont(QFont("Segoe UI", 11))
@@ -351,7 +385,6 @@ class MainWindow(QMainWindow):
         for name, view in self._views.items():
             self._content.addWidget(view)
 
-        # Set initial view
         self._content.setCurrentWidget(self._views["overview"])
 
     def _switch_view(self, view_name):
@@ -382,3 +415,8 @@ class MainWindow(QMainWindow):
         if event.button() == Qt.LeftButton:
             self._drag_position = None
             event.accept()
+
+    def resizeEvent(self, event):
+        """Update resize corner position when window is resized"""
+        super().resizeEvent(event)
+        self._update_resize_corner_position()

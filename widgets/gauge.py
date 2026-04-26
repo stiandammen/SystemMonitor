@@ -3,7 +3,7 @@ Gauge Widget - Circular progress indicator
 """
 from PyQt5.QtWidgets import QFrame
 from PyQt5.QtGui import QPainter, QBrush, QColor, QFont, QPen, QConicalGradient
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, QTimer
 
 from styles.theme import theme_manager
 from config import FontConfig
@@ -13,9 +13,10 @@ class Gauge(QFrame):
     """
     Circular gauge widget with animated progress
     Supports color thresholds and glow effects
+    Optimized with throttled repaints.
     """
-    
-    def __init__(self, title: str = "", max_value: float = 100.0, 
+
+    def __init__(self, title: str = "", max_value: float = 100.0,
                  unit: str = "%", size: int = 140, parent=None):
         super().__init__(parent)
         self._title = title
@@ -24,10 +25,20 @@ class Gauge(QFrame):
         self._size = size
         self._value = 0.0
         self._target_value = 0.0
-        
+        self._pending_update = False
+
         self.setFixedSize(size, size)
         self._apply_theme()
-    
+
+        # Throttle updates to ~30fps max
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._do_update)
+
+    def _do_update(self):
+        self._pending_update = False
+        self.update()
+
     def _apply_theme(self):
         """Apply theme styles"""
         c = theme_manager.colors
@@ -37,18 +48,22 @@ class Gauge(QFrame):
                 border: none;
             }}
         """)
-    
+
     def set_value(self, value: float):
         """Update gauge value"""
         self._target_value = max(0.0, min(value, self._max_value))
         # Simple animation step
         self._value = self._value + (self._target_value - self._value) * 0.3
-        self.update()
-    
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
+
     def set_max_value(self, max_value: float):
         """Update maximum value"""
         self._max_value = max(max_value, 1.0)
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
     
     def paintEvent(self, event):
         """Paint the gauge"""

@@ -3,7 +3,7 @@ CoreGraphWidget - Per-core CPU usage graph widget
 """
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
-from PyQt5.QtCore import Qt, pyqtProperty, QRectF
+from PyQt5.QtCore import Qt, pyqtProperty, QRectF, QTimer
 from typing import List
 import math
 
@@ -13,6 +13,7 @@ from styles.theme import theme_manager
 class CoreGraphWidget(QWidget):
     """
     Animated CPU core usage graph with smooth gradient fill
+    Optimized with throttled repaints.
     """
 
     def __init__(self, core_index: int = 0, parent=None):
@@ -23,6 +24,7 @@ class CoreGraphWidget(QWidget):
         self._current_value = 0.0
         self._animation_progress = 1.0
         self._target_value = 0.0
+        self._pending_update = False
 
         # Graph appearance
         self._line_color = theme_manager.colors.ACCENT_BLUE
@@ -31,10 +33,21 @@ class CoreGraphWidget(QWidget):
         self.setMinimumSize(150, 100)
         self.setMaximumHeight(120)
 
+        # Throttle updates to ~30fps max
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._do_update)
+
+    def _do_update(self):
+        self._pending_update = False
+        self.update()
+
     def set_core_index(self, index: int):
         """Set core number"""
         self._core_index = index
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
 
     def add_data_point(self, value: float):
         """Add a new data point with animation"""
@@ -45,7 +58,9 @@ class CoreGraphWidget(QWidget):
         if len(self._history) > self._max_points:
             self._history.pop(0)
 
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
 
     def set_value(self, value: float):
         """Set current CPU value"""
@@ -56,12 +71,16 @@ class CoreGraphWidget(QWidget):
             self._history.append(value)
             if len(self._history) > self._max_points:
                 self._history.pop(0)
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
 
     def clear_history(self):
         """Clear graph history"""
         self._history = []
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
 
     def paintEvent(self, event):
         """Paint the graph"""

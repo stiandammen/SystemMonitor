@@ -3,7 +3,7 @@ Graph Widget - Line/area charts for time-series data
 """
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, QTimer
 from typing import List, Tuple, Optional
 
 from styles.theme import theme_manager
@@ -13,8 +13,9 @@ class Graph(QWidget):
     """
     Time-series graph widget with line and area modes
     Supports multiple series and automatic scaling
+    Optimized with throttled repaints.
     """
-    
+
     def __init__(self, height: int = 160, fill: bool = True, parent=None):
         super().__init__(parent)
         self._height = height
@@ -22,24 +23,40 @@ class Graph(QWidget):
         self._data: List[Tuple[float, float]] = []
         self._color: str = theme_manager.colors.ACCENT_GREEN
         self._max_value: Optional[float] = None
-        
+        self._pending_update = False
+
         self.setFixedHeight(height)
         self.setMinimumWidth(200)
-    
+
+        # Throttle updates to ~30fps max
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._do_update)
+
+    def _do_update(self):
+        self._pending_update = False
+        self.update()
+
     def set_data(self, data: List[Tuple[float, float]]):
         """Set graph data as list of (timestamp, value) tuples"""
         self._data = data
-        self.update()
-    
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
+
     def set_color(self, color: str):
         """Set graph line color"""
         self._color = color
-        self.update()
-    
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
+
     def set_max_value(self, max_value: float):
         """Set fixed max value (auto-scale if None)"""
         self._max_value = max_value
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)
     
     def paintEvent(self, event):
         """Paint the graph"""

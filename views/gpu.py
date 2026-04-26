@@ -4,7 +4,7 @@ Modern glassmorphism design with responsive layout
 """
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QGridLayout, QGraphicsDropShadowEffect
+    QFrame, QGridLayout
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
@@ -34,7 +34,7 @@ COLORS = {
 
 
 class GlassCard(QFrame):
-    """Glass-effect card with shadow"""
+    """Glass-effect card - optimized without shadow for better performance"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_StyledBackground, True)
@@ -45,16 +45,11 @@ class GlassCard(QFrame):
                 border-radius: 12px;
             }}
         """)
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(15)
-        shadow.setColor(QColor(0, 0, 0, 30))
-        shadow.setOffset(0, 2)
-        self.setGraphicsEffect(shadow)
 
 
 class GPUGauge(QFrame):
     """
-    Circular gauge with glow effect, responsive sizing
+    Circular gauge with glow effect - optimized with throttled repaints
     """
     def __init__(self, title: str = "", unit: str = "%",
                  min_val: float = 0.0, max_val: float = 100.0,
@@ -70,14 +65,26 @@ class GPUGauge(QFrame):
         self._size = size
         self._display_value = 0.0
         self._target_value = 0.0
+        self._pending_update = False
 
         self.setFixedSize(size, size)
         self.setStyleSheet("background-color: transparent; border: none;")
 
-    def set_value(self, value: float):
-        """Update gauge value"""
-        self._target_value = max(self._min_val, min(value, self._max_val))
+        # Throttle updates to ~30fps max
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._do_update)
+
+    def _do_update(self):
+        self._pending_update = False
         self.update()
+
+    def set_value(self, value: float):
+        """Update gauge value with throttling"""
+        self._target_value = max(self._min_val, min(value, self._max_val))
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)  # ~30fps throttle
 
     def set_max_value(self, max_val: float):
         self._max_val = max_val
@@ -192,13 +199,23 @@ class StatTile(QFrame):
 
 
 class RealtimeGraph(QWidget):
-    """Real-time line graph with gradient fill"""
+    """Real-time line graph with gradient fill - optimized with throttled updates"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self._load_data = []
         self._temp_data = []
         self._max_points = 60
+        self._pending_update = False
         self.setMinimumHeight(160)
+
+        # Throttle updates to ~30fps max
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._do_update)
+
+    def _do_update(self):
+        self._pending_update = False
+        self.update()
 
     def update_chart(self, load: float, temp: float):
         self._load_data.append(load)
@@ -206,7 +223,9 @@ class RealtimeGraph(QWidget):
         if len(self._load_data) > self._max_points:
             self._load_data.pop(0)
             self._temp_data.pop(0)
-        self.update()
+        if not self._pending_update:
+            self._pending_update = True
+            self._update_timer.start(33)  # ~30fps throttle
 
     def paintEvent(self, event):
         painter = QPainter(self)
