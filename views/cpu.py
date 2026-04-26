@@ -175,8 +175,15 @@ class CPUView(QWidget):
         self._cpu_info = {}
         self._boot_time = None
         self._logical_count = 1
+        self._data_collector = None
         self._setup_ui()
         self._load_cpu_info()
+
+    def set_data_collector(self, collector):
+        """Set data collector and connect signals"""
+        self._data_collector = collector
+        if collector:
+            collector.data_ready.connect(self._on_data_ready)
         self._start_update_timer()
 
     def _setup_ui(self):
@@ -495,17 +502,29 @@ class CPUView(QWidget):
     def _start_update_timer(self):
         """Start the real-time update timer"""
         self._update_timer = QTimer(self)
-        self._update_timer.timeout.connect(self._update_data)
-        self._update_timer.start(500)  # Update every 500ms
+        self._update_timer.timeout.connect(self._update_display)
+        self._update_timer.start(500)  # Update display every 500ms
 
         # Initial update
-        self._update_data()
+        self._update_display()
 
-    def _update_data(self):
-        """Collect and display CPU data"""
+    def _on_data_ready(self, data):
+        """Handle data from background thread"""
+        if 'cpu' in data:
+            cpu = data['cpu']
+            self._per_core = cpu.get('per_core', [])
+            self._total_usage = cpu.get('percent', 0)
+
+    def _update_display(self):
+        """Update display with cached CPU data"""
         try:
-            per_core = psutil.cpu_percent(interval=None, percpu=True)
-            total_usage = psutil.cpu_percent(interval=None)
+            # Use cached data from collector if available
+            per_core = getattr(self, '_per_core', None)
+            total_usage = getattr(self, '_total_usage', None)
+
+            if per_core is None or total_usage is None:
+                per_core = psutil.cpu_percent(interval=None, percpu=True)
+                total_usage = psutil.cpu_percent(interval=None)
 
             colors = c()
 

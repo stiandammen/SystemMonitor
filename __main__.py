@@ -30,9 +30,17 @@ def main():
     from data.collector import DataCollector
     collector = DataCollector()
     collector.start()
-    
+
     # Connect data updates to window
     collector.data_ready.connect(window.update_data)
+
+    # Connect heavy operation signals to views
+    from views.overview_page import OverviewPage
+    from views.cpu import CPUView
+    if isinstance(window._views["overview"], OverviewPage):
+        window._views["overview"].set_data_collector(collector)
+    if isinstance(window._views["cpu"], CPUView):
+        window._views["cpu"].set_data_collector(collector)
     
     # Run application
     try:

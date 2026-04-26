@@ -175,13 +175,25 @@ class OverviewPage(QWidget):
         self._net_down_history = deque(maxlen=60)
         self._net_up_history = deque(maxlen=60)
 
-        # Cache for expensive WMI/system calls (cache for 30 seconds)
+        # Cached data from background thread
+        self._processes_cache = []
+        self._storage_cache = []
         self._system_info_cache = {}
+
+        # Cache for system info methods (used during initial UI setup)
         self._system_info_cache_time = 0
         self._system_info_cache_ttl = 30
 
         self._setup_ui()
         self._start_timers()
+
+    def set_data_collector(self, collector):
+        """Set data collector and connect signals"""
+        self._data_collector = collector
+        if collector:
+            collector.processes_updated.connect(self._on_processes_updated)
+            collector.storage_updated.connect(self._on_storage_updated)
+            collector.system_info_updated.connect(self._on_system_info_updated)
 
     def _setup_ui(self):
         """Setup main layout"""
@@ -385,26 +397,26 @@ class OverviewPage(QWidget):
         self._uptime_timer.timeout.connect(self._update_uptime)
         self._uptime_timer.start(1000)
 
-        self._process_timer = QTimer(self)
-        self._process_timer.timeout.connect(self._refresh_processes)
-        self._process_timer.start(3000)
+    def _on_processes_updated(self, processes):
+        """Handle processes updated from background thread"""
+        self._processes_cache = processes
+        self._update_process_table(processes)
 
-        self._storage_timer = QTimer(self)
-        self._storage_timer.timeout.connect(self._update_storage)
-        self._storage_timer.start(5000)
+    def _on_storage_updated(self, partitions):
+        """Handle storage updated from background thread"""
+        self._storage_cache = partitions
+        self._update_storage_display(partitions)
 
-        self._system_info_timer = QTimer(self)
-        self._system_info_timer.timeout.connect(self._update_system_info)
-        self._system_info_timer.start(10000)
+    def _on_system_info_updated(self, info):
+        """Handle system info updated from background thread"""
+        self._system_info_cache = info
+        cpu_name = info.get('cpu_name', 'Unknown')
+        self._cpu_val_label.setText(cpu_name[:35] + '...' if len(cpu_name) > 35 else cpu_name)
+        self._gpu_val_label.setText(info.get('gpu_name', 'N/A'))
 
     def _update_uptime(self):
         self._uptime_seconds = int(time.time() - self._start_time)
         self._uptime_val_label.setText(self._format_uptime(self._uptime_seconds))
-
-    def _update_system_info(self):
-        """Update CPU and GPU info in header periodically"""
-        self._cpu_val_label.setText(self._short_cpu())
-        self._gpu_val_label.setText(self._short_gpu())
 
     # ─── Row 1: Resource Cards ───────────────────────────────────────────────
 
@@ -973,48 +985,32 @@ class OverviewPage(QWidget):
         self._storage_container.setSpacing(8)
         layout.addLayout(self._storage_container)
 
-        self._update_storage()
+        # Initial storage display - will be populated when signal arrives
+        # If no data yet, show placeholder
+        self._update_storage_display([])
 
         return card
 
-    def _update_storage(self):
-        """Repopulate storage card with current partitions"""
+    def _update_storage_display(self, partitions):
+        """Repopulate storage card with partitions data from background thread"""
         # Clear existing
         while self._storage_container.count():
             item = self._storage_container.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        for partition in psutil.disk_partitions():
-            if not partition.fstype:
-                continue
-            try:
-                usage = psutil.disk_usage(partition.mountpoint)
-            except PermissionError:
+        for partition in partitions:
+            if not partition.get('fstype'):
                 continue
 
-            # Get drive letter and label
-            drive_letter = partition.device
-            mountpoint = partition.mountpoint
+            drive_letter = partition.get('device', '')
+            mountpoint = partition.get('mountpoint', '')
 
-            # Try to get a friendly name
-            try:
-                import wmi
-                w = wmi.WMI()
-                for disk in w.Win32_LogicalDisk():
-                    if disk.DeviceID == drive_letter:
-                        vol_name = disk.VolumeName
-                        break
-                else:
-                    vol_name = ""
-            except:
-                vol_name = ""
-
-            # Calculate values
-            total_gb = usage.total / (1024**3)
-            used_gb = usage.used / (1024**3)
-            free_gb = usage.free / (1024**3)
-            pct = usage.percent
+            # Calculate values from cached data
+            total_gb = partition.get('total', 0) / (1024**3)
+            used_gb = partition.get('used', 0) / (1024**3)
+            free_gb = partition.get('free', 0) / (1024**3)
+            pct = partition.get('percent', 0)
 
             # Create storage row
             row = QFrame()
@@ -1049,10 +1045,7 @@ class OverviewPage(QWidget):
             info_box.setSpacing(2)
 
             # Name/location
-            if vol_name:
-                name_text = f"{vol_name} ({mountpoint})"
-            else:
-                name_text = mountpoint if mountpoint else drive_letter
+            name_text = mountpoint if mountpoint else drive_letter
 
             name_lbl = QLabel(name_text)
             name_lbl.setFont(QFont("Segoe UI", 10, QFont.Bold))
@@ -1810,19 +1803,9 @@ class OverviewPage(QWidget):
 
     # ─── Process Refresh ───────────────────────────────────────────────────────
 
-    def _refresh_processes(self):
-        """Refresh process table every 3 seconds"""
+    def _update_process_table(self, processes):
+        """Update process table with data from background thread"""
         try:
-            processes = []
-            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
-                try:
-                    if proc.is_running():
-                        processes.append(proc.info)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-
-            processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
-
             text_color = QColor(COLORS['text_primary'])
 
             for i in range(6):
@@ -1861,7 +1844,7 @@ class OverviewPage(QWidget):
                         item.setForeground(text_color)
                         self._process_table.setItem(i, col, item)
         except Exception as e:
-            print(f"Process refresh error: {e}")
+            print(f"Process table update error: {e}")
 
     def _show_all_processes(self):
         """Show dialog with all running processes"""

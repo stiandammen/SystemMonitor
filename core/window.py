@@ -75,10 +75,18 @@ class TitleBar(QWidget):
         min_btn.setText("─")
         min_btn.setFont(QFont("Segoe UI", 14, QFont.Bold))
         min_btn.setStyleSheet(f"""
-            color: {COLORS['text_muted']};
-        """ + f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_muted']};
+                border: none;
+                border-radius: 6px;
+            }}
             QPushButton:hover {{
+                background-color: rgba(59, 130, 246, 0.2);
                 color: {COLORS['accent_blue']};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(59, 130, 246, 0.3);
             }}
         """)
         min_btn.clicked.connect(self._minimize_window)

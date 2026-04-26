@@ -2,6 +2,8 @@
 Data Collector - System data collection
 """
 import time
+import platform
+import subprocess
 from PyQt5.QtCore import QThread, pyqtSignal
 
 
@@ -9,12 +11,28 @@ class DataCollector(QThread):
     """Collects system data in background thread"""
 
     data_ready = pyqtSignal(dict)
+    processes_updated = pyqtSignal(list)
+    storage_updated = pyqtSignal(list)
+    system_info_updated = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._running = False
         self._data = {}
         self._gpu_collector = None
+
+        # Track collection intervals
+        self._last_process_update = 0
+        self._last_storage_update = 0
+        self._last_system_info_update = 0
+        self._process_interval = 3  # seconds
+        self._storage_interval = 5  # seconds
+        self._system_info_interval = 10  # seconds
+
+        # Caches for expensive calls
+        self._system_info_cache = {}
+        self._system_info_cache_time = 0
+        self._system_info_cache_ttl = 30
 
     def run(self):
         """Main collection loop"""
@@ -26,8 +44,23 @@ class DataCollector(QThread):
 
         while self._running:
             try:
+                current_time = time.time()
                 self._collect_data()
                 self.data_ready.emit(self._data.copy())
+
+                # Heavy operations - only collect at intervals
+                if current_time - self._last_process_update >= self._process_interval:
+                    self._collect_processes()
+                    self._last_process_update = current_time
+
+                if current_time - self._last_storage_update >= self._storage_interval:
+                    self._collect_storage()
+                    self._last_storage_update = current_time
+
+                if current_time - self._last_system_info_update >= self._system_info_interval:
+                    self._collect_system_info()
+                    self._last_system_info_update = current_time
+
                 time.sleep(1)  # Update every second
             except Exception as e:
                 print(f"Data collection error: {e}")
@@ -99,3 +132,168 @@ class DataCollector(QThread):
     def get_data(self):
         """Get current data"""
         return self._data.copy()
+
+    def _collect_processes(self):
+        """Collect process list - runs in background thread"""
+        import psutil
+        try:
+            processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
+                try:
+                    if proc.is_running():
+                        processes.append(proc.info)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
+            self.processes_updated.emit(processes[:100])  # Emit top 100
+        except Exception as e:
+            print(f"Process collection error: {e}")
+
+    def _collect_storage(self):
+        """Collect storage info - runs in background thread"""
+        import psutil
+        try:
+            partitions = []
+            for partition in psutil.disk_partitions():
+                if not partition.fstype:
+                    continue
+                try:
+                    usage = psutil.disk_usage(partition.mountpoint)
+                    partitions.append({
+                        'device': partition.device,
+                        'mountpoint': partition.mountpoint,
+                        'fstype': partition.fstype,
+                        'total': usage.total,
+                        'used': usage.used,
+                        'free': usage.free,
+                        'percent': usage.percent,
+                    })
+                except PermissionError:
+                    continue
+            self.storage_updated.emit(partitions)
+        except Exception as e:
+            print(f"Storage collection error: {e}")
+
+    def _collect_system_info(self):
+        """Collect system info - runs in background thread"""
+        import psutil
+        now = time.time()
+        info = {}
+
+        try:
+            # CPU name
+            if now - self._system_info_cache_time < self._system_info_cache_ttl and 'cpu_name' in self._system_info_cache:
+                info['cpu_name'] = self._system_info_cache['cpu_name']
+            else:
+                cpu_name = self._get_cpu_name()
+                self._system_info_cache['cpu_name'] = cpu_name
+                info['cpu_name'] = cpu_name
+
+            # GPU name
+            if now - self._system_info_cache_time < self._system_info_cache_ttl and 'gpu_name' in self._system_info_cache:
+                info['gpu_name'] = self._system_info_cache['gpu_name']
+            else:
+                gpu_name = self._get_gpu_name()
+                self._system_info_cache['gpu_name'] = gpu_name
+                info['gpu_name'] = gpu_name
+
+            # Motherboard
+            if now - self._system_info_cache_time < self._system_info_cache_ttl and 'motherboard' in self._system_info_cache:
+                info['motherboard'] = self._system_info_cache['motherboard']
+            else:
+                motherboard = self._get_motherboard()
+                self._system_info_cache['motherboard'] = motherboard
+                info['motherboard'] = motherboard
+
+            # RAM info
+            if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_info' in self._system_info_cache:
+                info['ram_info'] = self._system_info_cache['ram_info']
+            else:
+                ram_info = self._get_ram_info()
+                self._system_info_cache['ram_info'] = ram_info
+                info['ram_info'] = ram_info
+
+            self._system_info_cache_time = now
+            self.system_info_updated.emit(info)
+        except Exception as e:
+            print(f"System info collection error: {e}")
+
+    def _get_cpu_name(self):
+        """Get CPU name via WMI with caching"""
+        try:
+            if platform.system() == 'Windows':
+                import wmi
+                w = wmi.WMI()
+                for cpu in w.Win32_Processor():
+                    if cpu.Name:
+                        return cpu.Name.strip()
+        except:
+            pass
+        return platform.processor() or "Unknown CPU"
+
+    def _get_gpu_name(self):
+        """Get GPU name with caching"""
+        try:
+            import GPUtil
+            gpus = GPUtil.getGPUs()
+            if gpus:
+                name = gpus[0].name
+                if len(name) > 28:
+                    return name[:28] + "..."
+                return name
+        except:
+            pass
+        return "N/A"
+
+    def _get_motherboard(self):
+        """Get motherboard with caching"""
+        try:
+            if platform.system() == 'Windows':
+                import wmi
+                w = wmi.WMI()
+                return w.Win32_BaseBoard()[0].Product
+        except:
+            return "Unknown"
+
+    def _get_ram_info(self):
+        """Get RAM info: size and type with caching"""
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            total_gb = round(mem.total / (1024**3))
+
+            ram_type = "Unknown"
+            speed = 0
+
+            try:
+                if platform.system() == 'Windows':
+                    import wmi
+                    w = wmi.WMI()
+                    for mem_obj in w.Win32_PhysicalMemory():
+                        if hasattr(mem_obj, 'Speed') and mem_obj.Speed:
+                            speed = int(mem_obj.Speed)
+                        if hasattr(mem_obj, 'MemoryType') and mem_obj.MemoryType:
+                            mem_type = int(mem_obj.MemoryType)
+                            type_map = {20: "DDR5", 21: "DDR4", 22: "DDR3", 24: "DDR2"}
+                            ram_type = type_map.get(mem_type, "Unknown")
+                            if ram_type != "Unknown":
+                                break
+
+                    if ram_type == "Unknown" and speed > 0:
+                        if speed >= 6400:
+                            ram_type = "DDR5"
+                        elif speed >= 3200:
+                            ram_type = "DDR4"
+                        elif speed >= 2133:
+                            ram_type = "DDR3"
+                        else:
+                            ram_type = "DDR"
+            except:
+                pass
+
+            if ram_type != "Unknown":
+                return f"{total_gb} GB {ram_type}"
+            return f"{total_gb} GB"
+        except:
+            return "Unknown"
