@@ -306,6 +306,7 @@ class MainWindow(QMainWindow):
             ("Memory", "◐", "memory"),
             ("Disks", "⬟", "disks"),
             ("Processes", "◎", "processes"),
+            ("CMD", "⌨", "cmd"),
         ]
 
         for view_name, icon, view_key in nav_items:
@@ -369,6 +370,7 @@ class MainWindow(QMainWindow):
         from views.memory import MemoryView
         from views.disks import DisksView
         from views.processes import ProcessesView
+        from views.powershell import CommandPromptView
         from views.settings import SettingsView
 
         self._views = {
@@ -379,6 +381,7 @@ class MainWindow(QMainWindow):
             "memory": MemoryView(),
             "disks": DisksView(),
             "processes": ProcessesView(),
+            "cmd": CommandPromptView(),
             "settings": SettingsView(),
         }
 

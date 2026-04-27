@@ -13,6 +13,7 @@ class ViewName(Enum):
     MEMORY = "memory"
     DISKS = "disks"
     PROCESSES = "processes"
+    CMD = "cmd"
     SETTINGS = "settings"
 
 
@@ -52,6 +53,7 @@ VIEW_TITLES = {
     ViewName.MEMORY: "Memory",
     ViewName.DISKS: "Disks",
     ViewName.PROCESSES: "Processes",
+    ViewName.CMD: "CMD",
     ViewName.SETTINGS: "Settings",
 }
 
@@ -64,5 +66,6 @@ VIEW_ICONS = {
     ViewName.MEMORY: "💾",
     ViewName.DISKS: "💿",
     ViewName.PROCESSES: "⚙️",
+    ViewName.CMD: "⌨",
     ViewName.SETTINGS: "🔧",
 }
