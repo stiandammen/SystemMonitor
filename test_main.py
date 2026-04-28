@@ -28,8 +28,13 @@ print(f"[Test] Window shown", flush=True)
 
 # Create a simple signal and connect it to window.update_data
 from PyQt5.QtCore import QTimer
+
+# Wrapper to provide empty dict (actual app uses DataCollector which provides data)
+def emit_update():
+    window.update_data({})
+
 timer = QTimer()
-timer.timeout.connect(window.update_data)
+timer.timeout.connect(emit_update)
 timer.start(1000)  # Emit every second with empty data
 print(f"[Test] Timer connected to window.update_data", flush=True)
 

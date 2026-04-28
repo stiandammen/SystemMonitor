@@ -1,3 +1,7 @@
 {
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "pyright.diagnostics.reportAttributeAccessIssue": false,
+    "python.analysis.diagnostics": {
+        "reportAttributeAccessIssue": false
+    }
 }

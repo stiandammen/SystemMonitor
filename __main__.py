@@ -44,7 +44,6 @@ def main():
         from PyQt5.QtCore import Qt
         log_error("PyQt5 imported OK")
     except Exception as e:
-        import traceback
         log_error(f"Failed to import PyQt5: {e}\n{traceback.format_exc()}")
         return 1
 
@@ -52,7 +51,6 @@ def main():
         app = QApplication(sys.argv)
         log_error("QApplication created OK")
     except Exception as e:
-        import traceback
         log_error(f"Failed to create QApplication: {e}\n{traceback.format_exc()}")
         return 1
 
@@ -93,7 +91,6 @@ def main():
             result = app.exec_()
             log_error(f"App exited with code: {result}")
         except Exception as e:
-            import traceback
             log_error(f"app.exec_ exception: {e}\n{traceback.format_exc()}")
             result = 1
         collector.stop()

@@ -69,3 +69,8 @@ VIEW_ICONS = {
     ViewName.CMD: "⌨",
     ViewName.SETTINGS: "🔧",
 }
+
+# View icon images (PNG paths - takes precedence over VIEW_ICONS)
+VIEW_ICON_IMAGES = {
+    ViewName.DISKS: "C:/Users/RSman/Desktop/backup script/SystemMonitor/ssd3.png",
+}

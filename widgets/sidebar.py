@@ -1,38 +1,53 @@
 """
 Sidebar Navigation Widget
 """
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QPushButton, QLabel, QWidget
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont
-from typing import List, Callable
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QPushButton, QLabel, QWidget, QHBoxLayout
+from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtGui import QFont, QPixmap, QIcon
+from typing import List, Callable, Optional
 
 from styles.theme import theme_manager
-from utils.constants import ViewName, VIEW_ICONS, VIEW_TITLES
+from utils.constants import ViewName, VIEW_ICONS, VIEW_TITLES, VIEW_ICON_IMAGES
 
 
 class NavItem(QPushButton):
     """Individual navigation item"""
-    
+
     clicked_with_name = pyqtSignal(str)
-    
-    def __init__(self, view_name: str, icon: str, label: str, parent=None):
+
+    def __init__(self, view_name: str, icon: str, label: str, icon_image: Optional[str] = None, parent=None):
         super().__init__(parent)
         self._view_name = view_name
         self._icon = icon
         self._label = label
         self._active = False
-        
-        self.setText(f"{icon}  {label}")
+        self._icon_image = icon_image
+
         self.setCursor(Qt.PointingHandCursor)
         self.setCheckable(True)
         self.setMinimumHeight(44)
-        
+        self.setMinimumWidth(180)
+
         font = QFont("Segoe UI", 12)
         self.setFont(font)
-        
+
+        if icon_image:
+            pixmap = QPixmap(icon_image)
+            if not pixmap.isNull():
+                scaled_pixmap = pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.setIcon(QIcon(scaled_pixmap))
+                self.setIconSize(QSize(24, 24))
+                self.setText(f"  {label}")
+            else:
+                self.setText(f"{icon}  {label}")
+        else:
+            self.setText(f"{icon}  {label}")
+
+        self.setLayoutDirection(Qt.LeftToRight)
+
         self.clicked.connect(lambda: self.clicked_with_name.emit(view_name))
         self._apply_style()
-    
+
     def _apply_style(self):
         """Apply navigation item style"""
         c = theme_manager.colors
@@ -46,12 +61,12 @@ class NavItem(QPushButton):
                 text-align: left;
                 border-radius: 0px;
             }}
-            
+
             NavItem:hover {{
                 background-color: {c.BG_HOVER};
                 color: {c.TEXT_PRIMARY};
             }}
-            
+
             NavItem:checked {{
                 background-color: {c.BG_CARD};
                 color: {c.ACCENT_GREEN};
@@ -110,10 +125,12 @@ class Sidebar(QFrame):
         
         for view_name in ViewName:
             name = view_name.value
+            icon_image = VIEW_ICON_IMAGES.get(view_name)
             item = NavItem(
                 name,
                 VIEW_ICONS.get(view_name, "●"),
-                VIEW_TITLES.get(view_name, name.capitalize())
+                VIEW_TITLES.get(view_name, name.capitalize()),
+                icon_image=icon_image
             )
             item.clicked_with_name.connect(self._on_item_clicked)
             nav_layout.addWidget(item)
