@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import (
     QShortcut, QToolTip
 )
 from PyQt5.QtCore import Qt, QProcess, QRect
-from PyQt5.QtGui import QFont, QTextCursor, QKeySequence
+from PyQt5.QtGui import QFont, QTextCursor, QKeySequence, QKeyEvent
+from typing import TYPE_CHECKING, cast
 
 from styles.theme import theme_manager
 from filesystem import get_filesystem
@@ -20,6 +21,10 @@ class CmdInput(QLineEdit):
     Enhanced CMD input with command history and proper TAB cycling autocomplete.
     TAB cycles through matches like real Windows CMD/PowerShell.
     """
+    _tab_matches: list
+    _tab_index: int
+    _tab_original: str
+    _tab_cwd: str
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -82,20 +87,24 @@ class CmdInput(QLineEdit):
             self.setText(self._history[self._history_index])
         self.setCursorPosition(len(self.text()))
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, a0):
+        # type: (QKeyEvent | None) -> None
         """Handle key events with TAB cycling autocomplete - Windows CMD style"""
+        if a0 is None:
+            return
         # TAB for cycling autocomplete (Windows CMD style)
-        if event.key() == Qt.Key_Tab:
+        evt = cast(QKeyEvent, a0)
+        if evt.key() == Qt.Key_Tab:
             self._handle_tab_cycle()
-            event.accept()
+            evt.accept()
             return
 
         # Reset TAB state on any other key (except modifiers)
-        if event.key() not in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Meta,
+        if evt.key() not in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Meta,
                               Qt.Key_Alt, Qt.Key_Tab, Qt.Key_Backtab):
             self._reset_tab_state()
 
-        super().keyPressEvent(event)
+        super().keyPressEvent(a0)
 
     def _reset_tab_state(self):
         """Reset TAB cycling state"""
@@ -179,7 +188,7 @@ class CmdInput(QLineEdit):
     def _get_path_matches(self, path_input, cwd):
         """
         Get all path matches for the given input.
-        Returns sorted list of folders (with \ suffix) and files.
+        Returns sorted list of folders (with \\ suffix) and files.
         """
         completions = []
 
@@ -227,6 +236,7 @@ class CommandPromptView(QWidget):
     Windows Command Prompt (CMD) terminal with modern UI.
     INPUT | OUTPUT layout with full CMD functionality.
     """
+    _output: QTextEdit
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -269,18 +279,6 @@ class CommandPromptView(QWidget):
         title.setStyleSheet(f"color: {c.TEXT_PRIMARY};")
         header_layout.addWidget(title)
 
-        # Current path
-        self._path_label = QLabel(self._fs.get_current_path())
-        self._path_label.setFont(QFont("Consolas", 10))
-        self._path_label.setStyleSheet(f"""
-            color: {c.ACCENT_GREEN};
-            background-color: {c.BG_PRIMARY};
-            padding: 4px 10px;
-            border-radius: 4px;
-            border: 1px solid {c.BORDER};
-        """)
-        header_layout.addWidget(self._path_label)
-
         header_layout.addStretch()
 
         # Status
@@ -293,45 +291,6 @@ class CommandPromptView(QWidget):
         status_text.setFont(QFont("Segoe UI", 9))
         status_text.setStyleSheet(f"color: {c.TEXT_MUTED};")
         header_layout.addWidget(status_text)
-
-        # Buttons
-        btn_style = f"""
-            QPushButton {{
-                background-color: {c.BG_HOVER};
-                color: {c.TEXT_PRIMARY};
-                border: 1px solid {c.BORDER};
-                border-radius: 4px;
-                padding: 4px 10px;
-                font-size: 10px;
-            }}
-            QPushButton:hover {{
-                background-color: {c.BG_CARD};
-                border-color: {c.ACCENT_BLUE};
-            }}
-        """
-
-        cls_btn = QPushButton("Clear")
-        cls_btn.setStyleSheet(btn_style)
-        cls_btn.clicked.connect(self._clear_output)
-        header_layout.addWidget(cls_btn)
-
-        restart_btn = QPushButton("Restart")
-        restart_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {c.ACCENT_GREEN};
-                color: #000000;
-                border: none;
-                border-radius: 4px;
-                padding: 4px 10px;
-                font-weight: bold;
-                font-size: 10px;
-            }}
-            QPushButton:hover {{
-                background-color: #0d9a5d;
-            }}
-        """)
-        restart_btn.clicked.connect(self._restart_cmd)
-        header_layout.addWidget(restart_btn)
 
         main_layout.addWidget(header)
 
@@ -398,6 +357,59 @@ class CommandPromptView(QWidget):
         hint.setFont(QFont("Segoe UI", 9))
         hint.setStyleSheet(f"color: {c.TEXT_MUTED}; font-style: italic;")
         input_layout.addWidget(hint)
+
+        input_layout.addSpacing(6)
+
+        # Action buttons
+        btn_frame = QFrame()
+        btn_frame.setStyleSheet(f"""
+            background-color: {c.BG_SECONDARY};
+            border-radius: 10px;
+            padding: 4px;
+        """)
+        btn_inner = QHBoxLayout()
+        btn_inner.setContentsMargins(6, 6, 6, 6)
+        btn_inner.setSpacing(8)
+        btn_frame.setLayout(btn_inner)
+
+        cls_btn = QPushButton("Clear")
+        cls_btn.setFixedHeight(34)
+        cls_btn.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        cls_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {c.TEXT_PRIMARY};
+                border: none;
+                border-radius: 6px;
+                padding: 6px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: {c.BG_HOVER};
+            }}
+        """)
+        cls_btn.clicked.connect(self._clear_output)
+        btn_inner.addWidget(cls_btn)
+
+        restart_btn = QPushButton("Restart")
+        restart_btn.setFixedHeight(34)
+        restart_btn.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        restart_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c.ACCENT_BLUE};
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #2563eb;
+            }}
+        """)
+        restart_btn.clicked.connect(self._restart_cmd)
+        btn_inner.addWidget(restart_btn)
+
+        input_layout.addWidget(btn_frame)
 
         input_layout.addStretch()
 
@@ -597,25 +609,29 @@ class CommandPromptView(QWidget):
     def _copy_output(self):
         """Copy output to clipboard"""
         from PyQt5.QtWidgets import QApplication
-        clipboard = QApplication.clipboard()
-        clipboard.setText(self._output.toPlainText())
+        _clipboard = QApplication.clipboard()
+        _output_widget = self._output
+        if _clipboard is None or _output_widget is None:
+            return
+        _clipboard_text: str = _output_widget.toPlainText()
+        # Pylance doesn't properly narrow clipboard type after None check
+        _clipboard.setText(_clipboard_text)  # type: ignore[reportOptionalMemberAccess]
         self._log_activity("Output copied")
 
     def _update_path_display(self):
         """Update path display and prompt"""
-        path = self._fs.get_current_path()
-        self._path_label.setText(path)
         self._update_prompt_label()
 
     def _update_prompt_label(self):
         """Update the prompt label with current drive"""
-        if hasattr(self, '_prompt_label'):
-            path = self._fs.get_current_path()
-            if len(path) >= 2 and path[1] == ':':
-                drive = path[0].upper()
-                self._prompt_label.setText(drive + ":>")
-            else:
-                self._prompt_label.setText("C:>")
+        if not hasattr(self, '_prompt_label'):
+            return
+        path = self._fs.get_current_path()
+        if len(path) >= 2 and path[1] == ':':
+            drive = path[0].upper()
+            self._prompt_label.setText(drive + ":>")
+        else:
+            self._prompt_label.setText("C:>")
 
     def _execute_command(self):
         """Execute CMD command"""

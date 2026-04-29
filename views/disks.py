@@ -207,8 +207,10 @@ class DisksView(QWidget):
         # Clear existing
         while self._content_layout.count():
             item = self._content_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         for partition in psutil.disk_partitions():
             if not partition.fstype:

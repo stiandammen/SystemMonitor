@@ -1,4 +1,5 @@
 {
     "typeChecking": "basic",
-    "reportAttributeAccessIssue": false
+    "reportAttributeAccessIssue": false,
+    "reportOptionalMemberAccess": false
 }

@@ -57,7 +57,7 @@ class CpuGraphWidget(QWidget):
             self._pending_update = True
             self._update_timer.start(33)  # ~30fps throttle
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         """Paint the graph"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -143,7 +143,7 @@ class CpuGraphWidget(QWidget):
 
 class StatTile(QFrame):
     """Compact stat tile for info display"""
-    def __init__(self, label: str = "", value: str = "--", color: str = None, parent=None):
+    def __init__(self, label: str = "", value: str = "--", color: str | None = None, parent=None):
         super().__init__(parent)
         colors = c()
         self._color = color or colors.ACCENT_BLUE
@@ -375,7 +375,7 @@ class CPUView(QWidget):
 
         return panel
 
-    def _create_info_row(self, label: str, value: str, color: str = None):
+    def _create_info_row(self, label: str, value: str, color: str | None = None):
         """Create a label-value info row"""
         row = QFrame()
         row.setStyleSheet(f"""
@@ -445,8 +445,10 @@ class CPUView(QWidget):
         # Clear existing
         while self._graphs_grid.count():
             item = self._graphs_grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         self._core_graphs.clear()
 
@@ -668,7 +670,7 @@ class CPUView(QWidget):
         except Exception as e:
             pass  # Silently ignore update errors
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, a0):
         """Handle resize to recalculate grid columns"""
-        super().resizeEvent(event)
+        super().resizeEvent(a0)
         # Grid auto-adjusts via size policy, no manual recalculation needed

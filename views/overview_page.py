@@ -996,8 +996,10 @@ class OverviewPage(QWidget):
         # Clear existing
         while self._storage_container.count():
             item = self._storage_container.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         for partition in partitions:
             if not partition.get('fstype'):
@@ -1589,8 +1591,10 @@ class OverviewPage(QWidget):
         """Repaint alerts list"""
         while self._alerts_vbox.count():
             item = self._alerts_vbox.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         if alerts is None:
             if hasattr(self, '_last_data'):
