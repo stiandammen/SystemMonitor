@@ -1,6 +1,0 @@
-[Test] Starting...
-[Test] Imports done
-[Test] Window shown
-[Test] Switched to memory view
-[Test] Timer connected to window.update_data
-[Test] Entering exec_

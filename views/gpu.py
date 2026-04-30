@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QFrame, QGridLayout
 )
 from PyQt5.QtCore import Qt, QTimer
+from typing import Optional
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
 
 from styles.theme import theme_manager
@@ -81,13 +82,15 @@ class GPUGauge(QFrame):
 
     def set_value(self, value: float):
         """Update gauge value with throttling"""
+        if value is None:
+            value = 0
         self._target_value = max(self._min_val, min(value, self._max_val))
         if not self._pending_update:
             self._pending_update = True
             self._update_timer.start(33)  # ~30fps throttle
 
     def set_max_value(self, max_val: float):
-        self._max_val = max_val
+        self._max_val = max_val if max_val is not None else 100.0
 
     def _get_color_for_value(self, percentage: float) -> str:
         if percentage >= self._crit_threshold:
@@ -96,7 +99,7 @@ class GPUGauge(QFrame):
             return COLORS['accent_orange']
         return COLORS['accent_green']
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.HighQualityAntialiasing)
@@ -162,7 +165,7 @@ class GPUGauge(QFrame):
 
 class StatTile(QFrame):
     """Compact stat tile for info display"""
-    def __init__(self, label: str = "", value: str = "--", color: str = None, parent=None):
+    def __init__(self, label: str = "", value: str = "--", color: Optional[str] = None, parent=None):
         super().__init__(parent)
         self._color = color or COLORS['accent_cyan']
         self._setup_ui(label, value)
@@ -218,8 +221,8 @@ class RealtimeGraph(QWidget):
         self.update()
 
     def update_chart(self, load: float, temp: float):
-        self._load_data.append(load)
-        self._temp_data.append(temp)
+        self._load_data.append(load if load is not None else 0)
+        self._temp_data.append(temp if temp is not None else 0)
         if len(self._load_data) > self._max_points:
             self._load_data.pop(0)
             self._temp_data.pop(0)
@@ -227,7 +230,7 @@ class RealtimeGraph(QWidget):
             self._pending_update = True
             self._update_timer.start(33)  # ~30fps throttle
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
@@ -248,32 +251,35 @@ class RealtimeGraph(QWidget):
         # Draw load area
         if len(self._load_data) > 1:
             step = w / (self._max_points - 1)
-            points = [(i * step, h - (val / 100.0 * h)) for i, val in enumerate(self._load_data)]
+            valid_data = [(i, val) for i, val in enumerate(self._load_data) if val is not None]
+            if valid_data:
+                points = [(i * step, h - (val / 100.0 * h)) for i, val in valid_data]
 
-            # Fill
-            fill_pts = [(0, h)] + points + [(points[-1][0], h)]
-            gradient = QLinearGradient(0, 0, 0, h)
-            gradient.setColorAt(0, QColor(16, 185, 129, 100))
-            gradient.setColorAt(1, QColor(16, 185, 129, 5))
-            painter.setBrush(gradient)
-            painter.setPen(Qt.NoPen)
-            from PyQt5.QtCore import QPoint
-            qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
-            if len(qpoints) >= 3:
-                painter.drawPolygon(*qpoints)
+                # Fill
+                fill_pts = [(0, h)] + points + [(points[-1][0], h)]
+                gradient = QLinearGradient(0, 0, 0, h)
+                gradient.setColorAt(0, QColor(16, 185, 129, 100))
+                gradient.setColorAt(1, QColor(16, 185, 129, 5))
+                painter.setBrush(gradient)
+                painter.setPen(Qt.NoPen)
+                from PyQt5.QtCore import QPoint
+                qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
+                if len(qpoints) >= 3:
+                    painter.drawPolygon(*qpoints)
 
-            # Load line
-            painter.setPen(QPen(QColor(COLORS['accent_green']), 2))
-            for i in range(len(points) - 1):
-                painter.drawLine(int(points[i][0]), int(points[i][1]),
-                               int(points[i + 1][0]), int(points[i + 1][1]))
+                # Load line
+                painter.setPen(QPen(QColor(COLORS['accent_green']), 2))
+                for i in range(len(points) - 1):
+                    painter.drawLine(int(points[i][0]), int(points[i][1]),
+                                   int(points[i + 1][0]), int(points[i + 1][1]))
 
             # Temp line
             temp_points = []
             for i, val in enumerate(self._temp_data):
-                x = i * step
-                y = h - (min(val, 100) / 100.0 * h)
-                temp_points.append((x, y))
+                if val is not None:
+                    x = i * step
+                    y = h - (min(val, 100) / 100.0 * h)
+                    temp_points.append((x, y))
 
             if temp_points and temp_points[-1][1] < h:
                 painter.setPen(QPen(QColor(COLORS['accent_blue']), 2))
@@ -473,7 +479,7 @@ class GPUView(QWidget):
         self._gauge_load.set_value(load)
         self._gauge_temp.set_value(temp)
         self._gauge_vram.set_value(mem_used)
-        self._gauge_vram.set_max_value(mem_total if mem_total > 0 else 16)
+        self._gauge_vram.set_max_value(mem_total if mem_total else 16)
         self._gauge_power.set_value(power)
         self._gauge_fan.set_value(fan)
 

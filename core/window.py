@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QPoint, QEvent
 from PyQt5.QtGui import QFont, QPainter, QPen, QColor
 
+from widgets.sidebar import PremiumSidebar
+
 
 COLORS = {
     'bg_primary': '#0a0e14',
@@ -280,85 +282,9 @@ class MainWindow(QMainWindow):
             self._resize_corner.move(self.width() - 20, self.height() - 20)
 
     def _create_sidebar(self):
-        """Create sidebar navigation"""
-        sidebar = QFrame()
-        sidebar.setFixedWidth(220)
-        sidebar.setStyleSheet(f"background-color: {COLORS['bg_primary']};")
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(12, 20, 12, 12)
-        layout.setSpacing(6)
-        sidebar.setLayout(layout)
-
-        title = QLabel("⚙ System Monitor")
-        font = QFont("Segoe UI", 15, QFont.Bold)
-        title.setFont(font)
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        layout.addWidget(title)
-
-        layout.addSpacing(24)
-
-        nav_items = [
-            ("Overview", "◉", "overview"),
-            ("CPU", "◇", "cpu"),
-            ("GPU", "◈", "gpu"),
-            ("Network", "⬡", "network"),
-            ("Memory", "◐", "memory"),
-            ("Disks", "⬟", "disks"),
-            ("Processes", "◎", "processes"),
-            ("CMD", "⌨", "cmd"),
-        ]
-
-        for view_name, icon, view_key in nav_items:
-            btn = QPushButton(f"  {icon}  {view_name}")
-            btn.setMinimumHeight(44)
-            btn.setFont(QFont("Segoe UI", 11))
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {COLORS['text_primary']};
-                    border: none;
-                    border-radius: 10px;
-                    text-align: left;
-                    padding-left: 14px;
-                    font-weight: 500;
-                }}
-                QPushButton:hover {{
-                    background-color: {COLORS['bg_hover']};
-                }}
-                QPushButton:pressed {{
-                    background-color: {COLORS['border']};
-                }}
-            """)
-            btn.clicked.connect(lambda checked, key=view_key: self._switch_view(key))
-            layout.addWidget(btn)
-
-        layout.addStretch()
-
-        settings_btn = QPushButton("  ⚙  Settings")
-        settings_btn.setMinimumHeight(44)
-        settings_btn.setFont(QFont("Segoe UI", 11))
-        settings_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_card']};
-                color: {COLORS['text_primary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 10px;
-                text-align: left;
-                padding-left: 14px;
-                font-weight: 500;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                border-color: {COLORS['accent_blue']};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLORS['border']};
-            }}
-        """)
-        settings_btn.clicked.connect(lambda checked: self._switch_view("settings"))
-        layout.addWidget(settings_btn)
-
+        """Create sidebar navigation using premium sidebar widget"""
+        sidebar = PremiumSidebar()
+        sidebar.view_selected.connect(self._switch_view)
         return sidebar
 
     def _create_views(self):

@@ -57,17 +57,17 @@ VIEW_TITLES = {
     ViewName.SETTINGS: "Settings",
 }
 
-# View icons (Unicode)
+# View icons (qtawesome icon names)
 VIEW_ICONS = {
-    ViewName.OVERVIEW: "📊",
-    ViewName.CPU: "🔲",
-    ViewName.GPU: "🎮",
-    ViewName.NETWORK: "🌐",
-    ViewName.MEMORY: "💾",
-    ViewName.DISKS: "💿",
-    ViewName.PROCESSES: "⚙️",
-    ViewName.CMD: "⌨",
-    ViewName.SETTINGS: "🔧",
+    ViewName.OVERVIEW: "ph.gauge",
+    ViewName.CPU: "mdi.cpu-64-bit",
+    ViewName.GPU: "fa5s.desktop",
+    ViewName.NETWORK: "mdi.network",
+    ViewName.MEMORY: "mdi.memory",
+    ViewName.DISKS: "fa5s.server",
+    ViewName.PROCESSES: "fa5s.tools",
+    ViewName.CMD: "fa5s.terminal",
+    ViewName.SETTINGS: "fa5s.cog",
 }
 
 # View icon images (PNG paths - takes precedence over VIEW_ICONS)
