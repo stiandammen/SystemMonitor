@@ -378,7 +378,7 @@ class OverviewPage(QWidget):
     def _create_separator(self):
         sep = QFrame()
         sep.setFixedWidth(1)
-        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        sep.setStyleSheet(f"background-color: transparent;")
         return sep
 
     def _format_uptime(self, seconds):

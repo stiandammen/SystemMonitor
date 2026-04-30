@@ -37,7 +37,7 @@ class TitleBar(QWidget):
     def _setup_ui(self):
         """Setup title bar UI"""
         self.setFixedHeight(40)
-        self.setStyleSheet(f"background-color: {COLORS['bg_primary']}; border: none;")
+        self.setStyleSheet(f"background-color: {COLORS['bg_primary']}; border: none; border-radius: 0px;")
 
         layout = QHBoxLayout()
         layout.setContentsMargins(12, 0, 8, 0)

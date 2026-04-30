@@ -228,7 +228,7 @@ class PremiumSidebar(QFrame):
             QFrame {{
                 background-color: {c.BG_CARD};
                 border: none;
-                border-bottom: 1px solid {c.BORDER};
+                border-radius: 0px;
             }}
         """)
 
@@ -278,14 +278,14 @@ class PremiumSidebar(QFrame):
         title_layout.setAlignment(Qt.AlignVCenter)
         title_widget.setLayout(title_layout)
 
-        title = QLabel("NEXUS MONITOR")
+        title = QLabel("System ")
         title.setFont(QFont("Segoe UI", 16, QFont.Bold))
         title.setStyleSheet(f"""
             color: {c.TEXT_PRIMARY};
             letter-spacing: 2px;
         """)
 
-        subtitle = QLabel("System Command Center")
+        subtitle = QLabel("Dashboard")
         subtitle.setFont(QFont("Segoe UI", 11))
         subtitle.setStyleSheet(f"color: {c.TEXT_MUTED};")
 
@@ -307,7 +307,7 @@ class PremiumSidebar(QFrame):
             QFrame {{
                 background-color: {c.BG_CARD};
                 border: none;
-                border-top: 1px solid {c.BORDER};
+                border-radius: 0px;
             }}
         """)
 
@@ -358,7 +358,7 @@ class PremiumSidebar(QFrame):
             QFrame {{
                 background-color: {c.BG_SECONDARY};
                 border: none;
-                border-right: 1px solid {c.BORDER};
+                border-radius: 0px;
             }}
         """)
 

@@ -67,7 +67,7 @@ class Card(QFrame):
         self.setStyleSheet(f"""
             Card {{
                 background-color: {c.BG_CARD};
-                border: 1px solid {c.BORDER};
+                border: none;
                 border-radius: 10px;
             }}
         """)
