@@ -12,7 +12,19 @@
             "env": {
                 "QT_AUTO_SCREEN_SCALE_FACTOR": "1"
             },
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Setup SystemMonitor"
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Setup SystemMonitor",
+            "type": "shell",
+            "command": "cmd /c (if not exist .venv (echo Creating venv... && python -m venv .venv) && .venv\\Scripts\\pip.exe install -r requirements.txt --quiet && echo Setup complete!)",
+            "problemMatcher": [],
+            "runOptions": {
+                "runOn": "default"
+            }
         }
     ]
 }
