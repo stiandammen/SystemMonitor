@@ -2,13 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: SystemMonitor",
+            "name": "SystemMonitor",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/__main__.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "python": "${command:python}"
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "env": {
+                "QT_AUTO_SCREEN_SCALE_FACTOR": "1"
+            },
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
