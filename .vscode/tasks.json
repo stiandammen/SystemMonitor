@@ -1,26 +1,22 @@
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=733558
-    // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
+            "label": "Setup SystemMonitor",
             "type": "shell",
-            "command": "msbuild",
+            "command": "cmd /c",
             "args": [
-                // Ask msbuild to generate full paths for file names.
-                "/property:GenerateFullPaths=true",
-                "/t:build",
-                // Do not generate summary otherwise it leads to duplicate errors in Problems panel
-                "/consoleloggerparameters:NoSummary"
+                "if not exist .venv (echo Creating virtual environment... && python -m venv .venv) && .venv\\Scripts\\pip.exe install -r requirements.txt --quiet && echo Dependencies ready!"
             ],
-            "group": "build",
-            "presentation": {
-                // Reveal the output only if unrecognized errors occur.
-                "reveal": "silent"
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
             },
-            // Use the standard MS compiler pattern to detect errors, warnings and infos
-            "problemMatcher": "$msCompile"
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
         }
     ]
 }

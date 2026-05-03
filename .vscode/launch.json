@@ -1,30 +1,19 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "SystemMonitor",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/__main__.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
-            "env": {
-                "QT_AUTO_SCREEN_SCALE_FACTOR": "1"
-            },
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Setup SystemMonitor"
-        }
-    ],
-    "tasks": [
-        {
-            "label": "Setup SystemMonitor",
-            "type": "shell",
-            "command": "cmd /c (if not exist .venv (echo Creating venv... && python -m venv .venv) && .venv\\Scripts\\pip.exe install -r requirements.txt --quiet && echo Setup complete!)",
-            "problemMatcher": [],
-            "runOptions": {
-                "runOn": "default"
-            }
-        }
-    ]
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "SystemMonitor",
+			"type": "debugpy",
+			"request": "launch",
+			"program": "${workspaceFolder}/__main__.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"python": "${workspaceFolder}/.venv/Scripts/python.exe",
+			"env": {
+				"QT_AUTO_SCREEN_SCALE_FACTOR": "1"
+			},
+			"cwd": "${workspaceFolder}",
+			"preLaunchTask": "Setup SystemMonitor"
+		}
+	]
 }
