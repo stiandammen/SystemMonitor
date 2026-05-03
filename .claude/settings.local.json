@@ -21,7 +21,14 @@
       "Read(//c/Users/Stian/.local/bin/**)",
       "Bash(xxd)",
       "Read(//c/Users/Stian/**)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git rm *)",
+      "Bash(git fetch *)",
+      "Bash(git push *)",
+      "Bash(C:/Users/Stian/AppData/Local/Programs/Python/Python314/python.exe *)",
+      "Bash(cmd.exe *)"
     ]
   }
 }

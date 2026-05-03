@@ -2,12 +2,11 @@
     "typeChecking": "basic",
     "reportAttributeAccessIssue": false,
     "reportOptionalMemberAccess": false,
-    "pythonPath": "C:/Users/Stian/AppData/Local/Programs/Python/Python314/python.exe",
     "executionEnvironments": [
         {
-            "root": "C:/Users/Stian/Desktop/SystemMonitor",
+            "root": "D:/Prosjekter/SystemMonitor",
             "extraPaths": [
-                "C:/Users/Stian/AppData/Local/Programs/Python/Python314/Lib/site-packages"
+                "C:/Users/RSman/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
             ]
         }
     ]
