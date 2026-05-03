@@ -15,10 +15,10 @@ log_msg('Starting debug...')
 
 sys.path.insert(0, '.')
 
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 from core.window import MainWindow
 from core.theme import ThemeManager
-from PyQt5.QtCore import QTimer
+from PyQt6.QtCore import QTimer
 import time
 import traceback
 
