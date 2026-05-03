@@ -4,7 +4,7 @@ Metric History - Ring buffer for time-series data
 from collections import deque
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 
 @dataclass

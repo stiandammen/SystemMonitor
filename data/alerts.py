@@ -5,7 +5,7 @@ import time
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from utils.constants import AlertLevel
 
