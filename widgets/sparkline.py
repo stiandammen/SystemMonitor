@@ -2,9 +2,9 @@
 Sparkline Widget - Mini line charts with gradient fill
 """
 from collections import deque
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient
-from PyQt5.QtCore import Qt, QSize
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient
+from PyQt6.QtCore import Qt, QSize
 
 
 class SparklineWidget(QWidget):
@@ -26,10 +26,10 @@ class SparklineWidget(QWidget):
 
         self.setFixedHeight(50)
         self.setMinimumWidth(100)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         # Throttle updates to ~30fps max
-        from PyQt5.QtCore import QTimer
+        from PyQt6.QtCore import QTimer
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
         self._update_timer.timeout.connect(self._do_update)
@@ -96,7 +96,7 @@ class SparklineWidget(QWidget):
     def paintEvent(self, event):
         """Paint the sparkline."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         width = self.width()
         height = self.height()
@@ -142,12 +142,12 @@ class SparklineWidget(QWidget):
             fill_color = QColor(color)
             fill_color.setAlpha(50)
             gradient.setColorAt(0, fill_color)
-            gradient.setColorAt(1, Qt.transparent)
+            gradient.setColorAt(1, Qt.GlobalColor.transparent)
 
-            from PyQt5.QtCore import QPoint
+            from PyQt6.QtCore import QPoint
             qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
             if len(qpoints) >= 3:
-                painter.setPen(Qt.NoPen)
+                painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(gradient)
                 painter.drawPolygon(*qpoints)
 

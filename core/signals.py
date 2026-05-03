@@ -2,7 +2,7 @@
 Signal Bus - Central communication system
 Singleton pattern for cross-component communication
 """
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 from typing import Dict, List, Any, Optional
 
 

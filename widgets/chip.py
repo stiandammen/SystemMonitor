@@ -1,14 +1,15 @@
 """
 Stat Chip Widget - Compact stat display
 """
-from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
-class StatChip(QFrame):
+class StatChip(QFrame, ScaleMixin):
     """
     Compact chip showing label and value
     """
@@ -18,6 +19,7 @@ class StatChip(QFrame):
         self._label_text = label
         self._value_text = value
         self._trend_text = trend
+        self.scale_connect()
         self._setup_ui()
         self._apply_style()
     
@@ -36,8 +38,7 @@ class StatChip(QFrame):
         
         # Value
         self._value = QLabel(self._value_text)
-        value_font = QFont("Segoe UI", 11)
-        value_font.setBold(True)
+        value_font = QFont("Segoe UI", 11, QFont.Weight.Bold)
         self._value.setFont(value_font)
         layout.addWidget(self._value)
         
@@ -61,8 +62,8 @@ class StatChip(QFrame):
             }}
         """)
         
-        self._label.setStyleSheet(f"color: {c.TEXT_SECONDARY};")
-        self._value.setStyleSheet(f"color: {c.TEXT_PRIMARY};")
+        self._label.setStyleSheet(f"color: {c.TEXT_SECONDARY}; background: transparent;")
+        self._value.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
     
     def set_value(self, value: str):
         """Update value text"""

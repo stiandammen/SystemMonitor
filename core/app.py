@@ -5,8 +5,8 @@ import sys
 import os
 from typing import Optional
 
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
 
 # Import with proper relative paths for Pylance
 import styles.theme as theme_module
@@ -60,7 +60,7 @@ class SystemMonitorApp:
         self._window.set_active_view("overview")
         
         # Run application
-        result = self._app.exec_()
+        result = self._app.exec()
         
         # Stop data collector on exit
         self._stop_data_collector()

@@ -1,8 +1,8 @@
 """
 Theme Management - Dark and Light themes
 """
-from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import QObject, pyqtSignal
 
 
 class DarkTheme:
@@ -41,6 +41,114 @@ class DarkTheme:
     OVERLAY = "rgba(0, 0, 0, 0.7)"
 
 
+class MidnightTheme:
+    """OLED-friendly dark theme with true black backgrounds"""
+    # Backgrounds
+    BG_PRIMARY = "#000000"       # True black
+    BG_SECONDARY = "#0a0a0a"    # Near black
+    BG_CARD = "#111111"         # Dark gray
+    BG_HOVER = "#1a1a1a"        # Lighter gray
+    BG_INPUT = "#0a0a0a"        # Input fields
+
+    # Text
+    TEXT_PRIMARY = "#ffffff"    # Pure white
+    TEXT_SECONDARY = "#b0b0b0"  # Light gray
+    TEXT_MUTED = "#707070"      # Medium gray
+    TEXT_DISABLED = "#505050"   # Darker gray
+
+    # Accents
+    ACCENT_GREEN = "#10b981"    # Primary - success
+    ACCENT_BLUE = "#3b82f6"    # Info
+    ACCENT_ORANGE = "#f59e0b"   # Warning
+    ACCENT_RED = "#ef4444"      # Error
+    ACCENT_YELLOW = "#ffd740"   # Caution
+    ACCENT_CYAN = "#06b6d4"    # Network download
+    ACCENT_PURPLE = "#8b5cf6"   # Network upload
+    ACCENT_PINK = "#ec4899"     # Extra
+
+    # UI Elements
+    BORDER = "#2a2a2a"
+    BORDER_FOCUS = "#3b82f6"
+    GAUGE_BG = "#1a1a1a"
+    GAUGE_FILL = "#10b981"
+    CHART_FILL = "#064e3b"
+    CHART_LINE = "#10b981"
+    SHADOW = "rgba(0, 0, 0, 0.8)"
+    OVERLAY = "rgba(0, 0, 0, 0.9)"
+
+
+class OceanTheme:
+    """Dark theme with blue ocean accents"""
+    # Backgrounds
+    BG_PRIMARY = "#0a1628"       # Deep ocean blue
+    BG_SECONDARY = "#0f1f3a"    # Sidebar
+    BG_CARD = "#142247"         # Cards
+    BG_HOVER = "#1a2d5a"        # Hover states
+    BG_INPUT = "#0a1628"        # Input fields
+
+    # Text
+    TEXT_PRIMARY = "#e8f0ff"    # Main text
+    TEXT_SECONDARY = "#8899bb"  # Secondary text
+    TEXT_MUTED = "#556688"      # Labels, hints
+    TEXT_DISABLED = "#3d4d66"   # Disabled elements
+
+    # Accents
+    ACCENT_GREEN = "#06b6d4"    # Cyan accent
+    ACCENT_BLUE = "#3b82f6"     # Info blue
+    ACCENT_ORANGE = "#f59e0b"   # Warning
+    ACCENT_RED = "#ef4444"      # Error
+    ACCENT_YELLOW = "#ffd740"   # Caution
+    ACCENT_CYAN = "#06b6d4"     # Network download
+    ACCENT_PURPLE = "#8b5cf6"   # Network upload
+    ACCENT_PINK = "#ec4899"     # Extra
+
+    # UI Elements
+    BORDER = "#1e3a5f"
+    BORDER_FOCUS = "#3b82f6"
+    GAUGE_BG = "#1a2d5a"
+    GAUGE_FILL = "#06b6d4"
+    CHART_FILL = "#164e63"
+    CHART_LINE = "#06b6d4"
+    SHADOW = "rgba(0, 0, 0, 0.4)"
+    OVERLAY = "rgba(0, 0, 0, 0.7)"
+
+
+class SunsetTheme:
+    """Warm-toned dark theme with orange/purple accents"""
+    # Backgrounds
+    BG_PRIMARY = "#1a0f0f"       # Deep burgundy black
+    BG_SECONDARY = "#251a1a"    # Sidebar
+    BG_CARD = "#2d1f1f"         # Cards
+    BG_HOVER = "#3d2929"        # Hover states
+    BG_INPUT = "#1a0f0f"        # Input fields
+
+    # Text
+    TEXT_PRIMARY = "#fff0f0"    # Main text
+    TEXT_SECONDARY = "#cc9999"  # Secondary text
+    TEXT_MUTED = "#886666"      # Labels, hints
+    TEXT_DISABLED = "#553d3d"   # Disabled elements
+
+    # Accents
+    ACCENT_GREEN = "#f59e0b"    # Orange accent
+    ACCENT_BLUE = "#8b5cf6"     # Purple accent
+    ACCENT_ORANGE = "#f97316"   # Warning/Orange
+    ACCENT_RED = "#ef4444"      # Error
+    ACCENT_YELLOW = "#fbbf24"   # Caution/Yellow
+    ACCENT_CYAN = "#06b6d4"     # Cyan
+    ACCENT_PURPLE = "#a855f7"   # Network upload purple
+    ACCENT_PINK = "#ec4899"     # Extra
+
+    # UI Elements
+    BORDER = "#3d2929"
+    BORDER_FOCUS = "#f59e0b"
+    GAUGE_BG = "#3d2929"
+    GAUGE_FILL = "#f59e0b"
+    CHART_FILL = "#78350f"
+    CHART_LINE = "#f59e0b"
+    SHADOW = "rgba(0, 0, 0, 0.4)"
+    OVERLAY = "rgba(0, 0, 0, 0.7)"
+
+
 class LightTheme:
     """Modern light theme color palette"""
     # Backgrounds
@@ -49,13 +157,13 @@ class LightTheme:
     BG_CARD = "#ffffff"         # Cards
     BG_HOVER = "#f1f5f9"        # Hover states
     BG_INPUT = "#ffffff"        # Input fields
-    
+
     # Text
     TEXT_PRIMARY = "#0f172a"    # Main text
     TEXT_SECONDARY = "#475569"  # Secondary text
     TEXT_MUTED = "#64748b"      # Labels, hints
     TEXT_DISABLED = "#94a3b8"   # Disabled elements
-    
+
     # Accents
     ACCENT_GREEN = "#059669"    # Primary - success
     ACCENT_BLUE = "#2563eb"     # Info
@@ -65,7 +173,7 @@ class LightTheme:
     ACCENT_CYAN = "#0891b2"     # Network download
     ACCENT_PURPLE = "#7c3aed"   # Network upload
     ACCENT_PINK = "#db2777"     # Extra
-    
+
     # UI Elements
     BORDER = "#d1d5db"
     BORDER_FOCUS = "#3b82f6"
@@ -80,15 +188,31 @@ class LightTheme:
 class ThemeManager(QObject):
     """Manages application theme (singleton)"""
     theme_changed = pyqtSignal(str)  # Emits theme name
-    
+
     _instance = None
-    
+
+    _themes = {
+        "dark": DarkTheme,
+        "midnight": MidnightTheme,
+        "ocean": OceanTheme,
+        "sunset": SunsetTheme,
+        "light": LightTheme,
+    }
+
+    _theme_names = {
+        "dark": "Dark",
+        "midnight": "Midnight (OLED)",
+        "ocean": "Ocean",
+        "sunset": "Sunset",
+        "light": "Light",
+    }
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
@@ -96,26 +220,34 @@ class ThemeManager(QObject):
         self._initialized = True
         self._current_theme = "dark"
         self._colors = DarkTheme
-    
+
     @property
     def current_theme(self) -> str:
         return self._current_theme
-    
+
     @property
     def colors(self):
         return self._colors
-    
+
+    def get_available_themes(self) -> list:
+        """Get list of available theme names"""
+        return list(self._themes.keys())
+
+    def get_theme_display_name(self, theme_key: str) -> str:
+        """Get human-readable theme name"""
+        return self._theme_names.get(theme_key, theme_key.title())
+
     def set_theme(self, theme_name: str):
-        """Switch between dark and light themes"""
+        """Switch between themes"""
+        if theme_name not in self._themes:
+            theme_name = "dark"
+
         if theme_name == self._current_theme:
             return
-        
+
         self._current_theme = theme_name
-        if theme_name == "dark":
-            self._colors = DarkTheme
-        else:
-            self._colors = LightTheme
-        
+        self._colors = self._themes[theme_name]
+
         self.theme_changed.emit(theme_name)
     
     def toggle_theme(self):

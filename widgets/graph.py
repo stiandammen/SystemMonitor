@@ -1,9 +1,9 @@
 """
 Graph Widget - Line/area charts for time-series data
 """
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
-from PyQt5.QtCore import Qt, QRectF, QTimer
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
+from PyQt6.QtCore import Qt, QRectF, QTimer, QPointF
 from typing import List, Tuple, Optional
 
 from styles.theme import theme_manager
@@ -64,7 +64,7 @@ class Graph(QWidget):
             return
         
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         c = theme_manager.colors
         width = self.width()
@@ -90,7 +90,7 @@ class Graph(QWidget):
         graph_height = height - margin_top - margin_bottom
         
         # Draw grid lines
-        painter.setPen(QPen(QColor(c.BORDER), 1, Qt.DotLine))
+        painter.setPen(QPen(QColor(c.BORDER), 1, Qt.PenStyle.DotLine))
         for i in range(5):
             y = margin_top + (graph_height * i / 4)
             painter.drawLine(int(margin_left), int(y), int(width - margin_right), int(y))
@@ -127,7 +127,7 @@ class Graph(QWidget):
                 gradient.setColorAt(1, QColor(c.BG_PRIMARY))
                 
                 painter.setBrush(gradient)
-                painter.setPen(Qt.NoPen)
+                painter.setPen(Qt.PenStyle.NoPen)
                 
                 # Draw polygon
                 polygon = []
@@ -135,13 +135,12 @@ class Graph(QWidget):
                     polygon.append((int(x), int(y)))
                 
                 # Use drawPolygon with QPoint
-                from PyQt5.QtCore import QPoint
-                qpoints = [QPoint(int(x), int(y)) for x, y in polygon]
+                qpoints = [QPointF(int(x), int(y)) for x, y in polygon]
                 if len(qpoints) >= 3:
                     painter.drawPolygon(*qpoints)
             
             # Draw line
-            painter.setPen(QPen(QColor(self._color), 2, Qt.SolidLine))
+            painter.setPen(QPen(QColor(self._color), 2, Qt.PenStyle.SolidLine))
             for i in range(len(points) - 1):
                 painter.drawLine(
                     int(points[i][0]), int(points[i][1]),

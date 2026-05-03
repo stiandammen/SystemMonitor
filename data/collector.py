@@ -5,7 +5,7 @@ import time
 import platform
 import subprocess
 import sys
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 
 # Logging function that works in packaged app
 def _log(msg):

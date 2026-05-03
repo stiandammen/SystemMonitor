@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
-from PyQt5.QtGui import QFont
+from PyQt6.QtGui import QFont
 
 
 class AppConfig:

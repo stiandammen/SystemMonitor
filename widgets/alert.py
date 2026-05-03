@@ -1,9 +1,9 @@
 """
 Alert Badge Widget
 """
-from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 
 from styles.theme import theme_manager
 from utils.constants import AlertLevel
@@ -18,7 +18,7 @@ class AlertBadge(QPushButton):
         super().__init__(parent)
         self._count = count
         self._level = level
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedSize(32, 32)
         self._update_display()
     
@@ -47,8 +47,7 @@ class AlertBadge(QPushButton):
         # Show count or just dot
         if self._count > 0:
             self.setText(str(min(self._count, 99)))
-            font = QFont("Segoe UI", 10)
-            font.setBold(True)
+            font = QFont("Segoe UI", 10, QFont.Weight.Bold)
             self.setFont(font)
         else:
             self.setText("")

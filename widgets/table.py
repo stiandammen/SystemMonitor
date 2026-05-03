@@ -1,11 +1,11 @@
 """
 Sortable Table Widget
 """
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from typing import List, Dict, Any, Optional, Callable
 
 from styles.theme import theme_manager
@@ -48,7 +48,7 @@ class SortableTable(QTableWidget):
         # Header configuration
         header = self.horizontalHeader()
         header.setStretchLastSection(True)
-        header.setDefaultAlignment(Qt.AlignLeft)
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
         
         # Set column widths
         for i, col in enumerate(self._columns):
@@ -110,11 +110,11 @@ class SortableTable(QTableWidget):
                     value = col['formatter'](value)
                 
                 item = QTableWidgetItem(str(value))
-                item.setData(Qt.UserRole, row_data)  # Store full row data
+                item.setData(Qt.ItemDataRole.UserRole, row_data)  # Store full row data
                 
                 # Alignment
-                align = col.get('align', Qt.AlignLeft)
-                item.setTextAlignment(align | Qt.AlignVCenter)
+                align = col.get('align', Qt.AlignmentFlag.AlignLeft)
+                item.setTextAlignment(align | Qt.AlignmentFlag.AlignVCenter)
                 
                 self.setItem(row_idx, col_idx, item)
     
@@ -122,7 +122,7 @@ class SortableTable(QTableWidget):
         """Get selected row data"""
         selected = self.selectedItems()
         if selected:
-            return selected[0].data(Qt.UserRole)
+            return selected[0].data(Qt.ItemDataRole.UserRole)
         return None
     
     def filter_data(self, text: str):

@@ -1,9 +1,9 @@
 """
 DonutGauge Widget - Circular progress indicator
 """
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtGui import QPainter, QColor, QFont, QPen, QBrush
-from PyQt5.QtCore import Qt, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush
+from PyQt6.QtCore import Qt, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
 
 
 class DonutGauge(QWidget):
@@ -26,7 +26,7 @@ class DonutGauge(QWidget):
         """Setup value animation"""
         self._animator = QPropertyAnimation(self, b"animated_value")
         self._animator.setDuration(500)
-        self._animator.setEasingCurve(QEasingCurve.InOutQuad)
+        self._animator.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
     def get_animated_value(self):
         return self._animated_value
@@ -60,7 +60,7 @@ class DonutGauge(QWidget):
     def paintEvent(self, event):
         """Paint the donut gauge"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Colors
         bg_color = QColor("#1e2936")
@@ -72,10 +72,10 @@ class DonutGauge(QWidget):
         pen_width = 10
 
         # Background circle (full arc)
-        painter.setBrush(Qt.NoBrush)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         bg_pen = QPen(bg_color)
         bg_pen.setWidth(pen_width)
-        bg_pen.setCapStyle(Qt.RoundCap)
+        bg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(bg_pen)
         painter.drawArc(int(margin), int(margin), int(self._size - 2 * margin), int(self._size - 2 * margin), 225 * 16, -270 * 16)
 
@@ -85,7 +85,7 @@ class DonutGauge(QWidget):
 
         progress_pen = QPen(gauge_color)
         progress_pen.setWidth(pen_width)
-        progress_pen.setCapStyle(Qt.RoundCap)
+        progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(progress_pen)
         painter.drawArc(int(margin), int(margin), int(self._size - 2 * margin), int(self._size - 2 * margin), 225 * 16, -angle * 16)
 
@@ -93,7 +93,7 @@ class DonutGauge(QWidget):
         center_x = self._size / 2
         center_y = self._size / 2
 
-        painter.setFont(QFont("Segoe UI", 18, QFont.Bold))
+        painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         painter.setPen(QColor("#f0f4f8"))
         value_text = f"{self._animated_value:.0f}%"
         fm = painter.fontMetrics()
@@ -110,5 +110,5 @@ class DonutGauge(QWidget):
         painter.end()
 
     def sizeHint(self):
-        from PyQt5.QtCore import QSize
+        from PyQt6.QtCore import QSize
         return QSize(self._size, self._size)

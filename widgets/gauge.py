@@ -1,9 +1,9 @@
 """
 Gauge Widget - Circular progress indicator
 """
-from PyQt5.QtWidgets import QFrame
-from PyQt5.QtGui import QPainter, QBrush, QColor, QFont, QPen, QConicalGradient
-from PyQt5.QtCore import Qt, QRectF, QTimer
+from PyQt6.QtWidgets import QFrame
+from PyQt6.QtGui import QPainter, QBrush, QColor, QFont, QPen, QConicalGradient
+from PyQt6.QtCore import Qt, QRectF, QTimer
 
 from styles.theme import theme_manager
 from config import FontConfig
@@ -68,7 +68,7 @@ class Gauge(QFrame):
     def paintEvent(self, event):
         """Paint the gauge"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         c = theme_manager.colors
         
@@ -80,7 +80,7 @@ class Gauge(QFrame):
         
         # Draw background circle
         painter.setBrush(QBrush(QColor(c.GAUGE_BG)))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(rect)
         
         # Calculate progress
@@ -102,14 +102,14 @@ class Gauge(QFrame):
         # Draw background arc
         bg_pen = QPen(QColor(c.BORDER))
         bg_pen.setWidth(pen_width)
-        bg_pen.setCapStyle(Qt.RoundCap)
+        bg_pen.setCapStyle(Qt.PenStyle.RoundCap)
         painter.setPen(bg_pen)
         painter.drawArc(progress_rect, 0, 360 * 16)
         
         # Draw progress arc
         progress_pen = QPen(QColor(color))
         progress_pen.setWidth(pen_width)
-        progress_pen.setCapStyle(Qt.RoundCap)
+        progress_pen.setCapStyle(Qt.PenStyle.RoundCap)
         painter.setPen(progress_pen)
         painter.drawArc(progress_rect, 90 * 16, -angle * 16)
         

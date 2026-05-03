@@ -2,15 +2,15 @@
 GPU View - GPU monitoring with gauges, charts, and real-time data
 Modern glassmorphism design with responsive layout
 """
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QGridLayout
+    QFrame, QGridLayout, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QTimer
-from typing import Optional
-from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
 # Color palette
@@ -34,11 +34,35 @@ COLORS = {
 }
 
 
-class GlassCard(QFrame):
+def sync_colors():
+    """Sync COLORS dict with theme_manager.colors"""
+    c = theme_manager.colors
+    COLORS.update({
+        'bg_primary': c.BG_PRIMARY,
+        'bg_card': c.BG_CARD,
+        'bg_deeper': c.BG_HOVER,
+        'bg_hover': c.BG_HOVER,
+        'border': c.BORDER,
+        'border_card': c.BORDER,
+        'text_primary': c.TEXT_PRIMARY,
+        'text_secondary': c.TEXT_SECONDARY,
+        'text_muted': c.TEXT_MUTED,
+        'accent_blue': c.ACCENT_BLUE,
+        'accent_green': c.ACCENT_GREEN,
+        'accent_purple': c.ACCENT_PURPLE,
+        'accent_orange': c.ACCENT_ORANGE,
+        'accent_cyan': c.ACCENT_CYAN,
+        'accent_red': c.ACCENT_RED,
+        'accent_yellow': c.ACCENT_YELLOW,
+    })
+
+
+class GlassCard(QFrame, ScaleMixin):
     """Glass-effect card - optimized without shadow for better performance"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.scale_connect()
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_card']};
@@ -48,7 +72,7 @@ class GlassCard(QFrame):
         """)
 
 
-class GPUGauge(QFrame):
+class GPUGauge(QFrame, ScaleMixin):
     """
     Circular gauge with glow effect - optimized with throttled repaints
     """
@@ -76,6 +100,11 @@ class GPUGauge(QFrame):
         self._update_timer.setSingleShot(True)
         self._update_timer.timeout.connect(self._do_update)
 
+        self.scale_connect()
+
+    def on_scale_changed(self, factor: float):
+        self.update()
+
     def _do_update(self):
         self._pending_update = False
         self.update()
@@ -101,9 +130,8 @@ class GPUGauge(QFrame):
 
     def paintEvent(self, a0):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.HighQualityAntialiasing)
-
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
         size = self._size
         center = size / 2
 
@@ -123,30 +151,30 @@ class GPUGauge(QFrame):
         arc_rect = 14
 
         # Background track
-        painter.setPen(QPen(QColor(COLORS['border']), pen_width, Qt.SolidLine))
-        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor(COLORS['border']), pen_width, Qt.PenStyle.SolidLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
                        135 * 16, -270 * 16)
 
         # Glow effect
         glow_color = QColor(self._get_color_for_value(progress * 100))
         glow_color.setAlpha(40)
-        glow_pen = QPen(glow_color, pen_width + 6, Qt.SolidLine)
-        glow_pen.setCapStyle(Qt.RoundCap)
+        glow_pen = QPen(glow_color, pen_width + 6, Qt.PenStyle.SolidLine)
+        glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(glow_pen)
         painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
                        135 * 16, -270 * 16)
 
         # Progress arc
         progress_color = QColor(self._get_color_for_value(progress * 100))
-        progress_pen = QPen(progress_color, pen_width, Qt.SolidLine)
-        progress_pen.setCapStyle(Qt.RoundCap)
+        progress_pen = QPen(progress_color, pen_width, Qt.PenStyle.SolidLine)
+        progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(progress_pen)
         painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
                        135 * 16, int(-270 * 16 * progress))
 
         # Center value
-        painter.setFont(QFont("Segoe UI", 18, QFont.Light))
+        painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Light))
         painter.setPen(QColor(COLORS['text_primary']))
         value_text = f"{self._display_value:.0f}{self._unit}"
         fm = painter.fontMetrics()
@@ -163,11 +191,12 @@ class GPUGauge(QFrame):
         painter.end()
 
 
-class StatTile(QFrame):
+class StatTile(QFrame, ScaleMixin):
     """Compact stat tile for info display"""
     def __init__(self, label: str = "", value: str = "--", color: Optional[str] = None, parent=None):
         super().__init__(parent)
         self._color = color or COLORS['accent_cyan']
+        self.scale_connect()
         self._setup_ui(label, value)
 
     def _setup_ui(self, label, value):
@@ -175,22 +204,21 @@ class StatTile(QFrame):
             QFrame {{
                 background-color: {COLORS['bg_deeper']};
                 border-radius: 8px;
-                padding: 10px 14px;
             }}
         """)
         layout = QVBoxLayout()
         layout.setSpacing(2)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(10, 10, 10, 10)
         self.setLayout(layout)
 
         self._value_lbl = QLabel(value)
-        self._value_lbl.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        self._value_lbl.setStyleSheet(f"color: {self._color};")
+        self._value_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self._value_lbl.setStyleSheet(f"color: {self._color}; background: transparent;")
         layout.addWidget(self._value_lbl)
 
         self._label_lbl = QLabel(label)
         self._label_lbl.setFont(QFont("Segoe UI", 9))
-        self._label_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+        self._label_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
         layout.addWidget(self._label_lbl)
 
     def set_value(self, value: str):
@@ -198,10 +226,10 @@ class StatTile(QFrame):
 
     def set_color(self, color: str):
         self._color = color
-        self._value_lbl.setStyleSheet(f"color: {color};")
+        self._value_lbl.setStyleSheet(f"color: {color}; background: transparent;")
 
 
-class RealtimeGraph(QWidget):
+class RealtimeGraph(QWidget, ScaleMixin):
     """Real-time line graph with gradient fill - optimized with throttled updates"""
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -209,6 +237,7 @@ class RealtimeGraph(QWidget):
         self._temp_data = []
         self._max_points = 60
         self._pending_update = False
+        self.scale_connect()
         self.setMinimumHeight(160)
 
         # Throttle updates to ~30fps max
@@ -232,18 +261,18 @@ class RealtimeGraph(QWidget):
 
     def paintEvent(self, a0):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         w = self.width()
         h = self.height()
 
         # Background
         painter.setBrush(QColor(COLORS['bg_card']))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, 0, w, h)
 
         # Grid lines
-        painter.setPen(QPen(QColor(COLORS['border']), 1, Qt.DotLine))
+        painter.setPen(QPen(QColor(COLORS['border']), 1, Qt.PenStyle.DotLine))
         for i in range(5):
             y = h * i / 4
             painter.drawLine(0, int(y), w, int(y))
@@ -261,8 +290,8 @@ class RealtimeGraph(QWidget):
                 gradient.setColorAt(0, QColor(16, 185, 129, 100))
                 gradient.setColorAt(1, QColor(16, 185, 129, 5))
                 painter.setBrush(gradient)
-                painter.setPen(Qt.NoPen)
-                from PyQt5.QtCore import QPoint
+                painter.setPen(Qt.PenStyle.NoPen)
+                from PyQt6.QtCore import QPoint
                 qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
                 if len(qpoints) >= 3:
                     painter.drawPolygon(*qpoints)
@@ -297,13 +326,31 @@ class RealtimeGraph(QWidget):
         painter.end()
 
 
-class GPUView(QWidget):
+class GPUView(QWidget, ScaleMixin):
     """GPU monitoring view with modern responsive design"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._last_gpu_data = None
+        self.scale_connect()
         self._setup_ui()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def on_scale_changed(self, factor: float):
+        self._setup_ui()
+        self.update()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Re-apply styles when theme changes"""
+        sync_colors()
+        self._reapply_widget_styles()
+        if self._last_gpu_data is not None:
+            self.update_data(self._last_gpu_data)
+
+    def _reapply_widget_styles(self):
+        """Re-apply styles to widgets that use COLORS"""
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
+        self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
 
     def _setup_ui(self):
         """Setup GPU view UI"""
@@ -356,19 +403,19 @@ class GPUView(QWidget):
 
         # Status indicator
         self._status_dot = QLabel("●")
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px;")
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
         layout.addWidget(self._status_dot)
 
         # Title
         title = QLabel("GPU Monitor")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         layout.addWidget(title)
 
         # GPU name
         self._gpu_name_label = QLabel("—")
         self._gpu_name_label.setFont(QFont("Segoe UI", 11))
-        self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']};")
+        self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
         layout.addWidget(self._gpu_name_label)
 
         layout.addStretch()
@@ -436,8 +483,8 @@ class GPUView(QWidget):
         chart_card.setLayout(layout)
 
         chart_title = QLabel("Performance")
-        chart_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        chart_title.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        chart_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        chart_title.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
         layout.addWidget(chart_title)
 
         self._chart = RealtimeGraph()
@@ -454,10 +501,10 @@ class GPUView(QWidget):
         gpu_info = data.get('gpu_info', {})
 
         if not gpu.get('available', False):
-            self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: 14px;")
+            self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: 14px; background: transparent;")
             return
 
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px;")
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
 
         # Update GPU info
         if gpu_info:
@@ -489,4 +536,4 @@ class GPUView(QWidget):
         self._last_gpu_data = gpu
 
 
-from PyQt5.QtWidgets import QSizePolicy
+from PyQt6.QtWidgets import QSizePolicy

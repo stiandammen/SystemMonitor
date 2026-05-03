@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
+from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 from .constants import ExportFormat
 from core.signals import signal_bus

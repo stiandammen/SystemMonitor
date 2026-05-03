@@ -1,24 +1,31 @@
 """
 Overview View - Main dashboard
 """
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+
+from scaler import S, ScaleMixin
 
 
-class OverviewView(QWidget):
+class OverviewView(QWidget, ScaleMixin):
     """Overview dashboard view"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.scale_connect()
         self._setup_ui()
+
+    def on_scale_changed(self, factor: float):
+        self._setup_ui()
+        self.update()
 
     def _setup_ui(self):
         """Setup view UI"""
         self._scroll_area = QScrollArea()
         self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         content_widget = QWidget()
         content_widget.setMaximumWidth(1200)
@@ -86,7 +93,7 @@ class OverviewView(QWidget):
         value_font = QFont("Segoe UI", 32)
         value_font.setBold(True)
         value_label.setFont(value_font)
-        value_label.setStyleSheet("color: #10b981;")
+        value_label.setStyleSheet("color: #10b981; background: transparent;")
         layout.addWidget(value_label)
         
         # Store reference for updates

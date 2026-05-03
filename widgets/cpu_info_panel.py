@@ -1,14 +1,15 @@
 """
 CpuInfoPanel - CPU information display panel
 """
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
-class CpuInfoPanel(QWidget):
+class CpuInfoPanel(QWidget, ScaleMixin):
     """
     CPU information panel with 3-column layout:
     - Left: CPU name, architecture, uptime
@@ -20,6 +21,7 @@ class CpuInfoPanel(QWidget):
         super().__init__(parent)
         self._info = {}
         self._uptime_seconds = 0
+        self.scale_connect()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -33,7 +35,7 @@ class CpuInfoPanel(QWidget):
 
         # Title
         title = QLabel("CPU Information")
-        title_font = QFont("Segoe UI", 14, QFont.Bold)
+        title_font = QFont("Segoe UI", 14, QFont.Weight.Bold)
         title.setFont(title_font)
         main_layout.addWidget(title)
 
@@ -174,11 +176,11 @@ class CpuInfoPanel(QWidget):
         container.setLayout(layout)
 
         lbl = QLabel(label)
-        lbl.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; font-size: 11px;")
+        lbl.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; font-size: 11px; background: transparent;")
         layout.addWidget(lbl)
 
         val = QLabel(value)
-        val.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; font-size: 13px; font-weight: bold;")
+        val.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; font-size: 13px; font-weight: bold; background: transparent;")
         layout.addWidget(val)
 
         class Item:
@@ -227,7 +229,7 @@ class CpuInfoPanel(QWidget):
                 color = theme_manager.colors.ACCENT_YELLOW
             else:
                 color = theme_manager.colors.ACCENT_GREEN
-            self._usage_label.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: bold;")
+            self._usage_label.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: bold; background: transparent;")
 
     def _format_uptime(self, seconds: int) -> str:
         """Format uptime in human-readable format"""

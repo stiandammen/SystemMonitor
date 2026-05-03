@@ -2,13 +2,14 @@
 Nexus Monitor - Premium Sidebar Navigation Widget
 Modern enterprise-grade design with dark theme
 """
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QSizePolicy
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
-from PyQt5.QtGui import QFont, QIcon, QPainter, QLinearGradient, QColor
+from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QSizePolicy
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtGui import QFont, QIcon, QPainter, QLinearGradient, QColor
 import qtawesome as qta
 from typing import Optional, Dict
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
 # Navigation structure with sections
@@ -43,7 +44,7 @@ NAV_STRUCTURE = {
 }
 
 
-class PremiumNavItem(QPushButton):
+class PremiumNavItem(QPushButton, ScaleMixin):
     """Premium navigation item with glow and gradient effects"""
 
     clicked_with_name = pyqtSignal(str)
@@ -58,19 +59,29 @@ class PremiumNavItem(QPushButton):
         self._is_active = False
         self._is_hovered = False
 
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setCheckable(True)
-        self.setMinimumHeight(48)
-        self.setMinimumWidth(280)
+        self.setMinimumHeight(S.px(48))
+        self.setMinimumWidth(S.px(280))
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        font = QFont("Segoe UI", 13)
+        font = S.font("Segoe UI", 13)
         self.setFont(font)
 
         self._setup_icon()
-        self.setLayoutDirection(Qt.LeftToRight)
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.clicked.connect(lambda: self.clicked_with_name.emit(key))
         self._apply_style()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+        self.scale_connect()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Re-apply style when theme changes"""
+        self._apply_style()
+
+    def on_scale_changed(self, factor: float):
+        self._apply_style()
+        self._setup_icon()
 
     def _setup_icon(self):
         """Setup premium icon from qtawesome"""
@@ -83,7 +94,7 @@ class PremiumNavItem(QPushButton):
                 color_active=active_color
             )
             self.setIcon(icon)
-            self.setIconSize(QSize(24, 24))
+            self.setIconSize(QSize(S.px(24), S.px(24)))
             self.setText(f"  {self._label}")
         except Exception:
             self.setText(f"  {self._label}")
@@ -108,7 +119,7 @@ class PremiumNavItem(QPushButton):
 
         normal_bg = "background-color: transparent;"
 
-        active_border = f"border-left: 3px solid {self._accent};"
+        active_border = f"border-left: {S.px(3)}px solid {self._accent};"
         normal_border = "border-left: 3px solid transparent;"
 
         self.setStyleSheet(f"""
@@ -117,11 +128,11 @@ class PremiumNavItem(QPushButton):
                 color: {c.TEXT_SECONDARY};
                 border: none;
                 {normal_border}
-                padding: 14px 18px;
+                padding: {S.px(14)}px {S.px(18)}px;
                 text-align: left;
-                border-radius: 8px;
+                border-radius: {S.px(8)}px;
                 font-family: "Segoe UI", sans-serif;
-                font-size: 14px;
+                font-size: {S.px(14)}px;
                 font-weight: 500;
             }}
 
@@ -155,7 +166,7 @@ class PremiumNavItem(QPushButton):
             pass
 
 
-class PremiumSidebar(QFrame):
+class PremiumSidebar(QFrame, ScaleMixin):
     """Premium enterprise sidebar navigation"""
 
     view_selected = pyqtSignal(str)
@@ -167,6 +178,20 @@ class PremiumSidebar(QFrame):
         self._collapsed = False
         self._setup_ui()
         self._apply_theme()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+        self.scale_connect()
+
+    def on_scale_changed(self, factor: float):
+        self._setup_ui()
+        self._apply_theme()
+        self.update()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Re-apply theme when colors change"""
+        self._apply_theme()
+        # Re-style all nav items
+        for item in self._items.values():
+            item._apply_style()
 
     def _setup_ui(self):
         """Setup premium sidebar UI"""
@@ -184,6 +209,7 @@ class PremiumSidebar(QFrame):
 
         # Navigation area
         nav_scroll = QWidget()
+        nav_scroll.setStyleSheet(f"background-color: {theme_manager.colors.BG_CARD}; border: none;")
         nav_layout = QVBoxLayout()
         nav_layout.setContentsMargins(12, 8, 12, 8)
         nav_layout.setSpacing(6)
@@ -253,7 +279,7 @@ class PremiumSidebar(QFrame):
 
         icon_layout = QVBoxLayout()
         icon_layout.setContentsMargins(0, 0, 0, 0)
-        icon_layout.setAlignment(Qt.AlignCenter)
+        icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_container.setLayout(icon_layout)
 
         try:
@@ -265,7 +291,7 @@ class PremiumSidebar(QFrame):
             icon_label = QLabel("N")
             icon_label.setFont(QFont("Segoe UI", 24, QFont.Bold))
             icon_label.setStyleSheet("color: #ffffff;")
-            icon_label.setAlignment(Qt.AlignCenter)
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_layout.addWidget(icon_label)
 
         layout.addWidget(icon_container)
@@ -275,7 +301,7 @@ class PremiumSidebar(QFrame):
         title_layout = QVBoxLayout()
         title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(4)
-        title_layout.setAlignment(Qt.AlignVCenter)
+        title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         title_widget.setLayout(title_layout)
 
         title = QLabel("System ")
@@ -287,7 +313,7 @@ class PremiumSidebar(QFrame):
 
         subtitle = QLabel("Dashboard")
         subtitle.setFont(QFont("Segoe UI", 11))
-        subtitle.setStyleSheet(f"color: {c.TEXT_MUTED};")
+        subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
 
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
@@ -302,6 +328,7 @@ class PremiumSidebar(QFrame):
         c = theme_manager.colors
 
         footer = QFrame()
+        footer.setFrameShape(QFrame.Shape.NoFrame)
         footer.setFixedHeight(80)
         footer.setStyleSheet(f"""
             QFrame {{
@@ -330,7 +357,7 @@ class PremiumSidebar(QFrame):
 
         status_text = QLabel("All systems operational")
         status_text.setFont(QFont("Segoe UI", 10))
-        status_text.setStyleSheet(f"color: {c.TEXT_MUTED};")
+        status_text.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         status_layout.addWidget(status_text)
         status_layout.addStretch()
 
@@ -342,7 +369,7 @@ class PremiumSidebar(QFrame):
 
         version_text = QLabel("v2.0.0")
         version_text.setFont(QFont("Segoe UI", 10))
-        version_text.setStyleSheet(f"color: {c.TEXT_MUTED};")
+        version_text.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         version_layout.addWidget(version_text)
 
         version_layout.addStretch()

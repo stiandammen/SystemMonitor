@@ -1,9 +1,9 @@
 """
 CoreGraphWidget - Per-core CPU usage graph widget
 """
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
-from PyQt5.QtCore import Qt, pyqtProperty, QRectF, QTimer
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
+from PyQt6.QtCore import Qt, pyqtProperty, QRectF, QTimer, QPointF
 from typing import List
 import math
 
@@ -85,7 +85,7 @@ class CoreGraphWidget(QWidget):
     def paintEvent(self, event):
         """Paint the graph"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         c = theme_manager.colors
         width = self.width()
@@ -111,7 +111,7 @@ class CoreGraphWidget(QWidget):
             # Draw "No Data" text
             painter.setFont(QFont("Segoe UI", 9))
             painter.setPen(QColor(c.TEXT_MUTED))
-            painter.drawText(self.rect(), Qt.AlignCenter, "Initializing...")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Initializing...")
             return
 
         # Calculate points
@@ -152,18 +152,17 @@ class CoreGraphWidget(QWidget):
             gradient.setColorAt(0.5, fill_color.lighter(110))
             gradient.setColorAt(1, QColor(c.BG_CARD))
 
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(gradient)
 
             # Draw fill polygon
-            from PyQt5.QtCore import QPoint
-            qpoints = [QPoint(int(x), int(y)) for x, y in fill_path]
+            qpoints = [QPointF(int(x), int(y)) for x, y in fill_path]
             if len(qpoints) >= 3:
                 painter.drawPolygon(*qpoints)
 
             # Draw line on top
-            line_pen = QPen(line_color, 2, Qt.SolidLine)
-            line_pen.setCapStyle(Qt.RoundCap)
+            line_pen = QPen(line_color, 2, Qt.PenStyle.SolidLine)
+            line_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             painter.setPen(line_pen)
 
             for i in range(len(points) - 1):
@@ -181,7 +180,7 @@ class CoreGraphWidget(QWidget):
         # Draw current value
         if self._history:
             current = self._history[-1]
-            painter.setFont(QFont("Segoe UI", 10, QFont.Bold))
+            painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
             painter.setPen(QColor(c.TEXT_PRIMARY))
             value_text = f"{current:.0f}%"
             painter.drawText(width - pad_right - 40, pad_top + 14, value_text)

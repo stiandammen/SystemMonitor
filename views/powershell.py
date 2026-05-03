@@ -3,20 +3,21 @@ Command Prompt View - Windows CMD terminal with modern UI
 INPUT | OUTPUT layout with full CMD functionality and proper TAB cycling
 """
 import os
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QLineEdit,
     QPushButton, QLabel, QFrame, QSplitter,
-    QShortcut, QToolTip
+    QToolTip
 )
-from PyQt5.QtCore import Qt, QProcess, QRect
-from PyQt5.QtGui import QFont, QTextCursor, QKeySequence, QKeyEvent
+from PyQt6.QtCore import Qt, QProcess, QRect
+from PyQt6.QtGui import QFont, QTextCursor, QKeySequence, QKeyEvent, QShortcut
 from typing import TYPE_CHECKING, cast
 
 from styles.theme import theme_manager
 from filesystem import get_filesystem
+from scaler import S, ScaleMixin
 
 
-class CmdInput(QLineEdit):
+class CmdInput(QLineEdit, ScaleMixin):
     """
     Enhanced CMD input with command history and proper TAB cycling autocomplete.
     TAB cycles through matches like real Windows CMD/PowerShell.
@@ -32,6 +33,7 @@ class CmdInput(QLineEdit):
         self._history_index = -1
         self._current_history_search = ""
         self._fs = get_filesystem()
+        self.scale_connect()
 
         # TAB cycling state
         self._tab_matches = []
@@ -231,7 +233,7 @@ class CmdInput(QLineEdit):
         self._handle_tab_cycle()
 
 
-class CommandPromptView(QWidget):
+class CommandPromptView(QWidget, ScaleMixin):
     """
     Windows Command Prompt (CMD) terminal with modern UI.
     INPUT | OUTPUT layout with full CMD functionality.
@@ -245,8 +247,34 @@ class CommandPromptView(QWidget):
         self._history = []
         self._history_index = -1
         self._activity = []
+        self.scale_connect()
         self._setup_ui()
         self._start_cmd()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def on_scale_changed(self, factor: float):
+        self._setup_ui()
+        self.update()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Re-apply styles when theme changes"""
+        self._reapply_styles()
+
+    def _reapply_styles(self):
+        """Re-apply styles to widgets"""
+        c = theme_manager.colors
+        # Find and update styled widgets
+        for widget in self.findChildren(QFrame):
+            if widget.objectName() == "header":
+                widget.setStyleSheet(f"""
+                    background-color: {c.BG_SECONDARY};
+                    border-bottom: 1px solid {c.BORDER};
+                """)
+        for label in self.findChildren(QLabel):
+            if hasattr(label, 'setStyleSheet'):
+                label.style().unpolish(label)
+                label.style().polish(label)
+        self.update()
 
     def _setup_ui(self):
         """Setup modern CMD UI"""
@@ -275,8 +303,8 @@ class CommandPromptView(QWidget):
         header_layout.addWidget(icon)
 
         title = QLabel("Command Prompt")
-        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        title.setStyleSheet(f"color: {c.TEXT_PRIMARY};")
+        title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         header_layout.addWidget(title)
 
         header_layout.addStretch()
@@ -284,18 +312,18 @@ class CommandPromptView(QWidget):
         # Status
         self._status_dot = QLabel("●")
         self._status_dot.setFont(QFont("Segoe UI", 9))
-        self._status_dot.setStyleSheet(f"color: {c.ACCENT_GREEN};")
+        self._status_dot.setStyleSheet(f"color: {c.ACCENT_GREEN}; background: transparent;")
         header_layout.addWidget(self._status_dot)
 
         status_text = QLabel("Active")
         status_text.setFont(QFont("Segoe UI", 9))
-        status_text.setStyleSheet(f"color: {c.TEXT_MUTED};")
+        status_text.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         header_layout.addWidget(status_text)
 
         main_layout.addWidget(header)
 
         # ── Main Content: INPUT | OUTPUT ─────────────────────────────────────
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setStyleSheet(f"""
             QSplitter::handle {{
                 background-color: {c.BORDER};
@@ -314,8 +342,8 @@ class CommandPromptView(QWidget):
 
         # Label
         input_label = QLabel("── INPUT ──")
-        input_label.setFont(QFont("Consolas", 9, QFont.Bold))
-        input_label.setStyleSheet(f"color: {c.ACCENT_BLUE}; letter-spacing: 2px;")
+        input_label.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
+        input_label.setStyleSheet(f"color: {c.ACCENT_BLUE}; letter-spacing: 2px; background: transparent;")
         input_layout.addWidget(input_label)
 
         # Prompt input
@@ -332,8 +360,8 @@ class CommandPromptView(QWidget):
         prompt_frame.setLayout(prompt_layout)
 
         prompt_label = QLabel()
-        prompt_label.setFont(QFont("Consolas", 12, QFont.Bold))
-        prompt_label.setStyleSheet(f"color: {c.ACCENT_GREEN};")
+        prompt_label.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
+        prompt_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; background: transparent;")
         prompt_layout.addWidget(prompt_label)
         self._prompt_label = prompt_label
         self._update_prompt_label()
@@ -355,7 +383,7 @@ class CommandPromptView(QWidget):
         # Hint
         hint = QLabel("TAB cycles through folders")
         hint.setFont(QFont("Segoe UI", 9))
-        hint.setStyleSheet(f"color: {c.TEXT_MUTED}; font-style: italic;")
+        hint.setStyleSheet(f"color: {c.TEXT_MUTED}; font-style: italic; background: transparent;")
         input_layout.addWidget(hint)
 
         input_layout.addSpacing(6)
@@ -374,7 +402,7 @@ class CommandPromptView(QWidget):
 
         cls_btn = QPushButton("Clear")
         cls_btn.setFixedHeight(34)
-        cls_btn.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        cls_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         cls_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
@@ -392,7 +420,7 @@ class CommandPromptView(QWidget):
 
         restart_btn = QPushButton("Restart")
         restart_btn.setFixedHeight(34)
-        restart_btn.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        restart_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         restart_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {c.ACCENT_BLUE};
@@ -434,8 +462,8 @@ class CommandPromptView(QWidget):
         output_header.setLayout(output_header_layout)
 
         output_title = QLabel("OUTPUT")
-        output_title.setFont(QFont("Consolas", 9, QFont.Bold))
-        output_title.setStyleSheet(f"color: {c.TEXT_MUTED}; letter-spacing: 2px;")
+        output_title.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
+        output_title.setStyleSheet(f"color: {c.TEXT_MUTED}; letter-spacing: 2px; background: transparent;")
         output_header_layout.addWidget(output_title)
 
         output_header_layout.addStretch()
@@ -493,8 +521,8 @@ class CommandPromptView(QWidget):
         activity_frame.setLayout(activity_layout)
 
         activity_label = QLabel("── ACTIVITY ──")
-        activity_label.setFont(QFont("Consolas", 9, QFont.Bold))
-        activity_label.setStyleSheet(f"color: {c.ACCENT_BLUE}; letter-spacing: 1px;")
+        activity_label.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
+        activity_label.setStyleSheet(f"color: {c.ACCENT_BLUE}; letter-spacing: 1px; background: transparent;")
         activity_label.setFixedWidth(100)
         activity_layout.addWidget(activity_label)
 
@@ -608,7 +636,7 @@ class CommandPromptView(QWidget):
 
     def _copy_output(self):
         """Copy output to clipboard"""
-        from PyQt5.QtWidgets import QApplication
+        from PyQt6.QtWidgets import QApplication
         _clipboard = QApplication.clipboard()
         _output_widget = self._output
         if _clipboard is None or _output_widget is None:

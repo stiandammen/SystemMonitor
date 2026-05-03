@@ -1,24 +1,24 @@
 """
 Overview Page - Main dashboard with system overview
+Clean, text-focused design with large visible labels and values.
 """
 import platform
 import time
 import psutil
 from collections import deque
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QTableWidget, QTableWidgetItem, QPushButton,
-    QFormLayout, QProgressBar, QHeaderView, QSizePolicy
+    QScrollArea, QProgressBar, QPushButton
 )
-from PyQt5.QtCore import Qt, QTimer, QRect
-from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QLinearGradient
 
-from widgets.card import Card
 from widgets.donut_gauge import DonutGauge
 from widgets.sparkline import SparklineWidget
+from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
-# Color palette matching the app theme
 COLORS = {
     'bg_primary': '#0a0e14',
     'bg_card': '#161f2a',
@@ -34,182 +34,110 @@ COLORS = {
     'accent_orange': '#f59e0b',
     'accent_cyan': '#06b6d4',
     'accent_red': '#ef4444',
-    'accent_yellow': '#ffd740',
 }
 
 
-def card_stylesheet():
-    return f"""
-        QFrame {{
-            background-color: {COLORS['bg_card']};
-            border: 1px solid {COLORS['border']};
-            border-radius: 10px;
-            padding: 16px;
-        }}
-    """
-
-
-def label_stylesheet(color=None, size=None, bold=False):
-    style = ""
-    if color:
-        style += f"color: {color};"
-    if size:
-        style += f"font-size: {size}px;"
-    if bold:
-        style += "font-weight: bold;"
-    return style
-
-
-class DiskIcon(QWidget):
-    """Modern SSD/NVMe drive icon drawn with QPainter"""
-    def __init__(self, size=48, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(size, size)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.HighQualityAntialiasing)
-
-        w = self.width()
-        h = self.height()
-        pad = w * 0.08
-        body_h = h * 0.72
-        body_y = h * 0.12
-
-        # Main body (dark PCB-like)
-        body_rect = QRect(int(pad), int(body_y), int(w - pad * 2), int(body_h))
-        body_grad = QLinearGradient(0, body_y, 0, body_y + body_h)
-        body_grad.setColorAt(0, QColor(55, 65, 80))
-        body_grad.setColorAt(1, QColor(30, 38, 52))
-        painter.setBrush(body_grad)
-        painter.setPen(QPen(QColor(20, 26, 36), 1.5))
-        painter.drawRoundedRect(body_rect, 3, 3)
-
-        # Notch cut on right side (M.2 style)
-        notch_w = w * 0.06
-        notch_h = h * 0.22
-        notch_x = w - pad - notch_w
-        notch_y = body_y + body_h * 0.4
-        painter.setBrush(QColor(COLORS['bg_primary']))
-        painter.setPen(Qt.NoPen)
-        painter.drawRect(int(notch_x), int(notch_y), int(notch_w), int(notch_h))
-
-        # Gold pins at bottom
-        pin_area_h = h * 0.1
-        pin_area_y = body_y + body_h
-        pin_area_rect = QRect(int(pad), int(pin_area_y), int(w - pad * 2), int(pin_area_h))
-        pin_grad = QLinearGradient(0, pin_area_y, 0, pin_area_y + pin_area_h)
-        pin_grad.setColorAt(0, QColor(200, 165, 90))
-        pin_grad.setColorAt(1, QColor(160, 130, 60))
-        painter.setBrush(pin_grad)
-        painter.setPen(QPen(QColor(130, 100, 40), 1))
-        painter.drawRect(pin_area_rect)
-
-        # Horizontal pin dividers
-        pin_count = 6
-        pin_w_step = (w - pad * 2) / pin_count
-        painter.setPen(QPen(QColor(130, 100, 40), 0.8))
-        for i in range(1, pin_count):
-            x = int(pad + i * pin_w_step)
-            painter.drawLine(x, int(pin_area_y), x, int(pin_area_y + pin_area_h))
-
-        # Label area (small rectangle on body)
-        label_pad = w * 0.12
-        label_w = w - pad * 2 - label_pad * 2
-        label_h = h * 0.18
-        label_y = body_y + body_h * 0.18
-        label_rect = QRect(int(pad + label_pad), int(label_y), int(label_w), int(label_h))
-        label_grad = QLinearGradient(0, label_y, 0, label_y + label_h)
-        label_grad.setColorAt(0, QColor(80, 90, 110))
-        label_grad.setColorAt(1, QColor(65, 75, 95))
-        painter.setBrush(label_grad)
-        painter.setPen(QPen(QColor(50, 60, 78), 1))
-        painter.drawRoundedRect(label_rect, 1, 1)
-
-        # Small chip on body (flash chip)
-        chip_w = w * 0.18
-        chip_h = h * 0.14
-        chip_x = w * 0.22
-        chip_y = body_y + body_h * 0.52
-        painter.setBrush(QColor(25, 30, 42))
-        painter.setPen(QPen(QColor(40, 48, 65), 1))
-        painter.drawRect(int(chip_x), int(chip_y), int(chip_w), int(chip_h))
-        # Tiny dot on chip (origin marker)
-        painter.setBrush(QColor(180, 140, 50))
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(int(chip_x + 2), int(chip_y + 2), 3, 3)
-
-        # Controller chip (small square)
-        ctrl_size = w * 0.1
-        ctrl_x = w * 0.58
-        ctrl_y = body_y + body_h * 0.55
-        painter.setBrush(QColor(20, 24, 35))
-        painter.setPen(QPen(QColor(35, 42, 58), 1))
-        painter.drawRect(int(ctrl_x), int(ctrl_y), int(ctrl_size), int(ctrl_size))
-
-        painter.end()
-
-
-class OverviewPage(QWidget):
-    """
-    Main overview dashboard page
-    Shows real-time system performance with gauges, graphs, and info panels
-    """
+class OverviewPage(QWidget, ScaleMixin):
+    """Main overview dashboard - text-focused design."""
 
     def __init__(self, data_collector=None, parent=None):
         super().__init__(parent)
         self._data_collector = data_collector
         self._start_time = time.time()
         self._uptime_seconds = 0
-
-        # Network speed tracking (bytes/sec)
         self._last_net = None
         self._net_down_mbps = 0.0
         self._net_up_mbps = 0.0
 
-        # Data buffers for sparklines
         self._cpu_history = deque(maxlen=60)
         self._gpu_history = deque(maxlen=60)
         self._ram_history = deque(maxlen=60)
-        self._net_down_history = deque(maxlen=60)
-        self._net_up_history = deque(maxlen=60)
 
-        # Cached data from background thread
-        self._processes_cache = []
-        self._storage_cache = []
         self._system_info_cache = {}
-
-        # Cache for system info methods (used during initial UI setup)
         self._system_info_cache_time = 0
         self._system_info_cache_ttl = 30
 
         self._setup_ui()
         self._start_timers()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+        self.scale_connect()
 
     def set_data_collector(self, collector):
-        """Set data collector and connect signals"""
         self._data_collector = collector
         if collector:
             collector.processes_updated.connect(self._on_processes_updated)
-            collector.storage_updated.connect(self._on_storage_updated)
-            collector.system_info_updated.connect(self._on_system_info_updated)
+
+    def _on_theme_changed(self, theme_name: str):
+        self._apply_theme_colors()
+
+    def on_scale_changed(self, factor: float):
+        self._apply_theme_colors()
+
+    def _apply_theme_colors(self):
+        """Apply theme colors to COLORS dict."""
+        c = theme_manager.colors
+        COLORS['bg_primary'] = c.BG_PRIMARY
+        COLORS['bg_card'] = c.BG_CARD
+        COLORS['bg_deeper'] = c.BG_HOVER
+        COLORS['bg_hover'] = c.BG_HOVER
+        COLORS['border'] = c.BORDER
+        COLORS['text_primary'] = c.TEXT_PRIMARY
+        COLORS['text_secondary'] = c.TEXT_SECONDARY
+        COLORS['text_muted'] = c.TEXT_MUTED
+        COLORS['accent_blue'] = c.ACCENT_BLUE
+        COLORS['accent_green'] = c.ACCENT_GREEN
+        COLORS['accent_purple'] = c.ACCENT_PURPLE
+        COLORS['accent_orange'] = c.ACCENT_ORANGE
+        COLORS['accent_cyan'] = c.ACCENT_CYAN
+        COLORS['accent_red'] = c.ACCENT_RED
+
+        self._rebuild_styles()
+
+    def _rebuild_styles(self):
+        """Rebuild all dynamic styles."""
+        # Page background
+        self.setStyleSheet(f"background-color: {COLORS['bg_primary']};")
+
+        # Header
+        if hasattr(self, '_header'):
+            self._header.setStyleSheet(f"background-color: {COLORS['bg_primary']}; border: none;")
+            self._header_title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            self._header_subtitle.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+
+        # Info blocks
+        for block in self._info_blocks:
+            block.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
+            block.layout().setContentsMargins(16, 8, 16, 8)
+
+        # Resource cards
+        for card_key in ['cpu', 'gpu', 'ram', 'disk']:
+            card = getattr(self, f'_{card_key}_card', None)
+            if card:
+                card.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {COLORS['bg_card']};
+                        border: 1px solid {COLORS['border']};
+                        border-radius: 12px;
+                    }}
+                """)
+                card.layout().setContentsMargins(16, 16, 16, 16)
 
     def _setup_ui(self):
-        """Setup main layout"""
+        """Setup main layout."""
+        self.setStyleSheet(f"background-color: {COLORS['bg_primary']};")
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
 
-        # Page header
-        header = self._create_page_header()
-        layout.addWidget(header)
+        # Header
+        self._header = self._create_header()
+        layout.addWidget(self._header)
 
-        # Scroll area for content
+        # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"""
             QScrollArea {{
                 background-color: {COLORS['bg_primary']};
@@ -218,108 +146,156 @@ class OverviewPage(QWidget):
             QScrollArea > QWidget {{
                 background-color: {COLORS['bg_primary']};
             }}
-            QScrollArea > QWidget > QWidget {{
-                background-color: {COLORS['bg_primary']};
-            }}
         """)
+        layout.addWidget(scroll, stretch=1)
 
         content = QWidget()
+        content.setStyleSheet(f"background-color: {COLORS['bg_primary']};")
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(24, 16, 24, 24)
-        content_layout.setSpacing(20)
+        content_layout.setContentsMargins(24, 20, 24, 24)
+        content_layout.setSpacing(16)
         content.setLayout(content_layout)
+        scroll.setWidget(content)
 
-        # Row 1: Resource cards
-        resource_row = self._create_resource_cards_row()
+        # Resource cards row
+        resource_row = self._create_resource_row()
         content_layout.addWidget(resource_row)
 
-        # Row 2: Detail charts
-        chart_row = self._create_detail_charts_row()
+        # Detail charts row
+        chart_row = self._create_chart_row()
         content_layout.addWidget(chart_row)
 
-        # Row 3: Info panels
-        info_row = self._create_info_panels_row()
+        # Info panels row
+        info_row = self._create_info_row()
         content_layout.addWidget(info_row)
 
         content_layout.addStretch()
 
-        scroll.setWidget(content)
-        layout.addWidget(scroll, stretch=1)
-
-    # ─── Page Header ─────────────────────────────────────────────────────────
-
-    def _create_page_header(self):
+    def _create_header(self):
+        """Create page header with title and system info."""
         header = QFrame()
-        header.setFixedHeight(80)
+        header.setFixedHeight(110)
         header.setStyleSheet(f"background-color: {COLORS['bg_primary']}; border: none;")
         layout = QHBoxLayout()
-        layout.setContentsMargins(24, 0, 24, 0)
+        layout.setContentsMargins(28, 0, 28, 0)
+        layout.setSpacing(32)
         header.setLayout(layout)
 
-        # Left: Title + subtitle
+        # Title + Subtitle
         left = QVBoxLayout()
-        left.setSpacing(2)
-        left.addStretch()
+        left.setSpacing(6)
+        left.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        title = QLabel("Overview")
-        title.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        left.addWidget(title)
+        self._header_title = QLabel("Overview")
+        self._header_title.setFont(S.font("Segoe UI", 28, QFont.Bold))
+        self._header_title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        left.addWidget(self._header_title)
 
-        subtitle = QLabel("Real-time system performance")
-        subtitle.setFont(QFont("Segoe UI", 11))
-        subtitle.setStyleSheet(f"color: {COLORS['text_muted']};")
-        left.addWidget(subtitle)
-
-        left.addStretch()
+        self._header_subtitle = QLabel("Real-time system performance")
+        self._header_subtitle.setFont(S.font("Segoe UI", 13))
+        self._header_subtitle.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        left.addWidget(self._header_subtitle)
         layout.addLayout(left)
 
-        # Spacer
         layout.addStretch()
 
-        # Right: Info blocks
+        # Info blocks
+        self._info_blocks = []
         info_layout = QHBoxLayout()
-        info_layout.setSpacing(0)
-        info_layout.addWidget(self._create_info_block("Uptime", self._format_uptime(0)))
-        info_layout.addWidget(self._create_separator())
-        info_layout.addWidget(self._create_info_block("OS", self._short_os()))
-        info_layout.addWidget(self._create_separator())
-        info_layout.addWidget(self._create_info_block("CPU", self._short_cpu()))
-        info_layout.addWidget(self._create_separator())
-        info_layout.addWidget(self._create_info_block("GPU", self._short_gpu()))
+        info_layout.setSpacing(20)
+        info_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Store uptime label ref for timer updates
-        self._uptime_val_label = info_layout.itemAt(0).widget().layout().itemAt(1).widget()
+        uptime_block = self._create_info_block("Uptime", self._format_uptime(0))
+        self._uptime_val = uptime_block._val_label
+        info_layout.addWidget(uptime_block)
+        self._info_blocks.append(uptime_block)
 
-        # Store CPU info label ref for timer updates
-        self._cpu_val_label = info_layout.itemAt(4).widget().layout().itemAt(1).widget()
-        self._gpu_val_label = info_layout.itemAt(6).widget().layout().itemAt(1).widget()
+        info_layout.addWidget(self._create_sep())
+
+        os_block = self._create_info_block("OS", self._short_os())
+        info_layout.addWidget(os_block)
+        self._info_blocks.append(os_block)
+
+        info_layout.addWidget(self._create_sep())
+
+        cpu_block = self._create_info_block("CPU", self._short_cpu())
+        self._cpu_val = cpu_block._val_label
+        info_layout.addWidget(cpu_block)
+        self._info_blocks.append(cpu_block)
+
+        info_layout.addWidget(self._create_sep())
+
+        gpu_block = self._create_info_block("GPU", self._short_gpu())
+        self._gpu_val = gpu_block._val_label
+        info_layout.addWidget(gpu_block)
+        self._info_blocks.append(gpu_block)
 
         layout.addLayout(info_layout)
-
         return header
 
+    def _create_info_block(self, label, value):
+        """Create info block with label and value."""
+        block = QFrame()
+        block.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
+        layout = QVBoxLayout()
+        layout.setSpacing(2)
+        layout.setContentsMargins(16, 8, 16, 8)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        block.setLayout(layout)
+
+        lbl = QLabel(label)
+        lbl.setFont(S.font("Segoe UI", 11, QFont.Bold))
+        lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setFixedHeight(18)
+        layout.addWidget(lbl)
+
+        val = QLabel(value)
+        val.setFont(S.font("Segoe UI", 14, QFont.Bold))
+        val.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        val.setWordWrap(False)
+        val.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        val.setFixedHeight(22)
+        layout.addWidget(val)
+
+        block._val_label = val
+        return block
+
+    def _create_sep(self):
+        """Create vertical separator."""
+        sep = QFrame()
+        sep.setFixedWidth(1)
+        sep.setFixedHeight(40)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        return sep
+
+    def _format_uptime(self, seconds):
+        days = seconds // 86400
+        hours = (seconds % 86400) // 3600
+        mins = (seconds % 3600) // 60
+        if days > 0:
+            return f"{days}d {hours}h"
+        elif hours > 0:
+            return f"{hours}h {mins}m"
+        return f"{mins}m"
+
     def _short_os(self):
-        """Short OS string"""
         p = platform.platform()
         if "Windows" in p:
             return "Windows " + platform.win32_ver()[0]
         return p
 
     def _short_cpu(self):
-        """Short CPU string"""
         cpu = self._get_cpu_name()
         if not cpu:
             cpu = platform.processor()
         if not cpu:
             return "Unknown"
-        # Shorten only very long names
-        if len(cpu) > 35:
-            return cpu[:35] + "..."
+        if len(cpu) > 32:
+            return cpu[:32] + "..."
         return cpu
 
     def _get_cpu_name(self):
-        """Get CPU name via WMI with caching"""
         now = time.time()
         if now - self._system_info_cache_time < self._system_info_cache_ttl and 'cpu_name' in self._system_info_cache:
             return self._system_info_cache['cpu_name']
@@ -334,7 +310,6 @@ class OverviewPage(QWidget):
             return None
 
     def _short_gpu(self):
-        """Get GPU name with caching"""
         now = time.time()
         if now - self._system_info_cache_time < self._system_info_cache_ttl and 'gpu_name' in self._system_info_cache:
             return self._system_info_cache['gpu_name']
@@ -344,270 +319,284 @@ class OverviewPage(QWidget):
             if gpus:
                 name = gpus[0].name
                 if len(name) > 28:
-                    result = name[:28] + "..."
-                else:
-                    result = name
-                self._system_info_cache['gpu_name'] = result
-                self._system_info_cache_time = now
-                return result
+                    return name[:28] + "..."
+                return name
         except:
             pass
         return "N/A"
-
-    def _create_info_block(self, label, value):
-        block = QFrame()
-        block.setContentsMargins(16, 0, 16, 0)
-        layout = QVBoxLayout()
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
-        block.setLayout(layout)
-
-        lbl = QLabel(label)
-        lbl.setFont(QFont("Segoe UI", 10))
-        lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-        layout.addWidget(lbl)
-
-        val = QLabel(value)
-        val.setFont(QFont("Segoe UI", 10))
-        val.setStyleSheet(f"color: {COLORS['text_primary']};")
-        val.setWordWrap(False)
-        layout.addWidget(val)
-
-        return block
-
-    def _create_separator(self):
-        sep = QFrame()
-        sep.setFixedWidth(1)
-        sep.setStyleSheet(f"background-color: transparent;")
-        return sep
-
-    def _format_uptime(self, seconds):
-        days = seconds // 86400
-        hours = (seconds % 86400) // 3600
-        mins = (seconds % 3600) // 60
-        if days > 0:
-            return f"{days}d {hours}h {mins}m"
-        elif hours > 0:
-            return f"{hours}h {mins}m"
-        else:
-            return f"{mins}m"
 
     def _start_timers(self):
         self._uptime_timer = QTimer(self)
         self._uptime_timer.timeout.connect(self._update_uptime)
         self._uptime_timer.start(1000)
 
-    def _on_processes_updated(self, processes):
-        """Handle processes updated from background thread"""
-        self._processes_cache = processes
-        self._update_process_table(processes)
+        # Start cpu_percent-intervallet (første kall gir alltid 0.0 i psutil)
+        psutil.cpu_percent(percpu=False)
+        for proc in psutil.process_iter(['cpu_percent']):
+            try:
+                proc.cpu_percent()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
 
-    def _on_storage_updated(self, partitions):
-        """Handle storage updated from background thread"""
-        self._storage_cache = partitions
-        self._update_storage_display(partitions)
+        self._process_timer = QTimer(self)
+        self._process_timer.timeout.connect(self._refresh_process_list)
+        self._process_timer.start(3000)
 
-    def _on_system_info_updated(self, info):
-        """Handle system info updated from background thread"""
-        self._system_info_cache = info
-        cpu_name = info.get('cpu_name', 'Unknown')
-        self._cpu_val_label.setText(cpu_name[:35] + '...' if len(cpu_name) > 35 else cpu_name)
-        self._gpu_val_label.setText(info.get('gpu_name', 'N/A'))
+    def _refresh_process_list(self):
+        """Hent og vis aktive prosesser sortert på CPU-bruk."""
+        try:
+            processes = []
+            for proc in psutil.process_iter(['name', 'cpu_percent', 'memory_info']):
+                try:
+                    if proc.is_running():
+                        processes.append(proc.info)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            processes.sort(key=lambda x: x.get('cpu_percent') or 0, reverse=True)
+            self._update_process_list(processes[:6])
+        except Exception as e:
+            print(f"Process refresh error: {e}")
 
     def _update_uptime(self):
         self._uptime_seconds = int(time.time() - self._start_time)
-        self._uptime_val_label.setText(self._format_uptime(self._uptime_seconds))
+        self._uptime_val.setText(self._format_uptime(self._uptime_seconds))
 
-    # ─── Row 1: Resource Cards ───────────────────────────────────────────────
+    def _on_processes_updated(self, processes):
+        self._processes_cache = processes
+        self._update_process_list(processes)
 
-    def _create_resource_cards_row(self):
+    # ─── Resource Cards Row ────────────────────────────────────────────────────
+
+    def _create_resource_row(self):
         row = QFrame()
         layout = QHBoxLayout()
         layout.setSpacing(14)
         row.setLayout(layout)
 
-        self._cpu_card = self._create_resource_card("CPU", COLORS['accent_blue'], "Clock", "Temp", "Power")
+        self._cpu_card = self._create_resource_card("CPU", COLORS['accent_blue'], "Load", "Temp", "Power")
         self._gpu_card = self._create_resource_card("GPU", COLORS['accent_green'], "Temp", "Fan", "Power")
-        self._ram_card = self._create_resource_card("RAM", COLORS['accent_purple'], "Speed", "Used", "Available")
-        self._disk_card = self._create_resource_card("Disk", COLORS['accent_orange'], "Read", "Write", "Temp")
-        self._network_card = self._create_network_card()
+        self._ram_card = self._create_resource_card("RAM", COLORS['accent_purple'], "Used", "Free", "Type")
+        self._disk_card = self._create_resource_card("Disk", COLORS['accent_orange'], "Read", "Write", "Usage")
+        self._net_card = self._create_network_card()
 
         layout.addWidget(self._cpu_card, stretch=1)
         layout.addWidget(self._gpu_card, stretch=1)
         layout.addWidget(self._ram_card, stretch=1)
         layout.addWidget(self._disk_card, stretch=1)
-        layout.addWidget(self._network_card, stretch=1)
+        layout.addWidget(self._net_card, stretch=1)
 
         return row
 
     def _create_resource_card(self, title, color, *labels):
+        """Create a resource card with gauge, stats and sparkline."""
         card = QFrame()
-        card.setMinimumHeight(200)
-        card.setStyleSheet(card_stylesheet())
+        card.setMinimumHeight(220)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
+            }}
+        """)
         layout = QVBoxLayout()
         layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
         card.setLayout(layout)
 
         # Title
         title_lbl = QLabel(title)
-        title_lbl.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        title_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+        title_lbl.setFont(S.font("Segoe UI", 15, QFont.Bold))
+        title_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(title_lbl)
 
-        # Gauge + Stats row
-        content = QHBoxLayout()
-        content.setSpacing(14)
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(sep)
 
-        gauge = DonutGauge(color=color, size=90)
+        # Gauge + Stats
+        content = QHBoxLayout()
+        content.setSpacing(16)
+        content.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+        gauge = DonutGauge(color=color, size=100)
         content.addWidget(gauge)
 
-        # Stats
-        stats_vbox = QVBoxLayout()
-        stats_vbox.setSpacing(8)
+        # Stats column
+        stats = QVBoxLayout()
+        stats.setSpacing(8)
+        stats.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        stat_widgets = []
-        for lbl in labels:
+        stat_labels = []
+        for lbl_text in labels:
             stat_row = QHBoxLayout()
-            stat_row.setSpacing(4)
+            stat_row.setSpacing(8)
 
-            name_lbl = QLabel(lbl + ":")
-            name_lbl.setFont(QFont("Segoe UI", 11))
-            name_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            name_lbl = QLabel(lbl_text)
+            name_lbl.setFont(S.font("Segoe UI", 11))
+            name_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+            name_lbl.setFixedWidth(50)
             stat_row.addWidget(name_lbl)
 
             val_lbl = QLabel("--")
-            val_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            val_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            val_lbl.setFont(S.font("Segoe UI", 12, QFont.Bold))
+            val_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
             stat_row.addWidget(val_lbl)
 
-            stat_row.addStretch()
-            stats_vbox.addLayout(stat_row)
-            stat_widgets.append(val_lbl)
+            stats.addLayout(stat_row)
+            stat_labels.append(val_lbl)
 
-        stats_vbox.addStretch()
-        content.addLayout(stats_vbox)
+        content.addLayout(stats)
+        content.addStretch()
         layout.addLayout(content)
 
-        # Sparkline
-        sparkline = SparklineWidget(colors=[color])
-        sparkline.setFixedHeight(50)
-        layout.addWidget(sparkline)
-
         card.gauge = gauge
-        card.sparkline = sparkline
-        card.stats = stat_widgets
+        card.stats = stat_labels
 
         return card
 
     def _create_network_card(self):
+        """Create network card with up/down speeds."""
         card = QFrame()
-        card.setMinimumHeight(200)
-        card.setStyleSheet(card_stylesheet())
+        card.setMinimumHeight(220)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
+            }}
+        """)
         layout = QVBoxLayout()
         layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
         card.setLayout(layout)
 
         # Title
         title_lbl = QLabel("Network")
-        title_lbl.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        title_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+        title_lbl.setFont(S.font("Segoe UI", 16, QFont.Bold))
+        title_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         layout.addWidget(title_lbl)
 
-        # Up/Down
-        content = QHBoxLayout()
-        content.setSpacing(24)
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(sep)
+
+        # Up/Down speeds
+        speeds = QHBoxLayout()
+        speeds.setSpacing(24)
 
         # Upload
-        up_vbox = QVBoxLayout()
-        up_vbox.setSpacing(2)
+        up_box = QVBoxLayout()
+        up_box.setSpacing(2)
+        up_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         up_icon = QLabel("▲")
-        up_icon.setFont(QFont("Segoe UI", 14))
-        up_icon.setStyleSheet(f"color: {COLORS['accent_cyan']};")
-        up_vbox.addWidget(up_icon)
+        up_icon.setFont(S.font("Segoe UI", 14))
+        up_icon.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
+        up_box.addWidget(up_icon)
+
         self._net_up_lbl = QLabel("0.0")
-        self._net_up_lbl.setFont(QFont("Segoe UI", 20, QFont.Bold))
-        self._net_up_lbl.setStyleSheet(f"color: {COLORS['accent_cyan']};")
-        up_vbox.addWidget(self._net_up_lbl)
+        self._net_up_lbl.setFont(S.font("Segoe UI", 26, QFont.Bold))
+        self._net_up_lbl.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
+        up_box.addWidget(self._net_up_lbl)
+
         up_unit = QLabel("Mbps up")
-        up_unit.setFont(QFont("Segoe UI", 10))
-        up_unit.setStyleSheet(f"color: {COLORS['text_muted']};")
-        up_vbox.addWidget(up_unit)
-        up_vbox.addStretch()
-        content.addLayout(up_vbox)
+        up_unit.setFont(S.font("Segoe UI", 11))
+        up_unit.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        up_box.addWidget(up_unit)
+        speeds.addLayout(up_box)
+
+        # Divider
+        divider = QFrame()
+        divider.setFixedWidth(1)
+        divider.setFixedHeight(50)
+        divider.setStyleSheet(f"background-color: {COLORS['border']};")
+        speeds.addWidget(divider)
 
         # Download
-        down_vbox = QVBoxLayout()
-        down_vbox.setSpacing(2)
+        down_box = QVBoxLayout()
+        down_box.setSpacing(2)
+        down_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         down_icon = QLabel("▼")
-        down_icon.setFont(QFont("Segoe UI", 14))
-        down_icon.setStyleSheet(f"color: {COLORS['accent_blue']};")
-        down_vbox.addWidget(down_icon)
+        down_icon.setFont(S.font("Segoe UI", 14))
+        down_icon.setStyleSheet(f"color: {COLORS['accent_blue']}; background: transparent;")
+        down_box.addWidget(down_icon)
+
         self._net_down_lbl = QLabel("0.0")
-        self._net_down_lbl.setFont(QFont("Segoe UI", 20, QFont.Bold))
-        self._net_down_lbl.setStyleSheet(f"color: {COLORS['accent_blue']};")
-        down_vbox.addWidget(self._net_down_lbl)
+        self._net_down_lbl.setFont(S.font("Segoe UI", 26, QFont.Bold))
+        self._net_down_lbl.setStyleSheet(f"color: {COLORS['accent_blue']}; background: transparent;")
+        down_box.addWidget(self._net_down_lbl)
+
         down_unit = QLabel("Mbps down")
-        down_unit.setFont(QFont("Segoe UI", 10))
-        down_unit.setStyleSheet(f"color: {COLORS['text_muted']};")
-        down_vbox.addWidget(down_unit)
-        down_vbox.addStretch()
-        content.addLayout(down_vbox)
+        down_unit.setFont(S.font("Segoe UI", 11))
+        down_unit.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        down_box.addWidget(down_unit)
+        speeds.addLayout(down_box)
 
-        content.addStretch()
-        layout.addLayout(content)
+        speeds.addStretch()
+        layout.addLayout(speeds)
 
-        # Sparklines (dual)
+        # Sparkline
         self._net_sparkline = SparklineWidget(colors=[COLORS['accent_cyan'], COLORS['accent_blue']])
-        self._net_sparkline.setFixedHeight(50)
+        self._net_sparkline.setFixedHeight(55)
         layout.addWidget(self._net_sparkline)
 
         return card
 
-    # ─── Row 2: Detail Charts ──────────────────────────────────────────────────
+    # ─── Detail Charts Row ─────────────────────────────────────────────────────
 
-    def _create_detail_charts_row(self):
+    def _create_chart_row(self):
         row = QFrame()
         layout = QHBoxLayout()
         layout.setSpacing(14)
         row.setLayout(layout)
 
-        self._cpu_detail_chart = self._create_detail_chart("CPU Usage", "Total · Core 1-8", COLORS['accent_blue'])
-        self._gpu_detail_chart = self._create_detail_chart("GPU Usage", "Load %", COLORS['accent_green'])
-        self._ram_detail_chart = self._create_detail_chart("RAM Usage", "Used GB", COLORS['accent_purple'])
-        self._net_detail_chart = self._create_detail_chart("Network Activity", "Down · Up", COLORS['accent_cyan'])
-        self._net_detail_chart.sparkline._colors = [COLORS['accent_blue'], COLORS['accent_cyan']]
-        self._net_detail_chart.sparkline._data = [deque(maxlen=60), deque(maxlen=60)]
+        self._cpu_chart = self._create_detail_chart("CPU", COLORS['accent_blue'])
+        self._gpu_chart = self._create_detail_chart("GPU", COLORS['accent_green'])
+        self._ram_chart = self._create_detail_chart("RAM", COLORS['accent_purple'])
+        self._net_chart = self._create_detail_chart("Network", COLORS['accent_cyan'])
 
-        layout.addWidget(self._cpu_detail_chart, stretch=1)
-        layout.addWidget(self._gpu_detail_chart, stretch=1)
-        layout.addWidget(self._ram_detail_chart, stretch=1)
-        layout.addWidget(self._net_detail_chart, stretch=1)
+        layout.addWidget(self._cpu_chart, stretch=1)
+        layout.addWidget(self._gpu_chart, stretch=1)
+        layout.addWidget(self._ram_chart, stretch=1)
+        layout.addWidget(self._net_chart, stretch=1)
 
         return row
 
-    def _create_detail_chart(self, title, legend, color):
+    def _create_detail_chart(self, title, color):
+        """Create detail chart card with sparkline."""
         card = QFrame()
         card.setMinimumHeight(160)
-        card.setStyleSheet(card_stylesheet())
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
+            }}
+        """)
         layout = QVBoxLayout()
         layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
         card.setLayout(layout)
 
-        # Header
-        header = QHBoxLayout()
-        header_lbl = QLabel(title)
-        header_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        header_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
-        header.addWidget(header_lbl)
-        header.addStretch()
+        # Title
+        title_lbl = QLabel(title)
+        title_lbl.setFont(S.font("Segoe UI", 14, QFont.Bold))
+        title_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        layout.addWidget(title_lbl)
 
-        legend_lbl = QLabel(legend)
-        legend_lbl.setFont(QFont("Segoe UI", 10))
-        legend_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-        header.addWidget(legend_lbl)
-        layout.addLayout(header)
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(sep)
 
-        # Sparkline chart
+        # Sparkline
         sparkline = SparklineWidget(colors=[color])
         sparkline.setFixedHeight(90)
         layout.addWidget(sparkline)
@@ -615,567 +604,288 @@ class OverviewPage(QWidget):
         card.sparkline = sparkline
         return card
 
-    # ─── Row 3: Info Panels ───────────────────────────────────────────────────
+    # ─── Info Panels Row ───────────────────────────────────────────────────────
 
-    def _create_info_panels_row(self):
+    def _create_info_row(self):
         row = QFrame()
         layout = QHBoxLayout()
         layout.setSpacing(14)
         row.setLayout(layout)
 
         process_card = self._create_process_card()
-        sysinfo_card = self._create_system_info_card()
+        sysinfo_card = self._create_sysinfo_card()
         storage_card = self._create_storage_card()
-        alerts_card = self._create_alerts_card()
 
         layout.addWidget(process_card, stretch=1)
         layout.addWidget(sysinfo_card, stretch=1)
         layout.addWidget(storage_card, stretch=1)
-        layout.addWidget(alerts_card, stretch=1)
 
         return row
 
-    # ── Process Table Card ──────────────────────────────────────────────────
-
     def _create_process_card(self):
+        """Process list card."""
         card = QFrame()
-        card.setMinimumHeight(280)
-        card.setStyleSheet(card_stylesheet())
-        layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
-        card.setLayout(layout)
-
-        # Title
-        title = QLabel("Top Processes")
-        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        layout.addWidget(title)
-
-        # Table
-        table = QTableWidget()
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(["Process", "PID", "CPU %", "RAM %", "GPU"])
-        table.setRowCount(6)
-        table.setShowGrid(False)
-        table.setSelectionBehavior(QTableWidget.SelectRows)
-        table.setFont(QFont("Segoe UI", 10))
-        table.horizontalHeader().setFont(QFont("Segoe UI", 9, QFont.Bold))
-        table.verticalHeader().setVisible(False)
-        table.verticalHeader().setDefaultSectionSize(32)
-        table.setFocusPolicy(Qt.NoFocus)
-        table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: {COLORS['bg_deeper']};
-                color: {COLORS['text_primary']};
-                border: none;
-                border-radius: 6px;
-                gridline-color: {COLORS['border']};
-            }}
-            QTableWidget::item {{
-                padding: 6px 8px;
-                border: none;
-                border-bottom: 1px solid {COLORS['border']};
-            }}
-            QHeaderView::section {{
-                background-color: {COLORS['bg_deeper']};
-                color: {COLORS['text_muted']};
-                border: none;
-                border-bottom: 1px solid {COLORS['border']};
-                padding: 8px 8px;
-                font-weight: bold;
-            }}
-            QHeaderView {{
-                border: none;
+        card.setMinimumHeight(260)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
             }}
         """)
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        card.setLayout(layout)
 
-        header = table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.Fixed)
-        header.setSectionResizeMode(4, QHeaderView.Fixed)
-        table.setColumnWidth(1, 50)
-        table.setColumnWidth(2, 55)
-        table.setColumnWidth(3, 55)
-        table.setColumnWidth(4, 45)
+        # Header
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
 
-        layout.addWidget(table)
-        self._process_table = table
+        title = QLabel("Top Processes")
+        title.setFont(S.font("Segoe UI", 14, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        header_layout.addWidget(title)
+
+        header_layout.addStretch()
+
+        badge = QLabel("6")
+        badge.setFont(S.font("Segoe UI", 10, QFont.Bold))
+        badge.setStyleSheet(f"""
+            QLabel {{
+                background-color: {COLORS['accent_blue']};
+                color: white;
+                padding: 2px 10px;
+                border-radius: 10px;
+            }}
+        """)
+        header_layout.addWidget(badge)
+        layout.addLayout(header_layout)
+
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(sep)
+
+        # Column header
+        col_header = QHBoxLayout()
+        col_header.setContentsMargins(16, 2, 16, 2)
+        col_header.setSpacing(0)
+
+        proc_col = QLabel("Process")
+        proc_col.setFont(S.font("Segoe UI", 10, QFont.Bold))
+        proc_col.setStyleSheet("color: #64748b; background: transparent;")
+        col_header.addWidget(proc_col)
+
+        col_header.addStretch()
+
+        cpu_col = QLabel("CPU")
+        cpu_col.setFont(S.font("Segoe UI", 10, QFont.Bold))
+        cpu_col.setStyleSheet("color: #64748b; background: transparent;")
+        cpu_col.setFixedWidth(58)
+        cpu_col.setAlignment(Qt.AlignmentFlag.AlignRight)
+        col_header.addWidget(cpu_col)
+
+        spacer_col = QLabel("")
+        spacer_col.setFixedWidth(14)
+        col_header.addWidget(spacer_col)
+
+        ram_col = QLabel("RAM")
+        ram_col.setFont(S.font("Segoe UI", 10, QFont.Bold))
+        ram_col.setStyleSheet("color: #64748b; background: transparent;")
+        ram_col.setFixedWidth(58)
+        ram_col.setAlignment(Qt.AlignmentFlag.AlignRight)
+        col_header.addWidget(ram_col)
+
+        layout.addLayout(col_header)
+
+        # Process list
+        self._process_list = QVBoxLayout()
+        self._process_list.setSpacing(6)
+        self._process_rows = []
+
+        for i in range(6):
+            row = self._create_process_row("--", "--", "--")
+            self._process_list.addWidget(row)
+            self._process_rows.append(row)
+
+        layout.addLayout(self._process_list)
 
         # View all button
         btn = QPushButton("View all →")
-        btn.setFont(QFont("Segoe UI", 9))
-        btn.setFixedHeight(26)
-        btn.setCursor(Qt.PointingHandCursor)
+        btn.setFont(S.font("Segoe UI", 10))
+        btn.setFixedHeight(28)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.clicked.connect(self._show_all_processes)
         btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {COLORS['bg_deeper']};
+                background-color: {COLORS['bg_hover']};
                 color: {COLORS['text_secondary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 4px;
-                padding: 4px 12px;
+                border: none;
+                border-radius: 6px;
+                padding: 4px 14px;
             }}
             QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                color: {COLORS['text_primary']};
-                border-color: {COLORS['accent_blue']};
+                background-color: {COLORS['accent_blue']};
+                color: white;
             }}
         """)
         layout.addWidget(btn)
 
         return card
 
-    # ── System Info Card ───────────────────────────────────────────────────
-
-    def _create_system_info_card(self):
-        card = QFrame()
-        card.setMinimumHeight(200)
-        card.setStyleSheet(card_stylesheet())
-        layout = QVBoxLayout()
-        layout.setSpacing(12)
-        card.setLayout(layout)
-
-        # Header
-        header = QHBoxLayout()
-        header.setSpacing(8)
-
-        icon_lbl = QLabel("🖥️")
-        icon_lbl.setFont(QFont("Segoe UI", 14))
-        header.addWidget(icon_lbl)
-
-        title = QLabel("System Info")
-        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        header.addWidget(title)
-
-        header.addStretch()
-        layout.addLayout(header)
-
-        # System info rows container
-        sys_container = QVBoxLayout()
-        sys_container.setSpacing(8)
-        layout.addLayout(sys_container)
-
-        # System info data
-        sys_info = [
-            ("Motherboard", self._get_motherboard(), "🖧"),
-            ("CPU", (platform.processor() or "Unknown")[:40], "⚙️"),
-            ("GPU", self._short_gpu(), "🎮"),
-            ("RAM", self._get_ram_info(), "💾"),
-            ("Storage", self._get_primary_disk(), "🖴"),
-            ("OS", self._short_os(), "🖥️"),
-        ]
-
-        for label, value, icon in sys_info:
-            row = QFrame()
-            row.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['bg_deeper']};
-                    border-radius: 8px;
-                    padding: 10px 12px;
-                }}
-            """)
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(12)
-            row_layout.setContentsMargins(6, 6, 6, 6)
-            row.setLayout(row_layout)
-
-            # Icon box
-            icon_box = QFrame()
-            icon_box.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['bg_card']};
-                    border-radius: 8px;
-                    padding: 6px;
-                }}
-            """)
-            icon_box_layout = QVBoxLayout()
-            icon_box_layout.setContentsMargins(0, 0, 0, 0)
-            icon_box_layout.setSpacing(0)
-            icon_box.setLayout(icon_box_layout)
-
-            icon_lbl = QLabel(icon)
-            icon_lbl.setFont(QFont("Segoe UI", 16))
-            icon_lbl.setAlignment(Qt.AlignCenter)
-            icon_box_layout.addWidget(icon_lbl)
-
-            row_layout.addWidget(icon_box)
-
-            # Label
-            lbl = QLabel(label)
-            lbl.setFont(QFont("Segoe UI", 10))
-            lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-            lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            row_layout.addWidget(lbl)
-
-            row_layout.addStretch()
-
-            # Value
-            val_lbl = QLabel(value)
-            val_lbl.setFont(QFont("Segoe UI", 10))
-            val_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
-            val_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            row_layout.addWidget(val_lbl)
-
-            sys_container.addWidget(row)
-
-        return card
-
-    def _get_motherboard(self):
-        """Get motherboard with caching"""
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'motherboard' in self._system_info_cache:
-            return self._system_info_cache['motherboard']
-        try:
-            import wmi
-            w = wmi.WMI()
-            result = w.Win32_BaseBoard()[0].Product
-            self._system_info_cache['motherboard'] = result
-            self._system_info_cache_time = now
-            return result
-        except:
-            return "Unknown"
-
-    def _get_primary_disk(self):
-        """Get primary disk with caching"""
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'primary_disk' in self._system_info_cache:
-            return self._system_info_cache['primary_disk']
-        try:
-            result = psutil.disk_partitions()[0].device
-            self._system_info_cache['primary_disk'] = result
-            self._system_info_cache_time = now
-            return result
-        except:
-            return "Unknown"
-
-    def _get_ram_info(self):
-        """Get RAM info: size and type with caching"""
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_info' in self._system_info_cache:
-            return self._system_info_cache['ram_info']
-        try:
-            import psutil
-            mem = psutil.virtual_memory()
-            total_gb = round(mem.total / (1024**3))
-
-            # Try WMI for RAM type via multiple methods
-            ram_type = "Unknown"
-            speed = 0
-
-            try:
-                import wmi
-                w = wmi.WMI()
-                for mem_obj in w.Win32_PhysicalMemory():
-                    # Get speed first
-                    if hasattr(mem_obj, 'Speed') and mem_obj.Speed:
-                        speed = int(mem_obj.Speed)
-
-                    # Check MemoryType property
-                    if hasattr(mem_obj, 'MemoryType') and mem_obj.MemoryType:
-                        mem_type = int(mem_obj.MemoryType)
-                        # MemoryType values: 0=Unknown, 20=DDR5, 21=DDR4, 22=DDR3, 24=DDR2
-                        type_map = {
-                            20: "DDR5",
-                            21: "DDR4",
-                            22: "DDR3",
-                            24: "DDR2",
-                        }
-                        ram_type = type_map.get(mem_type, "Unknown")
-                        if ram_type != "Unknown":
-                            break
-
-                # Fallback: detect by speed if MemoryType didn't work
-                if ram_type == "Unknown" and speed > 0:
-                    if speed >= 6400:
-                        ram_type = "DDR5"
-                    elif speed >= 3200:
-                        ram_type = "DDR4"
-                    elif speed >= 2133:
-                        ram_type = "DDR3"
-                    else:
-                        ram_type = "DDR"
-
-            except Exception as e:
-                print(f"WMI RAM detection error: {e}")
-
-            if ram_type != "Unknown":
-                result = f"{total_gb} GB {ram_type}"
-            else:
-                result = f"{total_gb} GB"
-            self._system_info_cache['ram_info'] = result
-            self._system_info_cache_time = now
-            return result
-        except Exception as e:
-            print(f"RAM info error: {e}")
-            return "Unknown"
-
-    def _get_ram_speed(self):
-        """Get live RAM speed via WMI with caching"""
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_speed' in self._system_info_cache:
-            return self._system_info_cache['ram_speed']
-        try:
-            import wmi
-            w = wmi.WMI()
-            for mem_obj in w.Win32_PhysicalMemory():
-                if hasattr(mem_obj, 'Speed') and mem_obj.Speed:
-                    speed = int(mem_obj.Speed)
-                    if speed > 0:
-                        result = f"{speed} MHz"
-                        self._system_info_cache['ram_speed'] = result
-                        self._system_info_cache_time = now
-                        return result
-            return "-- MHz"
-        except:
-            return "-- MHz"
-
-    # ── Storage Card ─────────────────────────────────────────────────────────
-
-    def _create_storage_card(self):
-        card = QFrame()
-        card.setMinimumHeight(200)
-        card.setStyleSheet(card_stylesheet())
-        layout = QVBoxLayout()
-        layout.setSpacing(12)
-        card.setLayout(layout)
-
-        # Header
-        header = QHBoxLayout()
-        header.setSpacing(8)
-
-        icon_lbl = QLabel("💾")
-        icon_lbl.setFont(QFont("Segoe UI", 14))
-        header.addWidget(icon_lbl)
-
-        title = QLabel("Storage")
-        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        header.addWidget(title)
-
-        header.addStretch()
-
-        # View all button
-        btn = QPushButton("View all →")
-        btn.setFont(QFont("Segoe UI", 9))
-        btn.setFixedHeight(26)
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.clicked.connect(lambda: self._show_all_drives())
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_deeper']};
-                color: {COLORS['text_secondary']};
-                border: 1px solid {COLORS['border']};
+    def _create_process_row(self, name, cpu, ram):
+        """Single process row."""
+        row = QFrame()
+        row.setStyleSheet(f"""
+            QFrame {{
+                background-color: transparent;
                 border-radius: 4px;
-                padding: 4px 10px;
             }}
-            QPushButton:hover {{
+            QFrame:hover {{
                 background-color: {COLORS['bg_hover']};
-                color: {COLORS['text_primary']};
-                border-color: {COLORS['accent_orange']};
             }}
         """)
-        header.addWidget(btn)
-        layout.addLayout(header)
+        layout = QHBoxLayout()
+        layout.setContentsMargins(16, 8, 16, 8)
+        layout.setSpacing(0)
+        row.setLayout(layout)
 
-        self._storage_container = QVBoxLayout()
-        self._storage_container.setSpacing(8)
-        layout.addLayout(self._storage_container)
+        name_lbl = QLabel(name)
+        name_lbl.setFont(S.font("Segoe UI", 12, QFont.Bold))
+        name_lbl.setStyleSheet("color: #f0f4f8; background: transparent;")
+        layout.addWidget(name_lbl)
+        row._name_lbl = name_lbl
 
-        # Initial storage display - will be populated when signal arrives
-        # If no data yet, show placeholder
-        self._update_storage_display([])
+        layout.addStretch()
 
-        return card
+        cpu_lbl = QLabel(cpu)
+        cpu_lbl.setFont(S.font("Segoe UI", 11, QFont.Bold))
+        cpu_lbl.setStyleSheet("color: #60a5fa; background: transparent;")
+        cpu_lbl.setFixedWidth(58)
+        cpu_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(cpu_lbl)
+        row._cpu_lbl = cpu_lbl
 
-    def _update_storage_display(self, partitions):
-        """Repopulate storage card with partitions data from background thread"""
-        # Clear existing
-        while self._storage_container.count():
-            item = self._storage_container.takeAt(0)
-            if item is not None:
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
+        divider = QLabel("")
+        divider.setFixedWidth(14)
+        layout.addWidget(divider)
 
-        for partition in partitions:
-            if not partition.get('fstype'):
-                continue
+        ram_lbl = QLabel(ram)
+        ram_lbl.setFont(S.font("Segoe UI", 11, QFont.Bold))
+        ram_lbl.setStyleSheet("color: #a78bfa; background: transparent;")
+        ram_lbl.setFixedWidth(58)
+        ram_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(ram_lbl)
+        row._ram_lbl = ram_lbl
 
-            drive_letter = partition.get('device', '')
-            mountpoint = partition.get('mountpoint', '')
+        return row
 
-            # Calculate values from cached data
-            total_gb = partition.get('total', 0) / (1024**3)
-            used_gb = partition.get('used', 0) / (1024**3)
-            free_gb = partition.get('free', 0) / (1024**3)
-            pct = partition.get('percent', 0)
+    def _update_process_list(self, processes):
+        try:
+            for i in range(6):
+                if i < len(processes):
+                    proc = processes[i]
+                    name = (proc.get('name') or 'Unknown')[:18]
+                    cpu_val = proc.get('cpu_percent')
+                    cpu_str = f"{cpu_val:.1f}%" if cpu_val is not None else "--"
 
-            # Create storage row
-            row = QFrame()
-            row.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['bg_deeper']};
-                    border-radius: 8px;
-                    padding: 10px 12px;
-                }}
-            """)
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(12)
-            row_layout.setContentsMargins(4, 4, 4, 4)
-            row.setLayout(row_layout)
+                    mem_info = proc.get('memory_info')
+                    if mem_info and hasattr(mem_info, 'rss'):
+                        mem_pct = (mem_info.rss / psutil.virtual_memory().total) * 100
+                        ram_str = f"{mem_pct:.1f}%"
+                    else:
+                        ram_str = "--"
 
-            # Disk icon + drive letter
-            icon_col = QVBoxLayout()
-            icon_col.setSpacing(3)
-            icon_col.setAlignment(Qt.AlignCenter)
-            icon_label = DiskIcon(size=44)
-            icon_col.addWidget(icon_label)
-            drive_lbl = QLabel(drive_letter.replace("\\", ""))
-            drive_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            drive_lbl.setStyleSheet(f"color: {COLORS['accent_orange']};")
-            drive_lbl.setAlignment(Qt.AlignCenter)
-            icon_col.addWidget(drive_lbl)
+                    self._process_rows[i]._name_lbl.setText(name)
+                    self._process_rows[i]._name_lbl.setStyleSheet("color: #f0f4f8; background: transparent;")
+                    self._process_rows[i]._cpu_lbl.setText(cpu_str)
+                    self._process_rows[i]._cpu_lbl.setStyleSheet("color: #60a5fa; background: transparent;")
+                    self._process_rows[i]._ram_lbl.setText(ram_str)
+                    self._process_rows[i]._ram_lbl.setStyleSheet("color: #a78bfa; background: transparent;")
+                else:
+                    self._process_rows[i]._name_lbl.setText("--")
+                    self._process_rows[i]._name_lbl.setStyleSheet("color: #f0f4f8; background: transparent;")
+                    self._process_rows[i]._cpu_lbl.setText("--")
+                    self._process_rows[i]._cpu_lbl.setStyleSheet("color: #60a5fa; background: transparent;")
+                    self._process_rows[i]._ram_lbl.setText("--")
+                    self._process_rows[i]._ram_lbl.setStyleSheet("color: #a78bfa; background: transparent;")
+        except Exception as e:
+            print(f"Process list update error: {e}")
 
-            row_layout.addLayout(icon_col)
-
-            # Drive info
-            info_box = QVBoxLayout()
-            info_box.setSpacing(2)
-
-            # Name/location
-            name_text = mountpoint if mountpoint else drive_letter
-
-            name_lbl = QLabel(name_text)
-            name_lbl.setFont(QFont("Segoe UI", 10, QFont.Bold))
-            name_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
-            info_box.addWidget(name_lbl)
-
-            # Progress bar
-            bar = QProgressBar()
-            bar.setValue(int(pct))
-            bar.setFixedHeight(6)
-            bar.setTextVisible(False)
-            bar.setStyleSheet(f"""
-                QProgressBar {{
-                    background-color: {COLORS['bg_card']};
-                    border: none;
-                    border-radius: 3px;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {self._get_storage_color(pct)};
-                    border-radius: 3px;
-                }}
-            """)
-            info_box.addWidget(bar)
-
-            row_layout.addLayout(info_box, stretch=1)
-
-            # Size info
-            size_box = QVBoxLayout()
-            size_box.setSpacing(0)
-            size_box.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-
-            used_lbl = QLabel(f"{used_gb:.0f} GB used")
-            used_lbl.setFont(QFont("Segoe UI", 9))
-            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
-            used_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            size_box.addWidget(used_lbl)
-
-            free_lbl = QLabel(f"{free_gb:.0f} GB free")
-            free_lbl.setFont(QFont("Segoe UI", 8))
-            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-            free_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            size_box.addWidget(free_lbl)
-
-            row_layout.addLayout(size_box)
-
-            # Percentage badge
-            pct_box = QVBoxLayout()
-            pct_box.setSpacing(0)
-            pct_box.setAlignment(Qt.AlignCenter)
-
-            pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)};")
-            pct_lbl.setAlignment(Qt.AlignCenter)
-            pct_box.addWidget(pct_lbl)
-
-            row_layout.addLayout(pct_box)
-
-            self._storage_container.addWidget(row)
-
-    def _get_storage_color(self, pct):
-        """Get color based on usage percentage"""
-        if pct > 90:
-            return COLORS['accent_red']
-        elif pct > 75:
-            return COLORS['accent_orange']
-        return COLORS['accent_green']
-
-    def _show_all_drives(self):
-        """Show all drives in a dialog"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QProgressBar, QPushButton
+    def _show_all_processes(self):
+        """Show all processes dialog."""
+        from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton
+        from PyQt6.QtCore import Qt, QPoint
 
         dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-        dialog.setMinimumSize(750, 450)
+        dialog.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        dialog.setMinimumSize(800, 550)
         dialog.setStyleSheet(f"""
             QDialog {{
                 background-color: {COLORS['bg_primary']};
                 color: {COLORS['text_primary']};
+                border: none;
             }}
         """)
 
         # Drag state
-        _drag_pos = None
+        drag_position = QPoint()
 
         def mousePressEvent(event):
-            if event.button() == Qt.LeftButton:
-                nonlocal _drag_pos
-                _drag_pos = event.globalPos() - dialog.frameGeometry().topLeft()
+            nonlocal drag_position
+            if event.button() == Qt.MouseButton.LeftButton:
+                drag_position = event.globalPos() - dialog.frameGeometry().topLeft()
                 event.accept()
 
         def mouseMoveEvent(event):
-            if event.buttons() == Qt.LeftButton and _drag_pos:
-                dialog.move(event.globalPos() - _drag_pos)
+            nonlocal drag_position
+            if event.buttons() == Qt.MouseButton.LeftButton and not drag_position.isNull():
+                dialog.move(event.globalPos() - drag_position)
                 event.accept()
 
         def mouseReleaseEvent(event):
-            if event.button() == Qt.LeftButton:
-                _drag_pos = None
+            nonlocal drag_position
+            if event.button() == Qt.MouseButton.LeftButton:
+                drag_position = QPoint()
                 event.accept()
 
+        dialog.mousePressEvent = mousePressEvent
+        dialog.mouseMoveEvent = mouseMoveEvent
+        dialog.mouseReleaseEvent = mouseReleaseEvent
+
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(16)
         main_layout.setContentsMargins(24, 24, 24, 24)
         dialog.setLayout(main_layout)
 
-        # Header with drag handle
+        # Header with drag support
         header = QFrame()
-        header.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
+        header.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border-radius: 8px;
+            }}
+        """)
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(20, 12, 12, 12)
         header.setLayout(header_layout)
-        header.setCursor(Qt.SizeAllCursor)
+        header.setCursor(Qt.CursorShape.SizeAllCursor)
         header.mousePressEvent = mousePressEvent
         header.mouseMoveEvent = mouseMoveEvent
         header.mouseReleaseEvent = mouseReleaseEvent
 
-        title = QLabel("Storage Drives")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        title = QLabel("Running Processes")
+        title.setFont(S.font("Segoe UI", 16, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         header_layout.addWidget(title)
-
         header_layout.addStretch()
 
         close_btn = QPushButton("×")
-        close_btn.setFont(QFont("Segoe UI", 16))
+        close_btn.setFont(S.font("Segoe UI", 16))
         close_btn.setFixedSize(32, 32)
-        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
@@ -1188,15 +898,514 @@ class OverviewPage(QWidget):
                 color: {COLORS['text_primary']};
             }}
         """)
-        close_btn.clicked.connect(dialog.close)
+        close_btn.clicked.connect(dialog.accept)
         header_layout.addWidget(close_btn)
-
         main_layout.addWidget(header)
 
-        # Drives container
-        drives_container = QVBoxLayout()
-        drives_container.setSpacing(14)
-        main_layout.addLayout(drives_container)
+        # Table
+        table = QTableWidget()
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["Process", "PID", "CPU %", "RAM MB", "Status"])
+        table.setShowGrid(False)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setFont(S.font("Segoe UI", 11))
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {COLORS['bg_card']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
+                gridline-color: {COLORS['border']};
+            }}
+            QTableWidget::item {{
+                background-color: {COLORS['bg_card']};
+                color: {COLORS['text_primary']};
+                border: none;
+                border-bottom: 1px solid {COLORS['border']};
+            }}
+            QTableWidget::item:alternate {{
+                background-color: {COLORS['bg_deeper']};
+                color: {COLORS['text_primary']};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {COLORS['bg_hover']};
+                color: {COLORS['text_primary']};
+            }}
+            QHeaderView::section {{
+                background-color: {COLORS['bg_deeper']};
+                color: {COLORS['text_secondary']};
+                border: none;
+                border-bottom: 2px solid {COLORS['border']};
+                padding: 12px 16px;
+                font-weight: bold;
+                font-size: 11px;
+            }}
+            QHeaderView::section:pressed {{
+                background-color: {COLORS['bg_hover']};
+            }}
+        """)
+
+        table_header = table.horizontalHeader()
+        table_header.setStretchLastSection(True)
+        table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        table.setColumnWidth(0, 200)
+        table.setColumnWidth(1, 80)
+        table.setColumnWidth(2, 80)
+        table.setColumnWidth(3, 90)
+        table.setColumnWidth(4, 90)
+
+        processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
+            try:
+                if proc.is_running():
+                    processes.append(proc.info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+        processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
+
+        text_color = QColor(COLORS['text_primary'])
+        table.setRowCount(len(processes))
+
+        for i, proc in enumerate(processes):
+            name_item = QTableWidgetItem(proc.get('name') or 'Unknown')
+            name_item.setForeground(text_color)
+            table.setItem(i, 0, name_item)
+
+            pid_item = QTableWidgetItem(str(proc.get('pid', '--')))
+            pid_item.setForeground(text_color)
+            table.setItem(i, 1, pid_item)
+
+            cpu_val = proc.get('cpu_percent')
+            cpu_item = QTableWidgetItem(f"{cpu_val:.1f}" if cpu_val is not None else "--")
+            cpu_item.setForeground(text_color)
+            table.setItem(i, 2, cpu_item)
+
+            mem_info = proc.get('memory_info')
+            if mem_info and hasattr(mem_info, 'rss'):
+                mem_item = QTableWidgetItem(f"{mem_info.rss / (1024**2):.0f}")
+                mem_item.setForeground(text_color)
+                table.setItem(i, 3, mem_item)
+            else:
+                mem_item = QTableWidgetItem("--")
+                mem_item.setForeground(text_color)
+                table.setItem(i, 3, mem_item)
+
+            status_item = QTableWidgetItem("Running")
+            status_item.setForeground(QColor(COLORS['accent_green']))
+            table.setItem(i, 4, status_item)
+
+        main_layout.addWidget(table, stretch=1)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        close_btn = QPushButton("Close")
+        close_btn.setFont(S.font("Segoe UI", 11))
+        close_btn.setFixedHeight(38)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['accent_blue']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 24px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #2563eb;
+            }}
+        """)
+        btn_layout.addWidget(close_btn)
+
+        main_layout.addLayout(btn_layout)
+
+        close_btn.clicked.connect(dialog.accept)
+        dialog.exec()
+
+    def _create_sysinfo_card(self):
+        """System info card."""
+        card = QFrame()
+        card.setMinimumHeight(260)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
+            }}
+        """)
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        card.setLayout(layout)
+
+        # Title
+        title = QLabel("System Info")
+        title.setFont(S.font("Segoe UI", 14, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        layout.addWidget(title)
+
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(sep)
+
+        # Specs
+        specs = QVBoxLayout()
+        specs.setSpacing(8)
+
+        specs.addWidget(self._create_spec_row("Processor", self._get_cpu_display(), COLORS['accent_blue']))
+        specs.addWidget(self._create_spec_row("Graphics", self._get_gpu_display(), COLORS['accent_green']))
+        specs.addWidget(self._create_spec_row("Memory", self._get_ram_display(), COLORS['accent_purple']))
+        specs.addWidget(self._create_spec_row("Storage", self._get_disk_display(), COLORS['accent_orange']))
+        specs.addWidget(self._create_spec_row("OS", self._short_os(), COLORS['text_secondary']))
+
+        layout.addLayout(specs)
+        layout.addStretch()
+
+        return card
+
+    def _create_spec_row(self, label, value, color):
+        """Single spec row."""
+        row = QFrame()
+        row.setStyleSheet("background-color: transparent;")
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 6, 0, 6)
+        layout.setSpacing(0)
+        row.setLayout(layout)
+
+        indicator = QFrame()
+        indicator.setFixedSize(3, 22)
+        indicator.setStyleSheet(f"background-color: {color}; border-radius: 1px;")
+        layout.addWidget(indicator)
+
+        lbl = QLabel(label)
+        lbl.setFont(S.font("Segoe UI", 11))
+        lbl.setStyleSheet(f"color: {COLORS['text_muted']}; padding-left: 12px; background: transparent;")
+        lbl.setMinimumWidth(80)
+        layout.addWidget(lbl)
+
+        val_lbl = QLabel(value)
+        val_lbl.setFont(S.font("Segoe UI", 11))
+        val_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(val_lbl, stretch=1)
+
+        return row
+
+    def _get_cpu_display(self):
+        cpu = self._get_cpu_name()
+        if not cpu:
+            cpu = platform.processor()
+        if not cpu:
+            return "Unknown"
+        if len(cpu) > 38:
+            return cpu[:38] + "..."
+        return cpu
+
+    def _get_gpu_display(self):
+        gpu = self._short_gpu()
+        if not gpu or gpu == "N/A":
+            return "Not detected"
+        return gpu
+
+    def _get_ram_display(self):
+        now = time.time()
+        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_info' in self._system_info_cache:
+            return self._system_info_cache['ram_info']
+        try:
+            mem = psutil.virtual_memory()
+            total_gb = round(mem.total / (1024**3))
+
+            ram_type = "Unknown"
+            mem_obj = None
+            try:
+                import wmi
+                w = wmi.WMI()
+                for mem_obj in w.Win32_PhysicalMemory():
+                    if hasattr(mem_obj, 'MemoryType') and mem_obj.MemoryType:
+                        mem_type = int(mem_obj.MemoryType)
+                        type_map = {20: "DDR5", 21: "DDR4", 22: "DDR3", 24: "DDR2"}
+                        ram_type = type_map.get(mem_type, "Unknown")
+                        if ram_type != "Unknown":
+                            break
+                if ram_type == "Unknown" and mem_obj is not None and hasattr(mem_obj, 'Speed') and mem_obj.Speed:
+                    speed = int(mem_obj.Speed)
+                    if speed >= 6400:
+                        ram_type = "DDR5"
+                    elif speed >= 3200:
+                        ram_type = "DDR4"
+                    elif speed >= 2133:
+                        ram_type = "DDR3"
+            except:
+                pass
+
+            if ram_type != "Unknown":
+                result = f"{total_gb} GB {ram_type}"
+            else:
+                result = f"{total_gb} GB"
+
+            self._system_info_cache['ram_info'] = result
+            self._system_info_cache_time = now
+            return result
+        except:
+            return "Unknown"
+
+    def _get_disk_display(self):
+        try:
+            disk = psutil.disk_partitions()[0].device
+            return disk if disk else "Unknown"
+        except:
+            return "Unknown"
+
+    def _create_storage_card(self):
+        """Storage card."""
+        card = QFrame()
+        card.setMinimumHeight(260)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
+            }}
+        """)
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        card.setLayout(layout)
+
+        # Header
+        header = QHBoxLayout()
+        header.setSpacing(8)
+
+        title = QLabel("Storage")
+        title.setFont(S.font("Segoe UI", 14, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        header.addWidget(title)
+
+        header.addStretch()
+
+        btn = QPushButton("View all →")
+        btn.setFont(S.font("Segoe UI", 10))
+        btn.setFixedHeight(26)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(self._show_all_drives)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_hover']};
+                color: {COLORS['text_secondary']};
+                border: none;
+                border-radius: 6px;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['accent_orange']};
+                color: white;
+            }}
+        """)
+        header.addWidget(btn)
+        layout.addLayout(header)
+
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(sep)
+
+        # Storage container
+        self._storage_container = QVBoxLayout()
+        self._storage_container.setSpacing(8)
+        layout.addLayout(self._storage_container)
+
+        self._update_storage_display([])
+
+        return card
+
+    def _update_storage_display(self, partitions):
+        while self._storage_container.count():
+            item = self._storage_container.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+
+        if not partitions:
+            placeholder = QLabel("No drives detected")
+            placeholder.setFont(S.font("Segoe UI", 12))
+            placeholder.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._storage_container.addWidget(placeholder)
+            return
+
+        for partition in partitions:
+            if not partition.get('fstype'):
+                continue
+
+            drive_letter = partition.get('device', '')
+            mountpoint = partition.get('mountpoint', '')
+            total_gb = partition.get('total', 0) / (1024**3)
+            used_gb = partition.get('used', 0) / (1024**3)
+            free_gb = partition.get('free', 0) / (1024**3)
+            pct = partition.get('percent', 0)
+
+            row = QFrame()
+            row.setStyleSheet("background-color: transparent;")
+            row_layout = QHBoxLayout()
+            row_layout.setContentsMargins(0, 6, 0, 6)
+            row_layout.setSpacing(12)
+            row.setLayout(row_layout)
+
+            # Drive badge
+            badge = QLabel(drive_letter.replace("\\", "") if drive_letter else "?")
+            badge.setFont(S.font("Segoe UI", 11, QFont.Bold))
+            badge.setStyleSheet(f"""
+                background-color: {COLORS['accent_orange']};
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+            """)
+            badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            badge.setFixedWidth(32)
+            row_layout.addWidget(badge)
+
+            # Info
+            info = QVBoxLayout()
+            info.setSpacing(4)
+
+            name_lbl = QLabel(mountpoint if mountpoint else drive_letter)
+            name_lbl.setFont(S.font("Segoe UI", 11, QFont.Bold))
+            name_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            info.addWidget(name_lbl)
+
+            bar = QProgressBar()
+            bar.setValue(int(pct))
+            bar.setFixedHeight(6)
+            bar.setTextVisible(False)
+            bar.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {COLORS['bg_deeper']};
+                    border: none;
+                    border-radius: 3px;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {self._get_storage_color(pct)};
+                    border-radius: 3px;
+                }}
+            """)
+            info.addWidget(bar)
+            row_layout.addLayout(info, stretch=1)
+
+            # Usage
+            usage_lbl = QLabel(f"{used_gb:.0f}/{total_gb:.0f} GB")
+            usage_lbl.setFont(S.font("Segoe UI", 10))
+            usage_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+            usage_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            usage_lbl.setMinimumWidth(70)
+            row_layout.addWidget(usage_lbl)
+
+            # Percentage
+            pct_lbl = QLabel(f"{pct:.0f}%")
+            pct_lbl.setFont(S.font("Segoe UI", 11, QFont.Bold))
+            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)}; background: transparent;")
+            pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+            pct_lbl.setMinimumWidth(40)
+            row_layout.addWidget(pct_lbl)
+
+            self._storage_container.addWidget(row)
+
+    def _get_storage_color(self, pct):
+        if pct > 90:
+            return COLORS['accent_red']
+        elif pct > 75:
+            return COLORS['accent_orange']
+        return COLORS['accent_green']
+
+    def _show_all_drives(self):
+        """Show all drives dialog."""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QProgressBar, QPushButton
+        from PyQt6.QtCore import Qt
+
+        dialog = QDialog(self)
+        dialog.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        dialog.setMinimumSize(700, 450)
+        dialog.setStyleSheet(f"""
+            QDialog {{
+                background-color: {COLORS['bg_primary']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+
+        drag_pos = None
+
+        def mousePressEvent(event):
+            if event.button() == Qt.MouseButton.LeftButton:
+                nonlocal drag_pos
+                drag_pos = event.globalPos() - dialog.frameGeometry().topLeft()
+                event.accept()
+
+        def mouseMoveEvent(event):
+            if event.buttons() == Qt.MouseButton.LeftButton and drag_pos:
+                dialog.move(event.globalPos() - drag_pos)
+                event.accept()
+
+        def mouseReleaseEvent(event):
+            if event.button() == Qt.MouseButton.LeftButton:
+                nonlocal drag_pos
+                drag_pos = None
+                event.accept()
+
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        dialog.setLayout(main_layout)
+
+        # Header
+        header = QFrame()
+        header.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(20, 12, 12, 12)
+        header.setLayout(header_layout)
+        header.setCursor(Qt.CursorShape.SizeAllCursor)
+        header.mousePressEvent = mousePressEvent
+        header.mouseMoveEvent = mouseMoveEvent
+        header.mouseReleaseEvent = mouseReleaseEvent
+
+        title = QLabel("Storage Drives")
+        title.setFont(S.font("Segoe UI", 16, QFont.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+
+        close_btn = QPushButton("×")
+        close_btn.setFont(S.font("Segoe UI", 16))
+        close_btn.setFixedSize(32, 32)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLORS['text_muted']};
+                border: none;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_hover']};
+                color: {COLORS['text_primary']};
+            }}
+        """)
+        close_btn.clicked.connect(dialog.accept)
+        header_layout.addWidget(close_btn)
+        main_layout.addWidget(header)
+
+        # Drives
+        drives = QVBoxLayout()
+        drives.setSpacing(14)
 
         for partition in psutil.disk_partitions():
             if not partition.fstype:
@@ -1208,67 +1417,41 @@ class OverviewPage(QWidget):
 
             drive_letter = partition.device
             mountpoint = partition.mountpoint
-
-            try:
-                import wmi
-                w = wmi.WMI()
-                vol_name = ""
-                for disk in w.Win32_LogicalDisk():
-                    if disk.DeviceID == drive_letter:
-                        vol_name = disk.VolumeName or ""
-                        break
-            except:
-                vol_name = ""
-
             total_gb = usage.total / (1024**3)
             used_gb = usage.used / (1024**3)
             free_gb = usage.free / (1024**3)
             pct = usage.percent
 
-            # Drive card
             drive_card = QFrame()
             drive_card.setStyleSheet(f"""
                 QFrame {{
                     background-color: {COLORS['bg_card']};
                     border: 1px solid {COLORS['border']};
                     border-radius: 12px;
-                    padding: 16px;
                 }}
             """)
             drive_layout = QHBoxLayout()
             drive_layout.setSpacing(20)
+            drive_layout.setContentsMargins(16, 16, 16, 16)
             drive_card.setLayout(drive_layout)
 
-            # Left icon + drive letter (no frame, just icon column)
-            icon_col = QVBoxLayout()
-            icon_col.setSpacing(3)
-            icon_col.setAlignment(Qt.AlignCenter)
-            disk_icon = DiskIcon(size=56)
-            icon_col.addWidget(disk_icon)
-            drive_lbl = QLabel(drive_letter.replace("\\", ""))
-            drive_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            drive_lbl.setStyleSheet(f"color: {COLORS['accent_orange']};")
-            drive_lbl.setAlignment(Qt.AlignCenter)
-            icon_col.addWidget(drive_lbl)
+            # Drive letter
+            letter = QLabel(drive_letter.replace("\\", ""))
+            letter.setFont(S.font("Segoe UI", 20, QFont.Bold))
+            letter.setStyleSheet(f"color: {COLORS['accent_orange']}; background: transparent;")
+            letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            letter.setFixedSize(50, 50)
+            drive_layout.addWidget(letter)
 
-            drive_layout.addLayout(icon_col)
+            # Info
+            info = QVBoxLayout()
+            info.setSpacing(8)
 
-            # Center info
-            info_layout = QVBoxLayout()
-            info_layout.setSpacing(8)
+            name = QLabel(mountpoint if mountpoint else drive_letter)
+            name.setFont(S.font("Segoe UI", 13, QFont.Bold))
+            name.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            info.addWidget(name)
 
-            # Drive name
-            if vol_name:
-                name_text = f"{vol_name} ({mountpoint})"
-            else:
-                name_text = mountpoint if mountpoint else drive_letter
-
-            name_lbl = QLabel(name_text)
-            name_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            name_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
-            info_layout.addWidget(name_lbl)
-
-            # Progress bar
             bar = QProgressBar()
             bar.setValue(int(pct))
             bar.setFixedHeight(10)
@@ -1284,69 +1467,58 @@ class OverviewPage(QWidget):
                     border-radius: 5px;
                 }}
             """)
-            info_layout.addWidget(bar)
+            info.addWidget(bar)
 
-            # Stats row
-            stats_row = QHBoxLayout()
-            stats_row.setSpacing(16)
-
+            stats = QHBoxLayout()
             used_lbl = QLabel(f"{used_gb:.1f} GB used")
-            used_lbl.setFont(QFont("Segoe UI", 10))
-            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
-            stats_row.addWidget(used_lbl)
-
-            stats_row.addStretch()
-
+            used_lbl.setFont(S.font("Segoe UI", 10))
+            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+            stats.addWidget(used_lbl)
+            stats.addStretch()
             free_lbl = QLabel(f"{free_gb:.1f} GB free")
-            free_lbl.setFont(QFont("Segoe UI", 10))
-            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-            stats_row.addWidget(free_lbl)
+            free_lbl.setFont(S.font("Segoe UI", 10))
+            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+            stats.addWidget(free_lbl)
+            info.addLayout(stats)
 
-            total_lbl = QLabel(f"of {total_gb:.1f} GB total")
-            total_lbl.setFont(QFont("Segoe UI", 10))
-            total_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
-            stats_row.addWidget(total_lbl)
+            drive_layout.addLayout(info, stretch=1)
 
-            info_layout.addLayout(stats_row)
-
-            drive_layout.addLayout(info_layout, stretch=1)
-
-            # Right percentage badge
+            # Percentage
             pct_box = QFrame()
             pct_box.setStyleSheet(f"""
                 QFrame {{
                     background-color: {COLORS['bg_deeper']};
                     border-radius: 10px;
-                    padding: 12px 16px;
                 }}
             """)
-            pct_box_layout = QVBoxLayout()
-            pct_box_layout.setSpacing(2)
-            pct_box_layout.setContentsMargins(8, 8, 8, 8)
-            pct_box_layout.setAlignment(Qt.AlignCenter)
-            pct_box.setLayout(pct_box_layout)
+            pct_layout = QVBoxLayout()
+            pct_layout.setSpacing(2)
+            pct_layout.setContentsMargins(16, 8, 16, 8)
+            pct_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pct_box.setLayout(pct_layout)
 
             pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", 22, QFont.Bold))
-            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)};")
-            pct_lbl.setAlignment(Qt.AlignCenter)
-            pct_box_layout.addWidget(pct_lbl)
+            pct_lbl.setFont(S.font("Segoe UI", 22, QFont.Bold))
+            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)}; background: transparent;")
+            pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pct_layout.addWidget(pct_lbl)
 
-            used_of = QLabel("used")
-            used_of.setFont(QFont("Segoe UI", 9))
-            used_of.setStyleSheet(f"color: {COLORS['text_muted']};")
-            used_of.setAlignment(Qt.AlignCenter)
-            pct_box_layout.addWidget(used_of)
+            used_lbl = QLabel("used")
+            used_lbl.setFont(S.font("Segoe UI", 9))
+            used_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+            used_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pct_layout.addWidget(used_lbl)
 
             drive_layout.addWidget(pct_box)
+            drives.addWidget(drive_card)
 
-            drives_container.addWidget(drive_card)
+        main_layout.addLayout(drives)
 
         # Close button
         close_btn = QPushButton("Close")
-        close_btn.setFont(QFont("Segoe UI", 11))
+        close_btn.setFont(S.font("Segoe UI", 11))
         close_btn.setFixedHeight(38)
-        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['accent_blue']};
@@ -1360,325 +1532,26 @@ class OverviewPage(QWidget):
                 background-color: #2563eb;
             }}
         """)
-        close_btn.clicked.connect(dialog.close)
-        main_layout.addWidget(close_btn, 0, Qt.AlignRight)
+        close_btn.clicked.connect(dialog.accept)
+        main_layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignRight)
 
-        dialog.exec_()
-
-    # ── Alerts Card ──────────────────────────────────────────────────────────
-
-    def _create_alerts_card(self):
-        card = QFrame()
-        card.setMinimumHeight(260)
-        card.setStyleSheet(card_stylesheet())
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
-        card.setLayout(layout)
-
-        title = QLabel("Alerts")
-        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        layout.addWidget(title)
-
-        self._alerts_vbox = QVBoxLayout()
-        self._alerts_vbox.setSpacing(10)
-        layout.addLayout(self._alerts_vbox)
-
-        # View all button
-        btn = QPushButton("View all alerts →")
-        btn.setFont(QFont("Segoe UI", 10))
-        btn.setFixedHeight(30)
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_deeper']};
-                color: {COLORS['text_secondary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 6px;
-                padding: 4px 12px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                color: {COLORS['text_primary']};
-                border-color: {COLORS['accent_blue']};
-            }}
-        """)
-        btn.clicked.connect(self._show_all_alerts)
-        layout.addWidget(btn)
-
-        self._update_alerts([])
-
-        return card
-
-    def _get_alert_color(self, level):
-        """Get color based on alert level"""
-        if level == "red":
-            return COLORS['accent_red']
-        elif level == "yellow":
-            return COLORS['accent_orange']
-        return COLORS['accent_green']
-
-    def _show_all_alerts(self):
-        """Show all alerts in a dialog"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton
-
-        dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-        dialog.setMinimumSize(750, 500)
-        dialog.setStyleSheet(f"""
-            QDialog {{
-                background-color: {COLORS['bg_primary']};
-                color: {COLORS['text_primary']};
-            }}
-        """)
-
-        _drag_pos = None
-
-        def mousePressEvent(event):
-            if event.button() == Qt.LeftButton:
-                nonlocal _drag_pos
-                _drag_pos = event.globalPos() - dialog.frameGeometry().topLeft()
-                event.accept()
-
-        def mouseMoveEvent(event):
-            if event.buttons() == Qt.LeftButton and _drag_pos:
-                dialog.move(event.globalPos() - _drag_pos)
-                event.accept()
-
-        def mouseReleaseEvent(event):
-            if event.button() == Qt.LeftButton:
-                _drag_pos = None
-                event.accept()
-
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        dialog.setLayout(main_layout)
-
-        # Header
-        header = QFrame()
-        header.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(20, 12, 12, 12)
-        header.setLayout(header_layout)
-        header.setCursor(Qt.SizeAllCursor)
-        header.mousePressEvent = mousePressEvent
-        header.mouseMoveEvent = mouseMoveEvent
-        header.mouseReleaseEvent = mouseReleaseEvent
-
-        title = QLabel("All Alerts")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        header_layout.addWidget(title)
-
-        header_layout.addStretch()
-
-        close_btn = QPushButton("×")
-        close_btn.setFont(QFont("Segoe UI", 16))
-        close_btn.setFixedSize(32, 32)
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLORS['text_muted']};
-                border: none;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                color: {COLORS['text_primary']};
-            }}
-        """)
-        close_btn.clicked.connect(dialog.close)
-        header_layout.addWidget(close_btn)
-
-        main_layout.addWidget(header)
-
-        # Alerts container
-        alerts_container = QVBoxLayout()
-        alerts_container.setSpacing(14)
-        main_layout.addLayout(alerts_container)
-
-        # Generate current alerts
-        alerts = []
-        if hasattr(self, '_last_data'):
-            alerts = self._generate_alerts(self._last_data)
-
-        if not alerts:
-            alerts = [{"level": "green", "title": "All systems normal", "desc": "No issues detected"}]
-
-        for alert in alerts:
-            level = alert.get("level", "green")
-            title_text = alert.get("title", "")
-            desc = alert.get("desc", "")
-            color = self._get_alert_color(level)
-
-            alert_card = QFrame()
-            alert_card.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['bg_card']};
-                    border: 1px solid {COLORS['accent_green']};
-                    border-radius: 10px;
-                    padding: 16px;
-                }}
-            """)
-            alert_layout = QHBoxLayout()
-            alert_layout.setSpacing(20)
-            alert_card.setLayout(alert_layout)
-
-            # Left color bar
-            color_bar = QFrame()
-            color_bar.setFixedWidth(4)
-            color_bar.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {color};
-                    border-radius: 2px;
-                }}
-            """)
-            alert_layout.addWidget(color_bar)
-
-            # Icon column
-            icon_col = QVBoxLayout()
-            icon_col.setAlignment(Qt.AlignCenter)
-            icon_lbl = QLabel("●")
-            icon_lbl.setFont(QFont("Segoe UI", 24))
-            icon_lbl.setStyleSheet(f"color: {color};")
-            icon_col.addWidget(icon_lbl)
-            alert_layout.addLayout(icon_col)
-
-            # Center info
-            info_layout = QVBoxLayout()
-            info_layout.setSpacing(4)
-
-            title_lbl = QLabel(title_text)
-            title_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            title_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
-            info_layout.addWidget(title_lbl)
-
-            desc_lbl = QLabel(desc)
-            desc_lbl.setFont(QFont("Segoe UI", 10))
-            desc_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
-            info_layout.addWidget(desc_lbl)
-
-            alert_layout.addLayout(info_layout, stretch=1)
-
-            alerts_container.addWidget(alert_card)
-
-        # Close button
-        close_btn = QPushButton("Close")
-        close_btn.setFont(QFont("Segoe UI", 11))
-        close_btn.setFixedHeight(36)
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_card']};
-                color: {COLORS['text_primary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 8px;
-                padding: 6px 20px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                border-color: {COLORS['accent_blue']};
-            }}
-        """)
-        close_btn.clicked.connect(dialog.close)
-        main_layout.addWidget(close_btn, 0, Qt.AlignRight)
-
-        dialog.exec_()
-
-    def _update_alerts(self, alerts=None):
-        """Repaint alerts list"""
-        while self._alerts_vbox.count():
-            item = self._alerts_vbox.takeAt(0)
-            if item is not None:
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
-
-        if alerts is None:
-            if hasattr(self, '_last_data'):
-                alerts = self._generate_alerts(self._last_data)
-            else:
-                alerts = []
-
-        if not alerts:
-            alerts = [{"level": "green", "title": "All systems normal", "desc": "No issues detected"}]
-
-        for alert in alerts:
-            level = alert.get("level", "green")
-            title = alert.get("title", "")
-            desc = alert.get("desc", "")
-            color = self._get_alert_color(level)
-
-            item = QFrame()
-            item.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['bg_deeper']};
-                    border: 1px solid {COLORS['accent_green']};
-                    border-radius: 8px;
-                    padding: 10px 12px;
-                }}
-            """)
-            item_layout = QHBoxLayout()
-            item_layout.setSpacing(10)
-            item_layout.setContentsMargins(8, 8, 8, 8)
-            item.setLayout(item_layout)
-
-            # Text
-            txt_vbox = QVBoxLayout()
-            txt_vbox.setSpacing(1)
-            t = QLabel(title)
-            t.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            t.setStyleSheet(f"color: {COLORS['text_primary']};")
-            txt_vbox.addWidget(t)
-            d = QLabel(desc)
-            d.setFont(QFont("Segoe UI", 10))
-            d.setStyleSheet(f"color: {COLORS['text_muted']};")
-            txt_vbox.addWidget(d)
-            item_layout.addLayout(txt_vbox)
-
-            self._alerts_vbox.addWidget(item)
-
-    def _generate_alerts(self, data):
-        """Generate alert list from data"""
-        alerts = []
-
-        if 'cpu' in data:
-            pct = data['cpu'].get('percent', 0)
-            if pct > 95:
-                alerts.append({"level": "red", "title": "Critical CPU Usage", "desc": f"CPU at {pct:.0f}%"})
-            elif pct > 80:
-                alerts.append({"level": "yellow", "title": "High CPU Usage", "desc": f"CPU at {pct:.0f}%"})
-
-        if 'memory' in data:
-            pct = data['memory'].get('percent', 0)
-            if pct > 90:
-                alerts.append({"level": "yellow", "title": "High Memory Usage", "desc": f"RAM at {pct:.0f}%"})
-
-        if 'disk' in data:
-            pct = data['disk'].get('percent', 0)
-            if pct > 90:
-                alerts.append({"level": "yellow", "title": "Low Disk Space", "desc": f"Disk at {pct:.0f}%"})
-
-        return alerts
+        dialog.exec()
 
     # ─── Data Update ───────────────────────────────────────────────────────────
 
     def update_data(self, data):
-        """Called by MainWindow whenever new data arrives"""
+        """Called by MainWindow whenever new data arrives."""
         self._last_data = data
 
         # CPU
         if 'cpu' in data:
             cpu = data['cpu']
             pct = cpu.get('percent', 0)
-            per_core = cpu.get('per_core', [])
 
             self._cpu_card.gauge.set_value(pct)
-            self._cpu_card.sparkline.push(pct)
+            self._cpu_history.append(pct)
+            self._cpu_chart.sparkline.push(pct)
 
-            # Stats
             freq = psutil.cpu_freq()
             clock = f"{freq.current / 1000:.2f} GHz" if freq else "--"
             temp = self._get_cpu_temp()
@@ -1686,11 +1559,6 @@ class OverviewPage(QWidget):
 
             for i, val in enumerate([clock, temp, power]):
                 self._cpu_card.stats[i].setText(val)
-
-            self._cpu_history.append(pct)
-
-            # Update CPU detail chart
-            self._cpu_detail_chart.sparkline.push(pct)
 
         # Memory
         if 'memory' in data:
@@ -1701,25 +1569,22 @@ class OverviewPage(QWidget):
             avail_gb = mem.get('available', 0) / (1024**3)
 
             self._ram_card.gauge.set_value(pct)
-            self._ram_card.sparkline.push(pct)
-
-            for i, val in enumerate([self._get_ram_speed(), f"{used_gb:.1f} GB", f"{avail_gb:.1f} GB"]):
-                self._ram_card.stats[i].setText(val)
-
             self._ram_history.append(used_gb)
-            self._ram_detail_chart.sparkline.push(used_gb)
+            self._ram_chart.sparkline.push(used_gb)
+
+            for i, val in enumerate([f"{used_gb:.1f} GB", f"{avail_gb:.1f} GB", self._get_ram_type()]):
+                self._ram_card.stats[i].setText(val)
 
         # Disk
         if 'disk' in data:
             disk = data['disk']
             pct = disk.get('percent', 0)
-            used_gb = disk.get('used', 0) / (1024**3)
-            total_gb = disk.get('total', 0) / (1024**3)
+            read_speed = disk.get('read_speed', 0)
+            write_speed = disk.get('write_speed', 0)
 
             self._disk_card.gauge.set_value(pct)
-            self._disk_card.sparkline.push(pct)
 
-            for i, val in enumerate([f"{used_gb:.0f} MB/s", f"{used_gb:.0f} MB/s", "-- °C"]):
+            for i, val in enumerate([f"{read_speed:.0f} MB/s", f"{write_speed:.0f} MB/s", f"{pct:.0f}%"]):
                 self._disk_card.stats[i].setText(val)
 
         # Network
@@ -1729,8 +1594,8 @@ class OverviewPage(QWidget):
             bytes_recv = net.get('bytes_recv', 0)
 
             if self._last_net:
-                dt = 1.0  # seconds since last update
-                down_speed = (bytes_recv - self._last_net[0]) / dt / 1e6  # Mbps
+                dt = 1.0
+                down_speed = (bytes_recv - self._last_net[0]) / dt / 1e6
                 up_speed = (bytes_sent - self._last_net[1]) / dt / 1e6
 
                 self._net_down_mbps = max(0, down_speed)
@@ -1740,11 +1605,7 @@ class OverviewPage(QWidget):
                 self._net_up_lbl.setText(f"{self._net_up_mbps:.1f}")
 
                 self._net_sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
-
-                self._net_down_history.append(self._net_down_mbps)
-                self._net_up_history.append(self._net_up_mbps)
-
-                self._net_detail_chart.sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
+                self._net_chart.sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
 
             self._last_net = (bytes_sent, bytes_recv)
 
@@ -1757,15 +1618,11 @@ class OverviewPage(QWidget):
                 fan = gpu.get('fan_speed')
                 power = gpu.get('power')
 
-                # Update gauge with load percentage
                 if load is not None:
                     self._gpu_card.gauge.set_value(load)
-                    self._gpu_card.sparkline.push(load)
                     self._gpu_history.append(load)
-                    # Update GPU detail chart
-                    self._gpu_detail_chart.sparkline.push(load)
+                    self._gpu_chart.sparkline.push(load)
 
-                # Update stats: Temp, Fan, Power
                 temp_str = f"{temp:.0f} °C" if temp is not None else "-- °C"
                 fan_str = f"{fan} RPM" if fan is not None else "-- RPM"
                 power_str = f"{power:.0f} W" if power is not None else "-- W"
@@ -1773,18 +1630,13 @@ class OverviewPage(QWidget):
                 for i, val in enumerate([temp_str, fan_str, power_str]):
                     self._gpu_card.stats[i].setText(val)
 
-        # Alerts
-        self._update_alerts()
-
     def _get_cpu_temp(self):
-        """Get CPU temperature"""
         try:
             temps = psutil.cpu_temperature()
             if isinstance(temps, list):
                 return f"{temps[0]:.0f} °C"
             return f"{temps:.0f} °C"
         except:
-            # Try wmi
             try:
                 import wmi
                 w = wmi.WMI()
@@ -1796,377 +1648,22 @@ class OverviewPage(QWidget):
         return "-- °C"
 
     def _estimate_cpu_power(self, pct):
-        """Rough CPU power estimate in watts"""
         try:
-            # Base TDP ~65W, scale with usage
             base_tdp = 65
             power = base_tdp * (0.3 + 0.7 * pct / 100)
             return f"{power:.0f} W"
         except:
             return "-- W"
 
-    # ─── Process Refresh ───────────────────────────────────────────────────────
-
-    def _update_process_table(self, processes):
-        """Update process table with data from background thread"""
+    def _get_ram_type(self):
         try:
-            text_color = QColor(COLORS['text_primary'])
-
-            for i in range(6):
-                if i < len(processes):
-                    proc = processes[i]
-                    name_item = QTableWidgetItem((proc.get('name') or 'Unknown')[:25])
-                    name_item.setForeground(text_color)
-                    self._process_table.setItem(i, 0, name_item)
-
-                    pid_item = QTableWidgetItem(str(proc.get('pid', '--')))
-                    pid_item.setForeground(text_color)
-                    self._process_table.setItem(i, 1, pid_item)
-
-                    cpu_val = proc.get('cpu_percent')
-                    cpu_item = QTableWidgetItem(f"{cpu_val:.1f}" if cpu_val is not None else "--")
-                    cpu_item.setForeground(text_color)
-                    self._process_table.setItem(i, 2, cpu_item)
-
-                    mem_info = proc.get('memory_info')
-                    if mem_info and hasattr(mem_info, 'rss'):
-                        mem_pct = (mem_info.rss / psutil.virtual_memory().total) * 100
-                        mem_item = QTableWidgetItem(f"{mem_pct:.1f}")
-                        mem_item.setForeground(text_color)
-                        self._process_table.setItem(i, 3, mem_item)
-                    else:
-                        mem_item = QTableWidgetItem("--")
-                        mem_item.setForeground(text_color)
-                        self._process_table.setItem(i, 3, mem_item)
-
-                    gpu_item = QTableWidgetItem("--")
-                    gpu_item.setForeground(text_color)
-                    self._process_table.setItem(i, 4, gpu_item)
-                else:
-                    for col in range(5):
-                        item = QTableWidgetItem("")
-                        item.setForeground(text_color)
-                        self._process_table.setItem(i, col, item)
-        except Exception as e:
-            print(f"Process table update error: {e}")
-
-    def _show_all_processes(self):
-        """Show dialog with all running processes"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QFrame, QSizeGrip
-        from PyQt5.QtCore import Qt, QPoint
-
-        dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-        dialog.setSizeGripEnabled(True)
-        dialog.setMinimumSize(800, 600)
-        dialog.resize(900, 650)
-
-        # Mouse drag position
-        self._drag_position = None
-
-        def mousePressEvent(event):
-            if event.button() == Qt.LeftButton:
-                self._drag_position = event.globalPos() - dialog.frameGeometry().topLeft()
-                event.accept()
-
-        def mouseMoveEvent(event):
-            if event.buttons() == Qt.LeftButton and self._drag_position:
-                dialog.move(event.globalPos() - self._drag_position)
-                event.accept()
-
-        def mouseReleaseEvent(event):
-            if event.button() == Qt.LeftButton:
-                self._drag_position = None
-                event.accept()
-
-        # Install event filter on header for dragging
-        header_frame = None
-        dialog.setStyleSheet(f"""
-            QDialog {{
-                background-color: {COLORS['bg_primary']};
-                color: {COLORS['text_primary']};
-            }}
-        """)
-
-        # Main layout
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(16)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        dialog.setLayout(main_layout)
-
-        # Header with title and stats
-        header_frame = QFrame()
-        header_frame.setStyleSheet(f"background-color: {COLORS['bg_card']}; border-radius: 8px;")
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(20, 12, 12, 12)
-        header_frame.setLayout(header_layout)
-
-        # Enable dragging on header
-        header_frame.mousePressEvent = mousePressEvent
-        header_frame.mouseMoveEvent = mouseMoveEvent
-        header_frame.mouseReleaseEvent = mouseReleaseEvent
-        header_frame.setCursor(Qt.SizeAllCursor)
-
-        title = QLabel("Running Processes")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
-        header_layout.addWidget(title)
-
-        header_layout.addStretch()
-
-        # Stats badge
-        self._process_count_label = QLabel("0 processes")
-        self._process_count_label.setFont(QFont("Segoe UI", 11))
-        self._process_count_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background-color: {COLORS['bg_deeper']}; padding: 6px 14px; border-radius: 12px;")
-        header_layout.addWidget(self._process_count_label)
-
-        # Close button
-        close_btn = QPushButton("×")
-        close_btn.setFont(QFont("Segoe UI", 16))
-        close_btn.setFixedSize(32, 32)
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLORS['text_muted']};
-                border: none;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                color: {COLORS['text_primary']};
-            }}
-        """)
-        close_btn.clicked.connect(dialog.close)
-        header_layout.addWidget(close_btn)
-
-        main_layout.addWidget(header_frame)
-
-        # Table container
-        table_container = QFrame()
-        table_container.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_card']};
-                border-radius: 8px;
-                border: 1px solid {COLORS['border']};
-            }}
-        """)
-        table_layout = QVBoxLayout()
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.setSpacing(0)
-        table_container.setLayout(table_layout)
-
-        # Table
-        table = QTableWidget()
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(["Process Name", "PID", "CPU %", "RAM MB", "Status"])
-        table.setShowGrid(False)
-        table.setSelectionBehavior(QTableWidget.SelectRows)
-        table.setFont(QFont("Segoe UI", 11))
-        table.verticalHeader().setVisible(False)
-        table.setAlternatingRowColors(True)
-        table.setWordWrap(False)
-        table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: transparent;
-                color: {COLORS['text_primary']};
-                border: none;
-                border-radius: 8px;
-                gridline-color: {COLORS['border']};
-            }}
-            QTableWidget::item {{
-                padding: 12px 16px;
-                border: none;
-                border-bottom: 1px solid {COLORS['border']};
-            }}
-            QTableWidget::item:alternate {{
-                background-color: {COLORS['bg_deeper']};
-            }}
-            QTableWidget::item:selected {{
-                background-color: {COLORS['bg_hover']};
-            }}
-            QHeaderView::section {{
-                background-color: {COLORS['bg_deeper']};
-                color: {COLORS['text_secondary']};
-                border: none;
-                border-bottom: 2px solid {COLORS['border']};
-                padding: 14px 16px;
-                font-weight: bold;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }}
-            QHeaderView {{
-                border: none;
-            }}
-            QHeaderView::downArrow {{
-                width: 10px;
-            }}
-        """)
-
-        # Make table stretch to fill container
-        table_layout.addWidget(table)
-        table_container_layout = table_layout
-        table_container_layout.addWidget(table)
-
-        main_layout.addWidget(table_container, stretch=1)
-
-        # Set column resizing behavior - Process Name fixed, others stretch
-        header = table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(0, QHeaderView.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.Interactive)
-        header.setSectionResizeMode(2, QHeaderView.Interactive)
-        header.setSectionResizeMode(3, QHeaderView.Interactive)
-        header.setSectionResizeMode(4, QHeaderView.Interactive)
-        table.setColumnWidth(0, 180)
-        table.setColumnWidth(1, 80)
-        table.setColumnWidth(2, 80)
-        table.setColumnWidth(3, 90)
-        table.setColumnWidth(4, 90)
-
-        # Populate table
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
-            try:
-                if proc.is_running():
-                    processes.append(proc.info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-
-        processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
-
-        text_color = QColor(COLORS['text_primary'])
-        table.setRowCount(len(processes))
-
-        for i, proc in enumerate(processes):
-            name_item = QTableWidgetItem(proc.get('name') or 'Unknown')
-            name_item.setForeground(text_color)
-            table.setItem(i, 0, name_item)
-
-            pid_item = QTableWidgetItem(str(proc.get('pid', '--')))
-            pid_item.setForeground(text_color)
-            table.setItem(i, 1, pid_item)
-
-            cpu_val = proc.get('cpu_percent')
-            cpu_item = QTableWidgetItem(f"{cpu_val:.1f}" if cpu_val is not None else "--")
-            cpu_item.setForeground(text_color)
-            table.setItem(i, 2, cpu_item)
-
-            mem_info = proc.get('memory_info')
-            if mem_info and hasattr(mem_info, 'rss'):
-                mem_item = QTableWidgetItem(f"{mem_info.rss / (1024**2):.0f}")
-                mem_item.setForeground(text_color)
-                table.setItem(i, 3, mem_item)
-            else:
-                mem_item = QTableWidgetItem("--")
-                mem_item.setForeground(text_color)
-                table.setItem(i, 3, mem_item)
-
-            status_item = QTableWidgetItem("Running")
-            status_item.setForeground(QColor(COLORS['accent_green']))
-            table.setItem(i, 4, status_item)
-
-        # Update process count
-        self._process_count_label.setText(f"{len(processes)} processes")
-
-        # Bottom buttons
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(12)
-
-        # Refresh button
-        refresh_btn = QPushButton("↻ Refresh")
-        refresh_btn.setFont(QFont("Segoe UI", 11))
-        refresh_btn.setFixedHeight(38)
-        refresh_btn.setCursor(Qt.PointingHandCursor)
-        refresh_btn.clicked.connect(lambda: self._refresh_process_dialog(table, self._process_count_label))
-        refresh_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_deeper']};
-                color: {COLORS['text_secondary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 6px;
-                padding: 8px 18px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_hover']};
-                color: {COLORS['text_primary']};
-                border-color: {COLORS['accent_blue']};
-            }}
-        """)
-
-        # Close button
-        close_btn = QPushButton("Close")
-        close_btn.setFont(QFont("Segoe UI", 11))
-        close_btn.setFixedHeight(38)
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['accent_blue']};
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 24px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #2563eb;
-            }}
-        """)
-        close_btn.clicked.connect(dialog.close)
-
-        btn_layout.addStretch()
-        btn_layout.addWidget(refresh_btn)
-        btn_layout.addWidget(close_btn)
-
-        # Size grip for resizing
-        size_grip = QSizeGrip(dialog)
-        size_grip.setFixedSize(16, 16)
-
-        main_layout.addLayout(btn_layout)
-
-        dialog.exec_()
-
-    def _refresh_process_dialog(self, table, count_label):
-        """Refresh the process dialog table"""
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
-            try:
-                if proc.is_running():
-                    processes.append(proc.info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-
-        processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
-
-        text_color = QColor(COLORS['text_primary'])
-        table.setRowCount(len(processes))
-        count_label.setText(f"{len(processes)} processes")
-
-        for i, proc in enumerate(processes):
-            name_item = QTableWidgetItem(proc.get('name') or 'Unknown')
-            name_item.setForeground(text_color)
-            table.setItem(i, 0, name_item)
-
-            pid_item = QTableWidgetItem(str(proc.get('pid', '--')))
-            pid_item.setForeground(text_color)
-            table.setItem(i, 1, pid_item)
-
-            cpu_val = proc.get('cpu_percent')
-            cpu_item = QTableWidgetItem(f"{cpu_val:.1f}" if cpu_val is not None else "--")
-            cpu_item.setForeground(text_color)
-            table.setItem(i, 2, cpu_item)
-
-            mem_info = proc.get('memory_info')
-            if mem_info and hasattr(mem_info, 'rss'):
-                mem_item = QTableWidgetItem(f"{mem_info.rss / (1024**2):.0f}")
-                mem_item.setForeground(text_color)
-                table.setItem(i, 3, mem_item)
-            else:
-                mem_item = QTableWidgetItem("--")
-                mem_item.setForeground(text_color)
-                table.setItem(i, 3, mem_item)
-
-            status_item = QTableWidgetItem("Running")
-            status_item.setForeground(QColor(COLORS['accent_green']))
-            table.setItem(i, 4, status_item)
+            import wmi
+            w = wmi.WMI()
+            for mem_obj in w.Win32_PhysicalMemory():
+                if hasattr(mem_obj, 'MemoryType') and mem_obj.MemoryType:
+                    mem_type = int(mem_obj.MemoryType)
+                    type_map = {20: "DDR5", 21: "DDR4", 22: "DDR3", 24: "DDR2"}
+                    return type_map.get(mem_type, "Unknown")
+        except:
+            pass
+        return "DDR?"

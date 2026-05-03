@@ -5,15 +5,15 @@ Modern design matching GPU View
 import platform
 import time
 import psutil
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QFrame
+    QLabel, QFrame, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
-from PyQt5.QtWidgets import QSizePolicy
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
 # Use theme colors directly
@@ -60,7 +60,7 @@ class CpuGraphWidget(QWidget):
     def paintEvent(self, a0):
         """Paint the graph"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         colors = c()
         w = self.width()
@@ -83,7 +83,7 @@ class CpuGraphWidget(QWidget):
         if not self._history:
             painter.setFont(QFont("Segoe UI", 8))
             painter.setPen(QColor(colors.TEXT_MUTED))
-            painter.drawText(self.rect(), Qt.AlignCenter, "Loading...")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Loading...")
             painter.end()
             return
 
@@ -115,15 +115,15 @@ class CpuGraphWidget(QWidget):
             gradient.setColorAt(1, QColor(colors.BG_CARD))
 
             painter.setBrush(gradient)
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
 
-            from PyQt5.QtCore import QPoint
+            from PyQt6.QtCore import QPoint
             qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
             if len(qpoints) >= 3:
                 painter.drawPolygon(*qpoints)
 
             # Draw line
-            painter.setPen(QPen(line_color, 1.5, Qt.SolidLine))
+            painter.setPen(QPen(line_color, 1.5, Qt.PenStyle.SolidLine))
             for i in range(len(points) - 1):
                 painter.drawLine(int(points[i][0]), int(points[i][1]),
                                int(points[i + 1][0]), int(points[i + 1][1]))
@@ -134,7 +134,7 @@ class CpuGraphWidget(QWidget):
         painter.drawText(pad + 4, pad + 12, f"Core {self._core_index}")
 
         # Value label
-        painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
         painter.drawText(w - pad - 35, pad + 12, f"{current:.0f}%")
 
@@ -153,7 +153,6 @@ class StatTile(QFrame):
                 background-color: {colors.BG_CARD};
                 border: 1px solid {colors.BORDER};
                 border-radius: 8px;
-                padding: 10px 14px;
             }}
         """)
         layout = QVBoxLayout()
@@ -162,13 +161,13 @@ class StatTile(QFrame):
         self.setLayout(layout)
 
         self._value_lbl = QLabel(value)
-        self._value_lbl.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        self._value_lbl.setStyleSheet(f"color: {self._color};")
+        self._value_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self._value_lbl.setStyleSheet(f"color: {self._color}; background: transparent;")
         layout.addWidget(self._value_lbl)
 
         self._label_lbl = QLabel(label)
         self._label_lbl.setFont(QFont("Segoe UI", 9))
-        self._label_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED};")
+        self._label_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         layout.addWidget(self._label_lbl)
 
     def set_value(self, value: str):
@@ -176,10 +175,10 @@ class StatTile(QFrame):
 
     def set_color(self, color: str):
         self._color = color
-        self._value_lbl.setStyleSheet(f"color: {color};")
+        self._value_lbl.setStyleSheet(f"color: {color}; background: transparent;")
 
 
-class CPUView(QWidget):
+class CPUView(QWidget, ScaleMixin):
     """CPU monitoring dashboard with modern responsive design"""
 
     def __init__(self, parent=None):
@@ -189,8 +188,26 @@ class CPUView(QWidget):
         self._boot_time = None
         self._logical_count = 1
         self._data_collector = None
+        self.scale_connect()
         self._setup_ui()
         self._load_cpu_info()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def on_scale_changed(self, factor: float):
+        self._setup_ui()
+        self.update()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Re-apply styles when theme changes"""
+        # The view uses theme_manager.colors via c() function, so just trigger repaint
+        self._reapply_styles()
+        self._update_display()
+
+    def _reapply_styles(self):
+        """Re-apply styles to widgets"""
+        colors = c()
+        if hasattr(self, '_usage_indicator'):
+            self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_BLUE}; font-size: 18px; font-weight: bold; background: transparent;")
 
     def set_data_collector(self, collector):
         """Set data collector and connect signals"""
@@ -245,22 +262,22 @@ class CPUView(QWidget):
 
         # Title
         title = QLabel("CPU Monitor")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY};")
+        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         # CPU name
         self._cpu_name_label = QLabel("—")
         self._cpu_name_label.setFont(QFont("Segoe UI", 11))
-        self._cpu_name_label.setStyleSheet(f"color: {colors.ACCENT_BLUE};")
+        self._cpu_name_label.setStyleSheet(f"color: {colors.ACCENT_BLUE}; background: transparent;")
         layout.addWidget(self._cpu_name_label)
 
         layout.addStretch()
 
         # Overall usage indicator
         self._usage_indicator = QLabel("0%")
-        self._usage_indicator.setFont(QFont("Segoe UI", 18, QFont.Bold))
-        self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_BLUE};")
+        self._usage_indicator.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_BLUE}; background: transparent;")
         layout.addWidget(self._usage_indicator)
 
         return header
@@ -295,11 +312,11 @@ class CPUView(QWidget):
                 background-color: {colors.BG_CARD};
                 border: 1px solid {colors.BORDER};
                 border-radius: 10px;
-                padding: 16px;
             }}
         """)
         layout = QHBoxLayout()
         layout.setSpacing(24)
+        layout.setContentsMargins(16, 16, 16, 16)
         panel.setLayout(layout)
 
         # Left column - Basic info
@@ -307,8 +324,8 @@ class CPUView(QWidget):
         left_col.setSpacing(12)
 
         left_title = QLabel("Basic Information")
-        left_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        left_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY};")
+        left_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        left_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         left_col.addWidget(left_title)
 
         self._info_name = self._create_info_row("CPU Name", "—", colors.ACCENT_BLUE)
@@ -332,8 +349,8 @@ class CPUView(QWidget):
         center_col.setSpacing(12)
 
         center_title = QLabel("Specifications")
-        center_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        center_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY};")
+        center_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        center_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         center_col.addWidget(center_title)
 
         self._info_cores = self._create_info_row("Physical Cores", "—", colors.ACCENT_CYAN)
@@ -358,8 +375,8 @@ class CPUView(QWidget):
         right_col.setSpacing(12)
 
         right_title = QLabel("Usage Statistics")
-        right_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        right_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY};")
+        right_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        right_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         right_col.addWidget(right_title)
 
         self._info_usage = self._create_info_row("Current Usage", "0%", colors.ACCENT_BLUE)
@@ -382,7 +399,6 @@ class CPUView(QWidget):
             QFrame {{
                 background-color: {c().BG_SECONDARY};
                 border-radius: 6px;
-                padding: 8px 12px;
             }}
         """)
         layout = QHBoxLayout()
@@ -391,14 +407,14 @@ class CPUView(QWidget):
 
         lbl = QLabel(label)
         lbl.setFont(QFont("Segoe UI", 10))
-        lbl.setStyleSheet(f"color: {c().TEXT_MUTED};")
+        lbl.setStyleSheet(f"color: {c().TEXT_MUTED}; background: transparent;")
         layout.addWidget(lbl)
 
         layout.addStretch()
 
         val = QLabel(value)
-        val.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        val.setStyleSheet(f"color: {color or c().TEXT_PRIMARY};")
+        val.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        val.setStyleSheet(f"color: {color or c().TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(val)
 
         return row
@@ -422,8 +438,8 @@ class CPUView(QWidget):
 
         # Title
         title = QLabel("Per-Core Usage")
-        title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        title.setStyleSheet(f"color: {colors.TEXT_SECONDARY};")
+        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(title)
 
         # Grid container
@@ -553,7 +569,7 @@ class CPUView(QWidget):
             else:
                 usage_color = colors.ACCENT_BLUE
 
-            self._usage_indicator.setStyleSheet(f"color: {usage_color}; font-size: 18px; font-weight: bold;")
+            self._usage_indicator.setStyleSheet(f"color: {usage_color}; font-size: 18px; font-weight: bold; background: transparent;")
             self._usage_indicator.setText(f"{total_usage:.0f}%")
 
             # Update frequency
@@ -647,7 +663,7 @@ class CPUView(QWidget):
             usage_lbl = self._info_usage.layout().itemAt(1).widget()
             if usage_lbl:
                 usage_lbl.setText(f"{total_usage:.1f}%")
-                usage_lbl.setStyleSheet(f"color: {usage_color}; font-weight: bold;")
+                usage_lbl.setStyleSheet(f"color: {usage_color}; font-weight: bold; background: transparent;")
 
             # Process count
             try:

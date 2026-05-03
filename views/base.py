@@ -1,8 +1,8 @@
 """
 Base View - Base class for all views
 """
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from PyQt5.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtCore import pyqtSignal
 
 from styles.theme import theme_manager
 from core.signals import signal_bus

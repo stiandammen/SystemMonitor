@@ -2,12 +2,15 @@
 Disks View - Disk monitoring with detailed drive information
 """
 import psutil
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QProgressBar, QPushButton, QDialog
+    QFrame, QProgressBar, QPushButton
 )
-from PyQt5.QtCore import Qt, QTimer, QRect
-from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
+from PyQt6.QtCore import Qt, QTimer, QRect
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
+
+from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
 COLORS = {
@@ -27,17 +30,38 @@ COLORS = {
 }
 
 
+def sync_colors():
+    """Sync COLORS dict with theme_manager.colors"""
+    c = theme_manager.colors
+    COLORS.update({
+        'bg_primary': c.BG_PRIMARY,
+        'bg_card': c.BG_CARD,
+        'bg_deeper': c.BG_HOVER,
+        'bg_secondary': c.BG_SECONDARY,
+        'bg_hover': c.BG_HOVER,
+        'border': c.BORDER,
+        'text_primary': c.TEXT_PRIMARY,
+        'text_secondary': c.TEXT_SECONDARY,
+        'text_muted': c.TEXT_MUTED,
+        'accent_blue': c.ACCENT_BLUE,
+        'accent_green': c.ACCENT_GREEN,
+        'accent_purple': c.ACCENT_PURPLE,
+        'accent_orange': c.ACCENT_ORANGE,
+        'accent_red': c.ACCENT_RED,
+    })
+
+
 class DiskIcon(QWidget):
     """Modern SSD/NVMe drive icon drawn with QPainter"""
     def __init__(self, size=48, parent=None):
         super().__init__(parent)
         self.setFixedSize(size, size)
+        theme_manager.theme_changed.connect(self.update)
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.HighQualityAntialiasing)
-
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
         w = self.width()
         h = self.height()
         pad = w * 0.08
@@ -59,7 +83,7 @@ class DiskIcon(QWidget):
         notch_x = w - pad - notch_w
         notch_y = body_y + body_h * 0.4
         painter.setBrush(QColor(COLORS['bg_primary']))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(int(notch_x), int(notch_y), int(notch_w), int(notch_h))
 
         # Gold pins at bottom
@@ -104,7 +128,7 @@ class DiskIcon(QWidget):
         painter.drawRect(int(chip_x), int(chip_y), int(chip_w), int(chip_h))
         # Tiny dot on chip (origin marker)
         painter.setBrush(QColor(180, 140, 50))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(int(chip_x + 2), int(chip_y + 2), 3, 3)
 
         # Controller chip (small square)
@@ -118,13 +142,30 @@ class DiskIcon(QWidget):
         painter.end()
 
 
-class DisksView(QWidget):
+class DisksView(QWidget, ScaleMixin):
     """Disk monitoring view with per-drive breakdown"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._last_drives = None
+        sync_colors()  # Sync colors before UI setup
+        self.scale_connect()
         self._setup_ui()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def on_scale_changed(self, factor: float):
+        self._setup_ui()
+        self.update()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Re-apply styles when theme changes"""
+        sync_colors()
+        # Re-create header with new colors
+        self._header.setStyleSheet(f"background-color: {COLORS['bg_secondary']}; border: none;")
+        for label in self._header.findChildren(QLabel):
+            label.style().unpolish(label)
+            label.style().polish(label)
+        self._update_drives()
 
     def _setup_ui(self):
         """Setup view UI"""
@@ -140,7 +181,7 @@ class DisksView(QWidget):
         # Scroll area
         self._scroll_area = QScrollArea()
         self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll_area.setStyleSheet(f"""
             QScrollArea {{
                 background-color: {COLORS['bg_primary']};
@@ -170,7 +211,8 @@ class DisksView(QWidget):
     def _create_header(self):
         header = QFrame()
         header.setFixedHeight(80)
-        header.setStyleSheet(f"background-color: #111820; border: none;")
+        header.setStyleSheet(f"background-color: {COLORS['bg_secondary']}; border: none;")
+        self._header = header
         layout = QHBoxLayout()
         layout.setContentsMargins(24, 0, 24, 0)
         header.setLayout(layout)
@@ -180,13 +222,13 @@ class DisksView(QWidget):
         left.addStretch()
 
         title = QLabel("Disks")
-        title.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']};")
+        title.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         left.addWidget(title)
 
         subtitle = QLabel("Storage devices and drives")
         subtitle.setFont(QFont("Segoe UI", 11))
-        subtitle.setStyleSheet(f"color: {COLORS['text_muted']};")
+        subtitle.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
         left.addWidget(subtitle)
 
         left.addStretch()
@@ -255,13 +297,13 @@ class DisksView(QWidget):
             # Left icon + drive letter (no frame, just icon column)
             icon_col = QVBoxLayout()
             icon_col.setSpacing(3)
-            icon_col.setAlignment(Qt.AlignCenter)
+            icon_col.setAlignment(Qt.AlignmentFlag.AlignCenter)
             disk_icon = DiskIcon(size=56)
             icon_col.addWidget(disk_icon)
             drive_lbl = QLabel(drive_letter.replace("\\", ""))
-            drive_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            drive_lbl.setStyleSheet(f"color: {COLORS['accent_orange']};")
-            drive_lbl.setAlignment(Qt.AlignCenter)
+            drive_lbl.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+            drive_lbl.setStyleSheet(f"color: {COLORS['accent_orange']}; background: transparent;")
+            drive_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_col.addWidget(drive_lbl)
 
             drive_layout.addLayout(icon_col)
@@ -276,8 +318,8 @@ class DisksView(QWidget):
                 name_text = mountpoint if mountpoint else drive_letter
 
             name_lbl = QLabel(name_text)
-            name_lbl.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            name_lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+            name_lbl.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+            name_lbl.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
             info_layout.addWidget(name_lbl)
 
             bar = QProgressBar()
@@ -302,19 +344,19 @@ class DisksView(QWidget):
 
             used_lbl = QLabel(f"{used_gb:.1f} GB used")
             used_lbl.setFont(QFont("Segoe UI", 10))
-            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            used_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
             stats_row.addWidget(used_lbl)
 
             stats_row.addStretch()
 
             free_lbl = QLabel(f"{free_gb:.1f} GB free")
             free_lbl.setFont(QFont("Segoe UI", 10))
-            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            free_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
             stats_row.addWidget(free_lbl)
 
             total_lbl = QLabel(f"of {total_gb:.1f} GB total")
             total_lbl.setFont(QFont("Segoe UI", 10))
-            total_lbl.setStyleSheet(f"color: {COLORS['text_muted']};")
+            total_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
             stats_row.addWidget(total_lbl)
 
             info_layout.addLayout(stats_row)
@@ -332,19 +374,19 @@ class DisksView(QWidget):
             pct_box_layout = QVBoxLayout()
             pct_box_layout.setSpacing(2)
             pct_box_layout.setContentsMargins(8, 8, 8, 8)
-            pct_box_layout.setAlignment(Qt.AlignCenter)
+            pct_box_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_box.setLayout(pct_box_layout)
 
             pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", 22, QFont.Bold))
-            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)};")
-            pct_lbl.setAlignment(Qt.AlignCenter)
+            pct_lbl.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+            pct_lbl.setStyleSheet(f"color: {self._get_storage_color(pct)}; background: transparent;")
+            pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_box_layout.addWidget(pct_lbl)
 
             used_of = QLabel("used")
             used_of.setFont(QFont("Segoe UI", 9))
-            used_of.setStyleSheet(f"color: {COLORS['text_muted']};")
-            used_of.setAlignment(Qt.AlignCenter)
+            used_of.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+            used_of.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_box_layout.addWidget(used_of)
 
             drive_layout.addWidget(pct_box)

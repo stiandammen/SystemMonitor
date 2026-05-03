@@ -1,8 +1,10 @@
 """
 System Monitor - Main Entry Point
 """
-import sys
 import os
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+import sys
+
 import traceback
 
 # Handle PyInstaller packaged app paths
@@ -40,11 +42,11 @@ def main():
     log_error(f"Bundle dir: {bundle_dir}")
 
     try:
-        from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt
-        log_error("PyQt5 imported OK")
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import Qt
+        log_error("PyQt6 imported OK")
     except Exception as e:
-        log_error(f"Failed to import PyQt5: {e}\n{traceback.format_exc()}")
+        log_error(f"Failed to import PyQt6: {e}\n{traceback.format_exc()}")
         return 1
 
     try:
@@ -53,6 +55,13 @@ def main():
     except Exception as e:
         log_error(f"Failed to create QApplication: {e}\n{traceback.format_exc()}")
         return 1
+
+    try:
+        from scaler import init_scaler, S
+        init_scaler(app)
+        log_error("Scaler initialized OK")
+    except Exception as e:
+        log_error(f"Failed to init scaler: {e}")
 
     try:
         from core.window import MainWindow
@@ -84,11 +93,11 @@ def main():
         log_error("Views connected OK")
 
         log_error("Entering main loop")
-        from PyQt5.QtWidgets import QWidget
+        from PyQt6.QtWidgets import QWidget
         log_error(f"Window visible: {window.isVisible()}, widgets count: {len(window.findChildren(QWidget))}")
         log_error(f"About to enter Qt event loop")
         try:
-            result = app.exec_()
+            result = app.exec()
             log_error(f"App exited with code: {result}")
         except Exception as e:
             log_error(f"app.exec_ exception: {e}\n{traceback.format_exc()}")

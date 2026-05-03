@@ -1,5 +1,14 @@
 {
     "typeChecking": "basic",
     "reportAttributeAccessIssue": false,
-    "reportOptionalMemberAccess": false
+    "reportOptionalMemberAccess": false,
+    "pythonPath": "C:/Users/Stian/AppData/Local/Programs/Python/Python314/python.exe",
+    "executionEnvironments": [
+        {
+            "root": "C:/Users/Stian/Desktop/SystemMonitor",
+            "extraPaths": [
+                "C:/Users/Stian/AppData/Local/Programs/Python/Python314/Lib/site-packages"
+            ]
+        }
+    ]
 }
