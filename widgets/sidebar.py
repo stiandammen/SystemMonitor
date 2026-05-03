@@ -296,30 +296,6 @@ class PremiumSidebar(QFrame, ScaleMixin):
 
         layout.addWidget(icon_container)
 
-        # Title area
-        title_widget = QWidget()
-        title_layout = QVBoxLayout()
-        title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.setSpacing(4)
-        title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        title_widget.setLayout(title_layout)
-
-        title = QLabel("System ")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"""
-            color: {c.TEXT_PRIMARY};
-            letter-spacing: 2px;
-        """)
-
-        subtitle = QLabel("Dashboard")
-        subtitle.setFont(QFont("Segoe UI", 11))
-        subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-
-        layout.addWidget(title_widget, stretch=1)
-
         # Add header to main layout
         self.layout().insertWidget(0, header)
 
