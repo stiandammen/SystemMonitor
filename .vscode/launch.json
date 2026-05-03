@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/__main__.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "python": "C:/Users/RSman/AppData/Local/Python/pythoncore-3.14-64/python.exe"
+            "python": "${command:python}"
         }
     ]
 }

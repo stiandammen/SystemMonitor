@@ -1,8 +1,6 @@
 {
-    "python.defaultInterpreterPath": "C:/Users/RSman/AppData/Local/Python/pythoncore-3.14-64/python.exe",
-    "python.analysis.extraPaths": [
-        "C:/Users/RSman/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
-    ],
+    "python.defaultInterpreterPath": "${command:python}",
+    "python.analysis.extraPaths": [],
     "python.analysis.autoImportCompletions": true,
     "pyright.diagnostics.reportAttributeAccessIssue": false,
     "python.analysis.diagnostics": {
