@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import subprocess
 import platform
+import ctypes
 
 
 @dataclass
@@ -60,7 +61,7 @@ class GPUCollector:
         if self._try_nvml():
             return
 
-        # Try ADL (AMD Display Library)
+        # Try ADL (AMD Display Library) - also sets up PDH fallback
         if self._try_adl():
             return
 
@@ -95,61 +96,162 @@ class GPUCollector:
     def _try_adl(self) -> bool:
         """Try to initialize AMD ADL backend"""
         try:
-            from ctypes import cdll, c_int, c_char_p, pointer, Structure
             import ctypes
+            import os
 
             # Try to load ADL library
-            adl_lib = None
-            if platform.system() == "Windows":
-                import os
-                windir = os.environ.get("WINDIR", "C:\\Windows")
-                adl_path = os.path.join(windir, "System32", "atiadlxx.dll")
-                if os.path.exists(adl_path):
-                    adl_lib = ctypes.CDLL(adl_path)
-                else:
-                    adl_path = os.path.join(windir, "System32", "atiadlxy.dll")
-                    if os.path.exists(adl_path):
-                        adl_lib = ctypes.CDLL(adl_path)
-
-            if adl_lib is None:
+            windir = os.environ.get("WINDIR", "C:\\Windows")
+            adl_path = os.path.join(windir, "System32", "atiadlxx.dll")
+            if not os.path.exists(adl_path):
                 return False
 
-            # ADL basic functions we need
-            ADL_OK = 0
-            ADL_MAIN_MALLOC = 1
+            adl_lib = ctypes.CDLL(adl_path)
 
-            class ADL_MEMORY_INFO(Structure):
+            # Define ADL structures
+            class ADLTemperature(ctypes.Structure):
                 _fields_ = [
-                    ("iSize", c_int),
-                    ("iPhysicalMemorySize", c_int),
+                    ("iSize", ctypes.c_int),
+                    ("iTemperatureType", ctypes.c_int),
+                    ("iTemperature", ctypes.c_int),
                 ]
 
-            class ADL_GPU_INFO(Structure):
+            class ADLOD5CurrentActivity(ctypes.Structure):
                 _fields_ = [
-                    ("iSize", c_int),
-                    ("iDeviceNumber", c_int),
-                    ("iBusNumber", c_int),
-                    ("iDeviceNumber", c_int),
-                    ("iFunctionNumber", c_int),
-                    ("iVendorID", c_int),
-                    ("iAdapterID", c_int),
-                    ("iExist", c_int),
-                    ("strDriverPath", c_char_p),
-                    ("strDriverPathExt", c_char_p),
-                    ("strUGDriverPath", c_char_p),
-                    ("ullOSDisplayMask", ctypes.c_ulonglong),
+                    ("iSize", ctypes.c_int),
+                    ("iEngineClock", ctypes.c_int),
+                    ("iMemoryClock", ctypes.c_int),
+                    ("iVddc", ctypes.c_int),
+                    ("iActivityPercent", ctypes.c_int),
+                    ("iCurrentPerformanceLevel", ctypes.c_int),
+                    ("iCurrentBusSpeed", ctypes.c_int),
+                    ("iCurrentBusLanes", ctypes.c_int),
+                    ("iMaxBusLanes", ctypes.c_int),
+                    ("iReserved", ctypes.c_int * 8),
                 ]
 
-            # Simplified ADL detection - check if we can get basic info
+            # ADL_Main_Malloc callback type
+            ADL_MAIN_MALLOC = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_int)
+
+            # Get ADL_Main_Control_Create
+            adl_main_control_create = getattr(adl_lib, "ADL_Main_Control_Create", None)
+            if adl_main_control_create is None:
+                return False
+
+            adl_main_control_create.argtypes = [ADL_MAIN_MALLOC, ctypes.c_int]
+            adl_main_control_create.restype = ctypes.c_int
+
+            # Create malloc callback
+            @ADL_MAIN_MALLOC
+            def my_malloc(size):
+                import ctypes
+                return ctypes.pythonapi.PyMem_Malloc(size)
+
+            # Try to initialize ADL with enum=1 first
+            result = adl_main_control_create(my_malloc, 1)
+            if result != 0:
+                # Try with enum=0
+                result = adl_main_control_create(my_malloc, 0)
+                if result != 0:
+                    return False
+
+            # Get temperature function - try Overdrive6 first as it may work on newer GPUs
+            adl_temp_get = getattr(adl_lib, "ADL_Overdrive6_Temperature_Get", None)
+
+            # Get activity function
+            adl_activity_get = getattr(adl_lib, "ADL_Overdrive5_CurrentActivity_Get", None)
+
+            # If no temp function, check for other temperature-related functions
+            if adl_temp_get is None:
+                adl_temp_get = getattr(adl_lib, "ADL_Overdrive5_Temperature_Get", None)
+
+            if adl_temp_get is None and adl_activity_get is None:
+                return False
+
+            # Store ADL references for later use
+            self._adl_lib = adl_lib
+            self._adl_temp_get = adl_temp_get
+            self._adl_activity_get = adl_activity_get
+            self._ADLTemperature = ADLTemperature
+            self._ADLOD5CurrentActivity = ADLOD5CurrentActivity
+
             self._adl_available = True
-            self._gpu_count = 1  # Assume single GPU unless we detect more
+            self._gpu_count = 1
             self._gpu_device_ids = self._get_adl_device_ids()
             self._gpu_info = self._detect_adl()
             self._gpu_vendor = "AMD"
+
+            # Try to set up PDH-based fallback for temperature (Windows thermal zone)
+            self._init_pdh_fallback()
+
             return True
         except Exception as e:
             self._adl_available = False
             return False
+
+    def _init_pdh_fallback(self):
+        """Initialize PDH-based fallback for GPU metrics on Windows"""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            self._pdh_available = False
+            self._pdh_query = None
+            self._pdh_gpu_counter = None
+            self._pdh_temp_counter = None
+
+            pdh = ctypes.windll.pdh
+
+            class PDH_FMT_COUNTERVALUE(ctypes.Structure):
+                _fields_ = [
+                    ('CStatus', wintypes.DWORD),
+                    ('pad', wintypes.DWORD),
+                    ('doubleValue', ctypes.c_double),
+                ]
+
+            self._PDH_FMT_COUNTERVALUE = PDH_FMT_COUNTERVALUE
+            self._PDH_FMT_DOUBLE = 0x00000200
+
+            # Create a persistent query that stays open
+            hQuery = ctypes.c_void_p()
+            result = pdh.PdhOpenQueryW(None, 0, ctypes.byref(hQuery))
+            if result != 0:
+                return
+
+            # Store the persistent query handle
+            self._pdh_query = hQuery
+
+            # Add GPU utilization counter
+            hCounter = ctypes.c_void_p()
+            result = pdh.PdhAddCounterW(
+                hQuery,
+                r'\\GPU Engine(*)\\Utilization Percentage',
+                0,
+                ctypes.byref(hCounter)
+            )
+            if result == 0:
+                self._pdh_gpu_counter = hCounter
+
+                # Add thermal zone temperature counter
+                hTempCounter = ctypes.c_void_p()
+                result = pdh.PdhAddCounterW(
+                    hQuery,
+                    r'\\Temperatursoneinformasjon(*)\\Temperatur',
+                    0,
+                    ctypes.byref(hTempCounter)
+                )
+                if result == 0:
+                    self._pdh_temp_counter = hTempCounter
+                    self._pdh_available = True
+
+                    # Do initial collection
+                    pdh.PdhCollectQueryData(self._pdh_query)
+                    return
+
+            # Failed, close query
+            pdh.PdhCloseQuery(self._pdh_query)
+            self._pdh_query = None
+        except:
+            pass
 
     def _get_adl_device_ids(self) -> List[str]:
         """Get AMD GPU device IDs"""
@@ -441,20 +543,101 @@ class GPUCollector:
         """Collect using ADL for AMD GPUs"""
         try:
             info = self._detect_adl()
+
+            temp = None
+            load = None
+            fan = None
+            power = None
+
+            # Try to get temperature using ADL Overdrive 5/6
+            if hasattr(self, '_adl_temp_get') and self._adl_temp_get:
+                try:
+                    temp_struct = self._ADLTemperature()
+                    temp_struct.iSize = ctypes.sizeof(self._ADLTemperature)
+                    temp_struct.iTemperatureType = 0  # 0 = GPU temperature
+                    result = self._adl_temp_get(0, ctypes.byref(temp_struct))
+                    if result == 0:
+                        temp = temp_struct.iTemperature / 1000.0  # Convert from millidegrees
+                except:
+                    pass
+
+            # Try to get current activity (load, memory, etc.)
+            if hasattr(self, '_adl_activity_get') and self._adl_activity_get:
+                try:
+                    activity = self._ADLOD5CurrentActivity()
+                    activity.iSize = ctypes.sizeof(self._ADLOD5CurrentActivity)
+                    result = self._adl_activity_get(0, ctypes.byref(activity))
+                    if result == 0:
+                        load = activity.iActivityPercent
+                except:
+                    pass
+
+            # Fallback: use PDH for GPU metrics if ADL didn't provide them
+            if hasattr(self, '_pdh_available') and self._pdh_available:
+                pdh_temp, pdh_load = self._collect_pdh_metrics()
+                if temp is None and pdh_temp is not None:
+                    temp = pdh_temp
+                if load is None and pdh_load is not None:
+                    load = pdh_load
+
             return {
                 'available': True,
                 'name': info.name,
                 'vendor': 'AMD',
-                'load': None,  # ADL limited info without more complex setup
+                'load': load,
                 'memory_used': None,
                 'memory_total': info.vram_mb / 1024 if info.vram_mb else None,
                 'memory_percent': None,
-                'temperature': None,  # Would need ADL temperature calls
-                'power': None,
-                'fan_speed': None,
+                'temperature': temp,
+                'power': power,
+                'fan_speed': fan,
             }
         except Exception as e:
             return {'available': False, 'error': str(e)}
+
+    def _collect_pdh_metrics(self):
+        """Collect GPU metrics via PDH (Performance Data Helper)"""
+        temp = None
+        load = None
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            pdh = ctypes.windll.pdh
+
+            # Collect query data using persistent handles
+            if self._pdh_query:
+                pdh.PdhCollectQueryData(self._pdh_query)
+
+            # Get GPU utilization
+            if self._pdh_gpu_counter:
+                gpu_value = self._PDH_FMT_COUNTERVALUE()
+                result = pdh.PdhGetFormattedCounterValue(
+                    self._pdh_gpu_counter,
+                    self._PDH_FMT_DOUBLE,
+                    0,
+                    ctypes.byref(gpu_value)
+                )
+                if result == 0 and gpu_value.CStatus == 0:
+                    load = gpu_value.doubleValue
+
+            # Get temperature from thermal zone
+            if self._pdh_temp_counter:
+                temp_value = self._PDH_FMT_COUNTERVALUE()
+                result = pdh.PdhGetFormattedCounterValue(
+                    self._pdh_temp_counter,
+                    self._PDH_FMT_DOUBLE,
+                    0,
+                    ctypes.byref(temp_value)
+                )
+                if result == 0 and temp_value.CStatus == 0:
+                    # Temperature is in Kelvin, convert to Celsius
+                    temp_kelvin = temp_value.doubleValue
+                    if temp_kelvin > 100:  # Reasonable temperature check
+                        temp = temp_kelvin - 273.15
+        except:
+            pass
+        return temp, load
 
     def _collect_gputil(self) -> Dict[str, Any]:
         """Collect using GPUtil"""

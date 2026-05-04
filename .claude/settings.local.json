@@ -28,7 +28,8 @@
       "Bash(git fetch *)",
       "Bash(git push *)",
       "Bash(C:/Users/Stian/AppData/Local/Programs/Python/Python314/python.exe *)",
-      "Bash(cmd.exe *)"
+      "Bash(cmd.exe *)",
+      "Bash(py *)"
     ]
   }
 }
