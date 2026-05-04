@@ -249,7 +249,7 @@ class PremiumSidebar(QFrame, ScaleMixin):
         c = theme_manager.colors
 
         header = QFrame()
-        header.setFixedHeight(100)
+        header.setFixedHeight(80)
         header.setStyleSheet(f"""
             QFrame {{
                 background-color: {c.BG_CARD};
@@ -259,13 +259,14 @@ class PremiumSidebar(QFrame, ScaleMixin):
         """)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setContentsMargins(24, 16, 24, 16)
         layout.setSpacing(16)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setLayout(layout)
 
-        # Premium icon container
+        # Premium icon container - centered
         icon_container = QFrame()
-        icon_container.setFixedSize(56, 56)
+        icon_container.setFixedSize(48, 48)
         icon_container.setStyleSheet("""
             QFrame {
                 background-color: qlineargradient(
@@ -273,7 +274,7 @@ class PremiumSidebar(QFrame, ScaleMixin):
                     stop: 0 #00ab84,
                     stop: 1 #00bcd4
                 );
-                border-radius: 16px;
+                border-radius: 12px;
             }
         """)
 
@@ -285,40 +286,16 @@ class PremiumSidebar(QFrame, ScaleMixin):
         try:
             icon = qta.icon("ph.monitor", color="#ffffff", color_active="#ffffff")
             icon_label = QLabel()
-            icon_label.setPixmap(icon.pixmap(28, 28))
+            icon_label.setPixmap(icon.pixmap(24, 24))
             icon_layout.addWidget(icon_label)
         except Exception:
             icon_label = QLabel("N")
-            icon_label.setFont(QFont("Segoe UI", 24, QFont.Bold))
+            icon_label.setFont(QFont("Segoe UI", 20, QFont.Bold))
             icon_label.setStyleSheet("color: #ffffff;")
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_layout.addWidget(icon_label)
 
         layout.addWidget(icon_container)
-
-        # Title area
-        title_widget = QWidget()
-        title_layout = QVBoxLayout()
-        title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.setSpacing(4)
-        title_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        title_widget.setLayout(title_layout)
-
-        title = QLabel("System ")
-        title.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        title.setStyleSheet(f"""
-            color: {c.TEXT_PRIMARY};
-            letter-spacing: 2px;
-        """)
-
-        subtitle = QLabel("Dashboard")
-        subtitle.setFont(QFont("Segoe UI", 11))
-        subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-
-        title_layout.addWidget(title)
-        title_layout.addWidget(subtitle)
-
-        layout.addWidget(title_widget, stretch=1)
 
         # Add header to main layout
         self.layout().insertWidget(0, header)
