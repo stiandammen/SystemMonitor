@@ -400,7 +400,6 @@ class MainWindow(QMainWindow, ScaleMixin):
         from views.network import NetworkView
         from views.memory import MemoryView
         from views.disks import DisksView
-        from views.processes import ProcessesView
         from views.powershell import CommandPromptView
         from views.settings import SettingsView
 
@@ -411,7 +410,6 @@ class MainWindow(QMainWindow, ScaleMixin):
             "network": NetworkView(),
             "memory": MemoryView(),
             "disks": DisksView(),
-            "processes": ProcessesView(),
             "cmd": CommandPromptView(),
             "settings": SettingsView(),
         }

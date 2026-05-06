@@ -86,12 +86,11 @@ class SystemMonitorApp:
         import views.network as network_module
         import views.memory as memory_module
         import views.disks as disks_module
-        import views.processes as processes_module
         import views.settings as settings_view_module
-        
+
         if self._window is None:
             return
-        
+
         # Create and register views
         views_list = [
             ("overview", overview_module.OverviewView()),
@@ -100,7 +99,6 @@ class SystemMonitorApp:
             ("network", network_module.NetworkView()),
             ("memory", memory_module.MemoryView()),
             ("disks", disks_module.DisksView()),
-            ("processes", processes_module.ProcessesView()),
             ("settings", settings_view_module.SettingsView()),
         ]
         

@@ -14,7 +14,6 @@ class SignalBus(QObject):
     
     # Data signals
     data_updated = pyqtSignal(dict)           # Emitted when new system data is available
-    processes_updated = pyqtSignal(list)      # Emitted when process list is updated
     history_updated = pyqtSignal(str, list)   # Emitted when history buffer updates (metric_name, data)
     
     # Alert signals
@@ -57,11 +56,7 @@ class SignalBus(QObject):
     def emit_data(self, data: Dict[str, Any]):
         """Emit system data update"""
         self.data_updated.emit(data)
-    
-    def emit_processes(self, processes: List[Dict[str, Any]]):
-        """Emit process list update"""
-        self.processes_updated.emit(processes)
-    
+
     def emit_alert(self, alert: Dict[str, Any]):
         """Emit alert and store in history"""
         self._alert_history.append(alert)

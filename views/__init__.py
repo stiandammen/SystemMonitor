@@ -8,10 +8,9 @@ from .gpu import GPUView
 from .network import NetworkView
 from .memory import MemoryView
 from .disks import DisksView
-from .processes import ProcessesView
 from .settings import SettingsView
 
 __all__ = [
     'BaseView', 'OverviewView', 'CPUView', 'GPUView',
-    'NetworkView', 'MemoryView', 'DisksView', 'ProcessesView', 'SettingsView'
+    'NetworkView', 'MemoryView', 'DisksView', 'SettingsView'
 ]

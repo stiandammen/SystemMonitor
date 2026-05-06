@@ -58,3 +58,9 @@ widgets/__pycache__/table.cpython-314.pyc
 widgets/__pycache__/toggle.cpython-314.pyc
 *.pyc
 widgets/__pycache__/__init__.cpython-314.pyc
+widgets/__pycache__/alert.cpython-314.pyc
+widgets/__pycache__/card.cpython-314.pyc
+widgets/__pycache__/chip.cpython-314.pyc
+widgets/__pycache__/alert.cpython-314.pyc
+widgets/__pycache__/chip.cpython-314.pyc
+/widgets/__pycache__

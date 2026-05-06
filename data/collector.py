@@ -28,7 +28,6 @@ class DataCollector(QThread):
     """Collects system data in background thread"""
 
     data_ready = pyqtSignal(dict)
-    processes_updated = pyqtSignal(list)
     storage_updated = pyqtSignal(list)
     system_info_updated = pyqtSignal(dict)
 
@@ -40,10 +39,8 @@ class DataCollector(QThread):
         self._gpu_init_error = None
 
         # Track collection intervals
-        self._last_process_update = 0
         self._last_storage_update = 0
         self._last_system_info_update = 0
-        self._process_interval = 3  # seconds
         self._storage_interval = 5  # seconds
         self._system_info_interval = 10  # seconds
 
@@ -71,14 +68,6 @@ class DataCollector(QThread):
             try:
                 current_time = time.time()
                 self._collect_data()
-                if current_time - self._last_process_update >= self._process_interval:
-                    try:
-                        _log("Starting process collection...")
-                        self._collect_processes()
-                        _log("Process collection OK")
-                    except Exception as e:
-                        _log(f"Process collection failed: {e}")
-                    self._last_process_update = current_time
 
                 if current_time - self._last_storage_update >= self._storage_interval:
                     try:
@@ -172,23 +161,6 @@ class DataCollector(QThread):
     def get_data(self):
         """Get current data"""
         return self._data.copy()
-
-    def _collect_processes(self):
-        """Collect process list - runs in background thread"""
-        import psutil
-        try:
-            processes = []
-            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info']):
-                try:
-                    if proc.is_running():
-                        processes.append(proc.info)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-
-            processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
-            self.processes_updated.emit(processes[:100])  # Emit top 100
-        except Exception as e:
-            _log(f"Process collection error: {e}")
 
     def _collect_storage(self):
         """Collect storage info - runs in background thread"""

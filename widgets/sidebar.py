@@ -26,13 +26,6 @@ NAV_STRUCTURE = {
             {"key": "disks", "label": "Storage", "icon": "fa5s.database", "accent": "#f59e0b"},
         ]
     },
-    "process": {
-        "title": "PROCESS MANAGEMENT",
-        "items": [
-            {"key": "processes", "label": "Processes", "icon": "ph.list", "accent": "#f97316"},
-            {"key": "services", "label": "Services", "icon": "fa5s.cogs", "accent": "#64748b"},
-        ]
-    },
     "tools": {
         "title": "TERMINAL & TOOLS",
         "items": [
