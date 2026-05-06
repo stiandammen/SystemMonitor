@@ -677,5 +677,8 @@ class ProcessesView(QWidget, ScaleMixin):
 
     def __del__(self):
         """Cleanup"""
-        if hasattr(self, '_update_timer'):
-            self._update_timer.stop()
+        if hasattr(self, '_update_timer') and self._update_timer is not None:
+            try:
+                self._update_timer.stop()
+            except RuntimeError:
+                pass  # Timer was already deleted by C++
