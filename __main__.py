@@ -1,8 +1,11 @@
 """
 System Monitor - Main Entry Point
+Optimized for professional technician-grade performance
 """
 import os
+os.environ["QT_ENABLE_HIGH_DPI_SCALING"] = "1"
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+os.environ["QT_SCALE_FACTOR_ROUNDING_POLICY"] = "PassThrough"
 import sys
 
 import traceback
@@ -15,97 +18,87 @@ else:
 
 sys.path.insert(0, bundle_dir)
 
-# Setup logging for packaged app
-LOG_FILE = None
-if getattr(sys, 'frozen', False):
-    log_dir = os.path.join(os.environ.get('TEMP', ''), 'SystemMonitor')
-    os.makedirs(log_dir, exist_ok=True)
-    LOG_FILE = os.path.join(log_dir, 'error.log')
+# Setup logging
+from utils.logger import get_logger, LogCategory, log_info, log_error, log_exception
 
-def log_error(msg):
-    """Log error to file"""
-    print(f"[SystemMonitor] {msg}", flush=True)
-    if LOG_FILE:
-        try:
-            with open(LOG_FILE, 'a', encoding='utf-8') as f:
-                import datetime
-                f.write(f"[{datetime.datetime.now()}] {msg}\n")
-                f.flush()
-        except:
-            pass
+_log = get_logger()
+
 
 def main():
     """Main application entry point"""
-    log_error("=== SystemMonitor Starting ===")
-    log_error(f"Python: {sys.version}")
-    log_error(f"Frozen: {getattr(sys, 'frozen', False)}")
-    log_error(f"Bundle dir: {bundle_dir}")
+    log_info(LogCategory.APP, "=== SystemMonitor Starting ===")
+    log_info(LogCategory.APP, f"Python: {sys.version}")
+    log_info(LogCategory.APP, f"Frozen: {getattr(sys, 'frozen', False)}")
+    log_info(LogCategory.APP, f"Bundle dir: {bundle_dir}")
 
     try:
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import Qt
-        log_error("PyQt6 imported OK")
+        log_info(LogCategory.APP, "PyQt6 imported OK")
     except Exception as e:
-        log_error(f"Failed to import PyQt6: {e}\n{traceback.format_exc()}")
+        log_error(LogCategory.APP, f"Failed to import PyQt6: {e}\n{traceback.format_exc()}")
         return 1
 
     try:
+        # Enable High DPI scaling before QApplication
+        QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+
         app = QApplication(sys.argv)
-        log_error("QApplication created OK")
+        app.setApplicationName("SystemMonitor")
+        app.setApplicationVersion("1.0")
+        log_info(LogCategory.APP, "QApplication created OK")
     except Exception as e:
-        log_error(f"Failed to create QApplication: {e}\n{traceback.format_exc()}")
+        log_error(LogCategory.APP, f"Failed to create QApplication: {e}\n{traceback.format_exc()}")
         return 1
 
     try:
         from scaler import init_scaler, S
         init_scaler(app)
-        log_error("Scaler initialized OK")
+        log_info(LogCategory.APP, "Scaler initialized OK")
     except Exception as e:
-        log_error(f"Failed to init scaler: {e}")
+        log_error(LogCategory.APP, f"Failed to init scaler: {e}")
 
     try:
         from core.window import MainWindow
         from core.theme import ThemeManager
-        log_error("core modules imported OK")
+        log_info(LogCategory.APP, "core modules imported OK")
 
         theme_manager = ThemeManager()
         app.setStyleSheet(theme_manager.get_stylesheet())
-        log_error("Theme applied OK")
+        log_info(LogCategory.APP, "Theme applied OK")
 
         window = MainWindow()
         window.show()
-        log_error("MainWindow shown OK")
+        log_info(LogCategory.APP, "MainWindow shown OK")
 
-        from data.collector import DataCollector
+        # Use the new coordinator-based collector for better performance
+        from data.coordinator import DataCollector
         collector = DataCollector()
         collector.start()
-        log_error("DataCollector started OK")
+        log_info(LogCategory.APP, "DataCollector started OK")
 
+        # Connect signals with debouncing
         collector.data_ready.connect(window.update_data)
-        log_error("Signals connected OK")
+        log_info(LogCategory.APP, "Signals connected OK")
 
-        from views.overview_page import OverviewPage
-        from views.cpu import CPUView
-        if isinstance(window._views["overview"], OverviewPage):
-            window._views["overview"].set_data_collector(collector)
-        if isinstance(window._views["cpu"], CPUView):
-            window._views["cpu"].set_data_collector(collector)
-        log_error("Views connected OK")
+        # Lazy connect data collector to views as they become active
+        # The window handles this via lazy loading now
+        log_info(LogCategory.APP, "Views use lazy loading - connected on demand")
 
-        log_error("Entering main loop")
+        log_info(LogCategory.APP, "Entering main loop")
         from PyQt6.QtWidgets import QWidget
-        log_error(f"Window visible: {window.isVisible()}, widgets count: {len(window.findChildren(QWidget))}")
-        log_error(f"About to enter Qt event loop")
+        log_info(LogCategory.APP, f"Window visible: {window.isVisible()}, widgets count: {len(window.findChildren(QWidget))}")
+        log_info(LogCategory.APP, "About to enter Qt event loop")
         try:
             result = app.exec()
-            log_error(f"App exited with code: {result}")
+            log_info(LogCategory.APP, f"App exited with code: {result}")
         except Exception as e:
-            log_error(f"app.exec_ exception: {e}\n{traceback.format_exc()}")
+            log_error(LogCategory.APP, f"app.exec_ exception: {e}\n{traceback.format_exc()}")
             result = 1
         collector.stop()
         return result
     except Exception as e:
-        log_error(f"Application error: {e}\n{traceback.format_exc()}")
+        log_error(LogCategory.APP, f"Application error: {e}\n{traceback.format_exc()}")
         return 1
 
 

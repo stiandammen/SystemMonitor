@@ -1,5 +1,6 @@
 """
 Main Window - Application main window
+Optimized for professional technician-grade performance
 """
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -11,6 +12,7 @@ from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 from widgets.sidebar import PremiumSidebar
 from styles.theme import theme_manager
 from scaler import S, ScaleMixin
+from utils.logger import get_logger, LogCategory, log_info, log_debug
 
 
 class TitleBar(QWidget, ScaleMixin):
@@ -226,6 +228,9 @@ class TitleBar(QWidget, ScaleMixin):
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton and self._drag_position:
+            # Skip if already in resize mode to prevent conflicts
+            if self._in_drag_resize and not self._drag_position:
+                return
             if self._maximized:
                 self._parent.showNormal()
                 self._max_btn.setText("□")
@@ -237,7 +242,9 @@ class TitleBar(QWidget, ScaleMixin):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_position = None
-            self._parent._in_drag_resize = False
+            # Use a single-shot to delay the flag clear slightly
+            # This prevents immediate scale updates right after drag ends
+            QTimer.singleShot(50, lambda: self._parent and setattr(self._parent, '_in_drag_resize', False))
             event.accept()
 
     def changeEvent(self, event):
@@ -253,16 +260,19 @@ class TitleBar(QWidget, ScaleMixin):
 
 
 class ResizeCorner(QWidget, ScaleMixin):
-    """Custom resize grip in bottom-right corner"""
+    """Custom resize grip in bottom-right corner - optimized"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._parent = parent
-        self.setFixedWidth(20)
-        self.setMinimumHeight(20)
+        self.setFixedWidth(S.px(20))
+        self.setMinimumHeight(S.px(20))
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._resize_dir = None
         self._start_geometry = None
         self._start_pos = None
+        self._last_update_time = 0
+        self._update_interval = 16  # ~60fps for smooth resize
         self.scale_connect()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -310,15 +320,56 @@ class ResizeCorner(QWidget, ScaleMixin):
 
 
 class MainWindow(QMainWindow, ScaleMixin):
-    """Main application window"""
+    """Main application window - optimized for performance"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._drag_position = None
         self._in_drag_resize = False  # Guard against UI rebuilds during window operations
+        self._pending_scale_update = False
+        self._view_cache = {}  # Lazy loading cache for views
+        self._active_view = None  # Track which view is currently active
+        self._resize_debounce_timer = QTimer()  # Debounce resize events
+        self._resize_debounce_timer.setSingleShot(True)
+        self._resize_debounce_timer.timeout.connect(self._update_resize_corner)
+
         self.scale_connect()
         theme_manager.theme_changed.connect(self._on_theme_changed)
         self._setup_ui()
+        self._preload_overview()  # Preload the default view
+
+    def _preload_overview(self):
+        """Preload the default overview view"""
+        self._get_view("overview")
+
+    def _get_view(self, view_name: str) -> QWidget:
+        """Get or create a view lazily"""
+        if view_name not in self._view_cache:
+            from views.overview_page import OverviewPage
+            from views.cpu import CPUView
+            from views.gpu import GPUView
+            from views.network import NetworkView
+            from views.memory import MemoryView
+            from views.disks import DisksView
+            from views.powershell import CommandPromptView
+            from views.settings import SettingsView
+
+            view_classes = {
+                "overview": OverviewPage,
+                "cpu": CPUView,
+                "gpu": GPUView,
+                "network": NetworkView,
+                "memory": MemoryView,
+                "disks": DisksView,
+                "cmd": CommandPromptView,
+                "settings": SettingsView,
+            }
+
+            if view_name in view_classes:
+                self._view_cache[view_name] = view_classes[view_name]()
+                self._content.addWidget(self._view_cache[view_name])
+
+        return self._view_cache[view_name]
 
     def on_scale_changed(self, factor: float):
         # Ignore scale changes during drag - just mark for later update
@@ -326,17 +377,26 @@ class MainWindow(QMainWindow, ScaleMixin):
             self._pending_scale_update = True
             return
         # Only rebuild when stationary
-        self._setup_ui()
-        self.update()
+        log_debug(LogCategory.WINDOW, f"Scale changed: {factor}")
+        self._pending_scale_update = True
+        QTimer.singleShot(100, self._debounced_setup_ui)
+
+    def _debounced_setup_ui(self):
+        """Debounced UI rebuild after scale changes"""
+        if not self._in_drag_resize:
+            self._setup_ui()
+            self.update()
 
     def _on_theme_changed(self, theme_name: str):
         """Handle theme change - update all widgets"""
-        self._title_bar._on_theme_changed(theme_name)
-        self._sidebar._apply_theme()
-        # Re-apply styles on all nav items
-        for item in self._sidebar._items.values():
-            item._apply_style()
-        self._resize_corner._on_theme_changed(theme_name)
+        if hasattr(self, '_title_bar'):
+            self._title_bar._on_theme_changed(theme_name)
+        if hasattr(self, '_sidebar'):
+            self._sidebar._apply_theme()
+            for item in self._sidebar._items.values():
+                item._apply_style()
+        if hasattr(self, '_resize_corner'):
+            self._resize_corner._on_theme_changed(theme_name)
 
     def _setup_ui(self):
         """Setup window UI"""
@@ -370,12 +430,14 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._sidebar = self._create_sidebar()
         content_layout.addWidget(self._sidebar)
 
-        # Content
+        # Content - use the cached view if available
         self._content = QStackedWidget()
         content_layout.addWidget(self._content, stretch=1)
 
-        # Create views
-        self._create_views()
+        # Load overview as default
+        overview = self._get_view("overview")
+        self._content.setCurrentWidget(overview)
+        self._active_view = "overview"
 
         # Resize corner in bottom-right
         self._resize_corner = ResizeCorner(self)
@@ -392,43 +454,22 @@ class MainWindow(QMainWindow, ScaleMixin):
         sidebar.view_selected.connect(self._switch_view)
         return sidebar
 
-    def _create_views(self):
-        """Create all views"""
-        from views.overview_page import OverviewPage
-        from views.cpu import CPUView
-        from views.gpu import GPUView
-        from views.network import NetworkView
-        from views.memory import MemoryView
-        from views.disks import DisksView
-        from views.powershell import CommandPromptView
-        from views.settings import SettingsView
+    def _switch_view(self, view_name: str):
+        """Switch to different view - lazy loading"""
+        view = self._get_view(view_name)
+        self._content.setCurrentWidget(view)
+        self._active_view = view_name
+        log_info(LogCategory.UI, f"Switched to view: {view_name}")
 
-        self._views = {
-            "overview": OverviewPage(),
-            "cpu": CPUView(),
-            "gpu": GPUView(),
-            "network": NetworkView(),
-            "memory": MemoryView(),
-            "disks": DisksView(),
-            "cmd": CommandPromptView(),
-            "settings": SettingsView(),
-        }
-
-        for name, view in self._views.items():
-            self._content.addWidget(view)
-
-        self._content.setCurrentWidget(self._views["overview"])
-
-    def _switch_view(self, view_name):
-        """Switch to different view"""
-        if view_name in self._views:
-            self._content.setCurrentWidget(self._views[view_name])
-
-    def update_data(self, data):
-        """Update all views with new data"""
-        for view in self._views.values():
+    def update_data(self, data: dict):
+        """Update all active views with new data"""
+        # Only update the current view to save CPU
+        if self._active_view and self._active_view in self._view_cache:
+            view = self._view_cache[self._active_view]
             if hasattr(view, 'update_data'):
                 view.update_data(data)
+        elif hasattr(self, '_overview_page'):
+            self._overview_page.update_data(data)
 
     def mousePressEvent(self, event):
         """Handle window drag from content area"""
@@ -457,6 +498,14 @@ class MainWindow(QMainWindow, ScaleMixin):
             event.accept()
 
     def resizeEvent(self, event):
-        """Update resize corner position when window is resized"""
+        """Update resize corner position when window is resized - debounced"""
         super().resizeEvent(event)
+        # Debounce resize corner updates to avoid excessive repaints
+        if not getattr(self, '_resize_debounce_active', False):
+            self._resize_debounce_active = True
+            QTimer.singleShot(16, self._update_resize_corner)
+
+    def _update_resize_corner(self):
+        """Perform the actual resize corner position update"""
+        self._resize_debounce_active = False
         self._update_resize_corner_position()

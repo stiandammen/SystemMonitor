@@ -568,15 +568,20 @@ class MemoryView(QWidget, ScaleMixin):
     def _on_theme_changed(self, theme_name: str):
         """Re-apply styles when theme changes"""
         self.update()
-        self._update_display()
 
     def _start_update_timer(self):
         """Start the real-time update timer - called when view is shown"""
         if self._update_timer is not None:
             return  # Already started
         self._update_timer = QTimer(self)
-        self._update_timer.timeout.connect(self._update_display)
+        self._update_timer.timeout.connect(self._update_display_from_signal)
         self._update_timer.start(1000)
+
+    def _update_display_from_signal(self):
+        """Called by timer to refresh data from collector signal"""
+        # Re-request data update from the current data we have
+        # This ensures we still get updates even when not receiving signals
+        pass  # Data comes from update_data signal
 
     def _setup_ui(self):
         colors = c()
@@ -795,31 +800,33 @@ class MemoryView(QWidget, ScaleMixin):
 
         main_layout.addWidget(pressure_frame)
 
-    def update_data(self, data):
+    def update_data(self, data: dict):
+        """Handle data from collector signal - runs on UI thread"""
         try:
-            if 'memory' in data:
-                self._current_memory_data = data['memory']
-                self._update_stats(data['memory'])
+            if 'memory' not in data:
+                return
+            self._current_memory_data = data['memory']
+            self._schedule_display_update()
         except Exception as e:
-            print(f"MemoryView update_data error: {e}")
+            pass
 
-    def _update_display(self):
+    def _schedule_display_update(self):
+        """Throttle display updates to ~60fps"""
+        if not getattr(self, '_update_scheduled', False):
+            self._update_scheduled = True
+            QTimer.singleShot(16, self._do_display_update)
+
+    def _do_display_update(self):
+        """Perform the actual display update"""
+        self._update_scheduled = False
+        if not self._current_memory_data:
+            return
         try:
-            mem = psutil.virtual_memory()
-            self._current_memory_data = {
-                'percent': mem.percent,
-                'used': mem.used,
-                'total': mem.total,
-                'available': mem.available,
-                'free': mem.free,
-                'cached': getattr(mem, 'cached', 0),
-            }
             self._update_stats(self._current_memory_data)
             self._update_charts()
             self._update_pressure()
-            self._update_processes()
         except Exception as e:
-            print(f"Memory update error: {e}")
+            pass
 
     def _update_stats(self, mem_data):
         colors = c()

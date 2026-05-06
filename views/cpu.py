@@ -1,6 +1,6 @@
 """
 CPU View - CPU monitoring dashboard with per-core graphs
-Modern design matching GPU View
+Optimized for professional technician-grade performance
 """
 import platform
 import time
@@ -14,6 +14,7 @@ from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
 
 from styles.theme import theme_manager
 from scaler import S, ScaleMixin
+from utils.logger import get_logger, LogCategory, log_debug
 
 
 # Use theme colors directly
@@ -214,7 +215,52 @@ class CPUView(QWidget, ScaleMixin):
         self._data_collector = collector
         if collector:
             collector.data_ready.connect(self._on_data_ready)
-        self._start_update_timer()
+
+    def update_data(self, data: dict):
+        """Handle data update from window - called by the main data collector signal"""
+        if 'cpu' not in data:
+            return
+        cpu = data['cpu']
+        self._per_core = cpu.get('per_core', [])
+        self._total_usage = cpu.get('percent', 0)
+        if not getattr(self, '_update_scheduled', False):
+            self._update_scheduled = True
+            QTimer.singleShot(16, self._perform_update)
+
+    def _on_data_ready(self, data: dict):
+        """Handle data from background thread - runs on UI thread via signal"""
+        if 'cpu' not in data:
+            return
+        cpu = data['cpu']
+        self._per_core = cpu.get('per_core', [])
+        self._total_usage = cpu.get('percent', 0)
+        if not getattr(self, '_update_scheduled', False):
+            self._update_scheduled = True
+            QTimer.singleShot(16, self._perform_update)
+
+    def _perform_update(self):
+        """Perform the actual UI update (throttled)"""
+        self._update_scheduled = False
+        try:
+            per_core = getattr(self, '_per_core', [])
+            total_usage = getattr(self, '_total_usage', 0)
+            colors = c()
+            if total_usage > 80:
+                usage_color = colors.ACCENT_RED
+            elif total_usage > 60:
+                usage_color = colors.ACCENT_ORANGE
+            elif total_usage > 40:
+                usage_color = colors.ACCENT_YELLOW
+            else:
+                usage_color = colors.ACCENT_BLUE
+            if hasattr(self, '_usage_indicator'):
+                self._usage_indicator.setStyleSheet(f"color: {usage_color}; font-size: 18px; font-weight: bold; background: transparent;")
+                self._usage_indicator.setText(f"{total_usage:.0f}%")
+            for i, usage in enumerate(per_core if isinstance(per_core, list) else []):
+                if i < len(self._core_graphs):
+                    self._core_graphs[i].set_value(usage)
+        except Exception:
+            pass
 
     def _setup_ui(self):
         """Setup CPU view UI"""
@@ -529,77 +575,6 @@ class CPUView(QWidget, ScaleMixin):
             return name.strip()
 
         return "Unknown CPU"
-
-    def _start_update_timer(self):
-        """Start the real-time update timer"""
-        self._update_timer = QTimer(self)
-        self._update_timer.timeout.connect(self._update_display)
-        self._update_timer.start(500)  # Update display every 500ms
-
-        # Initial update
-        self._update_display()
-
-    def _on_data_ready(self, data):
-        """Handle data from background thread"""
-        if 'cpu' in data:
-            cpu = data['cpu']
-            self._per_core = cpu.get('per_core', [])
-            self._total_usage = cpu.get('percent', 0)
-
-    def _update_display(self):
-        """Update display with cached CPU data"""
-        try:
-            # Use cached data from collector if available
-            per_core = getattr(self, '_per_core', None)
-            total_usage = getattr(self, '_total_usage', None)
-
-            if per_core is None or total_usage is None:
-                per_core = psutil.cpu_percent(interval=None, percpu=True)
-                total_usage = psutil.cpu_percent(interval=None)
-
-            colors = c()
-
-            # Update usage indicator color
-            if total_usage > 80:
-                usage_color = colors.ACCENT_RED
-            elif total_usage > 60:
-                usage_color = colors.ACCENT_ORANGE
-            elif total_usage > 40:
-                usage_color = colors.ACCENT_YELLOW
-            else:
-                usage_color = colors.ACCENT_BLUE
-
-            self._usage_indicator.setStyleSheet(f"color: {usage_color}; font-size: 18px; font-weight: bold; background: transparent;")
-            self._usage_indicator.setText(f"{total_usage:.0f}%")
-
-            # Update frequency
-            freq = psutil.cpu_freq()
-            if freq:
-                self._stat_freq.set_value(f"{freq.current:.0f} MHz")
-
-            # Update uptime
-            if self._boot_time:
-                uptime_sec = int(time.time() - self._boot_time)
-                days = uptime_sec // 86400
-                hours = (uptime_sec % 86400) // 3600
-                if days > 0:
-                    self._stat_uptime.set_value(f"{days}d {hours}h")
-                elif hours > 0:
-                    self._stat_uptime.set_value(f"{hours}h")
-                else:
-                    mins = uptime_sec // 60
-                    self._stat_uptime.set_value(f"{mins}m")
-
-            # Update each core graph
-            for i, usage in enumerate(per_core):
-                if i < len(self._core_graphs):
-                    self._core_graphs[i].set_value(usage)
-
-            # Update info panel
-            self._update_info_panel(total_usage, per_core)
-
-        except Exception as e:
-            print(f"CPU update error: {e}")
 
     def _update_info_panel(self, total_usage, per_core):
         """Update the info panel with current data"""

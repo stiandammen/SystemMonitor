@@ -493,9 +493,20 @@ class GPUView(QWidget, ScaleMixin):
 
         return chart_card
 
-    def update_data(self, data):
-        """Update view with GPU data"""
+    def update_data(self, data: dict):
+        """Update view with GPU data - throttled"""
         if 'gpu' not in data:
+            return
+        self._pending_gpu_data = data
+        if not getattr(self, '_update_scheduled', False):
+            self._update_scheduled = True
+            QTimer.singleShot(16, self._do_update)
+
+    def _do_update(self):
+        """Perform GPU update"""
+        self._update_scheduled = False
+        data = getattr(self, '_pending_gpu_data', None)
+        if not data:
             return
 
         gpu = data['gpu']
@@ -507,7 +518,6 @@ class GPUView(QWidget, ScaleMixin):
 
         self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
 
-        # Update GPU info
         if gpu_info:
             self._gpu_name_label.setText(gpu_info.get('name', '—'))
             self._card_model.set_value(gpu_info.get('name', 'Unknown')[:35])
@@ -516,7 +526,6 @@ class GPUView(QWidget, ScaleMixin):
             self._card_vram.set_value(f"{vram_gb:.1f} GB")
             self._card_vendor.set_value(gpu_info.get('vendor', 'Unknown'))
 
-        # Update gauges
         load = gpu.get('load', 0)
         mem_used = gpu.get('memory_used', 0)
         mem_total = gpu.get('memory_total', 1)
@@ -530,10 +539,7 @@ class GPUView(QWidget, ScaleMixin):
         self._gauge_vram.set_max_value(mem_total if mem_total else 16)
         self._gauge_power.set_value(power)
         self._gauge_fan.set_value(fan)
-
-        # Update chart
         self._chart.update_chart(load, temp)
-
         self._last_gpu_data = gpu
 
 

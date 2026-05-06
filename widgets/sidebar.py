@@ -18,7 +18,6 @@ NAV_STRUCTURE = {
         "title": None,
         "items": [
             {"key": "overview", "label": "Dashboard", "icon": "mdi.view-dashboard", "accent": "#00ab84"},
-            {"key": "performance", "label": "Performance", "icon": "mdi.gauge", "accent": "#00ab84"},
             {"key": "cpu", "label": "Processor", "icon": "ph.cpu", "accent": "#3b82f6"},
             {"key": "gpu", "label": "Graphics", "icon": "ph.monitor", "accent": "#ec4899"},
             {"key": "network", "label": "Network", "icon": "ph.wifi-high", "accent": "#06b6d4"},
@@ -30,7 +29,6 @@ NAV_STRUCTURE = {
         "title": "TERMINAL & TOOLS",
         "items": [
             {"key": "cmd", "label": "Terminal", "icon": "fa5s.terminal", "accent": "#10b981"},
-            {"key": "alerts", "label": "Alerts", "icon": "ph.bell", "accent": "#ef4444"},
             {"key": "settings", "label": "Settings", "icon": "ph.gear", "accent": "#94a3b8"},
         ]
     }
