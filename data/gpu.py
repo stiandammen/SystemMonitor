@@ -35,6 +35,8 @@ class GPUCollector:
         self._wmi_cache: Dict[str, Any] = {}
         self._wmi_cache_time: float = 0
         self._wmi_cache_ttl: float = 10.0  # Cache WMI for 10 seconds
+        # Cache for ADL detect to avoid expensive calls every collect
+        self._adl_info_cache: Optional[GPUInfo] = None
         self._init_backends()
 
     def _get_wmi_command(self, key: str, command: str, force_refresh: bool = False) -> str:
@@ -542,7 +544,10 @@ class GPUCollector:
     def _collect_adl(self) -> Dict[str, Any]:
         """Collect using ADL for AMD GPUs"""
         try:
-            info = self._detect_adl()
+            # Use cached info if available, only detect once
+            if self._adl_info_cache is None:
+                self._adl_info_cache = self._detect_adl()
+            info = self._adl_info_cache
 
             temp = None
             load = None

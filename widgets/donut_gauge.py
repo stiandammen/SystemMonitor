@@ -98,14 +98,18 @@ class DonutGauge(QWidget):
         value_text = f"{self._animated_value:.0f}%"
         fm = painter.fontMetrics()
         text_width = fm.horizontalAdvance(value_text)
-        painter.drawText(int(center_x - text_width / 2), int(center_y + 6), value_text)
+        # Center text vertically with padding to avoid truncation
+        text_y = int(center_y + 6)
+        painter.drawText(int(center_x - text_width / 2), text_y, value_text)
 
-        # Label text
+        # Label text (positioned below value)
         if self._label:
             painter.setFont(QFont("Segoe UI", 9))
             painter.setPen(QColor("#64748b"))
             label_width = fm.horizontalAdvance(self._label)
-            painter.drawText(int(center_x - label_width / 2), int(center_y + 22), self._label)
+            # Position label below value, not overlapping
+            label_y = int(center_y + 26)
+            painter.drawText(int(center_x - label_width / 2), label_y, self._label)
 
         painter.end()
 

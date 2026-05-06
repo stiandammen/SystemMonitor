@@ -273,8 +273,8 @@ class NetworkTrafficGraph(QWidget):
         if len(self._upload_history) > 1:
             draw_series(self._upload_history, c.ACCENT_PURPLE)
 
-        # Legend
-        legend_y = h - 8
+        # Legend (positioned above bottom edge to avoid truncation)
+        legend_y = h - 20
         painter.setFont(QFont("Segoe UI", 9))
 
         # Download

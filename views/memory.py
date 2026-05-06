@@ -307,8 +307,8 @@ class MemoryUsageGraph(QWidget):
             else:
                 badge_color = colors.ACCENT_GREEN
 
-            # Badge background
-            badge_x = w - 60
+            # Badge background (positioned top-right, away from graph content)
+            badge_x = w - 65
             badge_y = 8
             painter.setBrush(QColor(colors.BG_SECONDARY))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -319,11 +319,13 @@ class MemoryUsageGraph(QWidget):
             painter.setPen(QColor(badge_color))
             painter.drawText(int(badge_x + 8), int(badge_y + 15), f"{val:.1f}%")
 
-        # Time indicator
+        # Time indicator (positioned to avoid overlapping with badge)
         painter.setFont(QFont("Segoe UI", 8))
         painter.setPen(QColor(colors.TEXT_MUTED))
         painter.drawText(int(graph_x), int(h - 5), "60s ago")
-        painter.drawText(int(graph_x + graph_w - 30), int(h - 5), "now")
+        # Position "now" text with padding from right edge
+        now_x = int(graph_x + graph_w - 35)
+        painter.drawText(now_x, int(h - 5), "now")
 
         # Y-axis label (rotated)
         painter.save()

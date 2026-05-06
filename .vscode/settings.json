@@ -4,5 +4,6 @@
     "pyright.diagnostics.reportAttributeAccessIssue": false,
     "python.analysis.diagnostics": {
         "reportAttributeAccessIssue": false
-    }
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }

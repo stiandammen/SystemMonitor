@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QStackedWidget
 )
-from PyQt6.QtCore import Qt, QPoint, QEvent
+from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer
 from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 
 from widgets.sidebar import PremiumSidebar
@@ -26,6 +26,9 @@ class TitleBar(QWidget, ScaleMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def on_scale_changed(self, factor: float):
+        # Ignore during parent drag - prevent expensive rebuilds
+        if self._parent and self._parent._in_drag_resize:
+            return
         self._setup_ui()
         self.update()
 
@@ -218,6 +221,7 @@ class TitleBar(QWidget, ScaleMixin):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_position = event.globalPos() - self._parent.frameGeometry().topLeft()
+            self._parent._in_drag_resize = True
             event.accept()
 
     def mouseMoveEvent(self, event):
@@ -233,6 +237,7 @@ class TitleBar(QWidget, ScaleMixin):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_position = None
+            self._parent._in_drag_resize = False
             event.accept()
 
     def changeEvent(self, event):
@@ -284,6 +289,7 @@ class ResizeCorner(QWidget, ScaleMixin):
             self._resize_dir = 'bottom_right'
             self._start_geometry = self._parent.geometry()
             self._start_pos = event.globalPos()
+            self._parent._in_drag_resize = True
             event.accept()
 
     def mouseMoveEvent(self, event):
@@ -299,6 +305,7 @@ class ResizeCorner(QWidget, ScaleMixin):
             self._resize_dir = None
             self._start_geometry = None
             self._start_pos = None
+            self._parent._in_drag_resize = False
             event.accept()
 
 
@@ -308,11 +315,17 @@ class MainWindow(QMainWindow, ScaleMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._drag_position = None
+        self._in_drag_resize = False  # Guard against UI rebuilds during window operations
         self.scale_connect()
         theme_manager.theme_changed.connect(self._on_theme_changed)
         self._setup_ui()
 
     def on_scale_changed(self, factor: float):
+        # Ignore scale changes during drag - just mark for later update
+        if self._in_drag_resize:
+            self._pending_scale_update = True
+            return
+        # Only rebuild when stationary
         self._setup_ui()
         self.update()
 
@@ -423,6 +436,7 @@ class MainWindow(QMainWindow, ScaleMixin):
         """Handle window drag from content area"""
         if event.button() == Qt.MouseButton.LeftButton and event.globalY() < self._title_bar.height():
             self._drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            self._in_drag_resize = True
             event.accept()
 
     def mouseMoveEvent(self, event):
@@ -435,6 +449,13 @@ class MainWindow(QMainWindow, ScaleMixin):
         """Handle mouse release"""
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_position = None
+            was_resizing = self._in_drag_resize
+            self._in_drag_resize = False
+            # Flush pending scale update if any
+            if hasattr(self, '_pending_scale_update') and self._pending_scale_update:
+                self._pending_scale_update = False
+                self._setup_ui()
+                self.update()
             event.accept()
 
     def resizeEvent(self, event):

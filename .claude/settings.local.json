@@ -29,7 +29,10 @@
       "Bash(git push *)",
       "Bash(C:/Users/Stian/AppData/Local/Programs/Python/Python314/python.exe *)",
       "Bash(cmd.exe *)",
-      "Bash(py *)"
+      "Bash(py *)",
+      "Bash(git *)",
+      "Bash(pip install *)",
+      "Bash(start \"\" python __main__.py)"
     ]
   }
 }

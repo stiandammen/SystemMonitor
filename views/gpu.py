@@ -186,7 +186,8 @@ class GPUGauge(QFrame, ScaleMixin):
             painter.setFont(QFont("Segoe UI", 8))
             painter.setPen(QColor(COLORS['text_muted']))
             title_width = fm.width(self._title)
-            painter.drawText(int(center - title_width / 2), int(center + 20), self._title)
+            # Draw below the center to avoid overlapping with value
+            painter.drawText(int(center - title_width / 2), int(center + 32), self._title)
 
         painter.end()
 

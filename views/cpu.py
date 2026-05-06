@@ -128,15 +128,15 @@ class CpuGraphWidget(QWidget):
                 painter.drawLine(int(points[i][0]), int(points[i][1]),
                                int(points[i + 1][0]), int(points[i + 1][1]))
 
-        # Core label
+        # Core label (top-left)
         painter.setFont(QFont("Segoe UI", 8))
         painter.setPen(QColor(colors.TEXT_SECONDARY))
         painter.drawText(pad + 4, pad + 12, f"Core {self._core_index}")
 
-        # Value label
+        # Value label (top-right, separate from core label)
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
-        painter.drawText(w - pad - 35, pad + 12, f"{current:.0f}%")
+        painter.drawText(w - pad - 40, pad + 12, f"{current:.0f}%")
 
         painter.end()
 
