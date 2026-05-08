@@ -12,9 +12,11 @@ from .alert import AlertBadge
 from .chip import StatChip
 from .core_graph import CoreGraphWidget
 from .cpu_info_panel import CpuInfoPanel
+from .donut_gauge import DonutGauge
+from .sparkline import SparklineWidget
 
 __all__ = [
     'Card', 'Gauge', 'Graph', 'SortableTable',
     'NavItem', 'ToggleSwitch', 'SearchBar', 'AlertBadge', 'StatChip',
-    'CoreGraphWidget', 'CpuInfoPanel'
+    'CoreGraphWidget', 'CpuInfoPanel', 'DonutGauge', 'SparklineWidget'
 ]

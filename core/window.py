@@ -228,8 +228,13 @@ class TitleBar(QWidget, ScaleMixin):
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton and self._drag_position:
+<<<<<<< Updated upstream
             # Skip if already in resize mode to prevent conflicts
             if self._parent._in_drag_resize and not self._drag_position:
+=======
+            # Skip if parent is being resized to prevent conflicts
+            if self._parent and getattr(self._parent, '_in_drag_resize', False) and not self._drag_position:
+>>>>>>> Stashed changes
                 return
             if self._maximized:
                 self._parent.showNormal()

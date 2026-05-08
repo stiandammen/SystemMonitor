@@ -53,22 +53,9 @@ class CPUCollector:
     
     def _get_temperature(self) -> Optional[float]:
         """Try to get CPU temperature"""
-        try:
-            import psutil
-            temps = psutil.sensors_temperatures()
-            if temps:
-                # Try common CPU temperature keys
-                for key in ['coretemp', 'cpu_thermal', 'k10temp', 'zenpower']:
-                    if key in temps:
-                        entries = temps[key]
-                        if entries:
-                            # Return average of available temperatures
-                            values = [e.current for e in entries if hasattr(e, 'current')]
-                            if values:
-                                return sum(values) / len(values)
-            return None
-        except Exception:
-            return None
+        # Temperature collection is handled by CPUCollectorThread in collector.py
+        # This method is a fallback and rarely works on modern Windows
+        return None
     
     def get_info(self) -> Dict[str, Any]:
         """Get static CPU information (cached)"""

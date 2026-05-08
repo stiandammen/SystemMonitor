@@ -1187,20 +1187,11 @@ class OverviewPage(QWidget, ScaleMixin):
                     self._gpu_card.stats[i].setText(val)
 
     def _get_cpu_temp(self):
-        try:
-            temps = psutil.cpu_temperature()
-            if isinstance(temps, list):
-                return f"{temps[0]:.0f} °C"
-            return f"{temps:.0f} °C"
-        except:
-            try:
-                import wmi
-                w = wmi.WMI()
-                temps = w.Win32_TemperatureProbe()
-                if temps:
-                    return f"{temps[0].CurrentReading / 10:.0f} °C"
-            except:
-                pass
+        """Get CPU temperature from collected data"""
+        if hasattr(self, '_last_data') and 'cpu' in self._last_data:
+            temp = self._last_data['cpu'].get('temperature')
+            if temp is not None:
+                return f"{temp:.0f} °C"
         return "-- °C"
 
     def _estimate_cpu_power(self, pct):

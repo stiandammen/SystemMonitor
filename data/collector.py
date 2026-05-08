@@ -96,6 +96,9 @@ class CPUCollectorThread(BaseCollector):
 
             freq = psutil.cpu_freq()
 
+            # Get temperature
+            temperature = self._get_cpu_temperature()
+
             return {
                 'percent': percent,
                 'per_core': per_core,
@@ -103,11 +106,150 @@ class CPUCollectorThread(BaseCollector):
                 'thread_count': psutil.cpu_count(logical=True) or 1,
                 'frequency_current': freq.current if freq else 0,
                 'frequency_max': freq.max if freq else 0,
+                'temperature': temperature,
             }
 
         except Exception as e:
             log_exception(LogCategory.CPU, "CPU collection failed", e)
             return {}
+
+    def _get_cpu_temperature(self):
+        """Get CPU temperature using psutil sensors or WMI fallback"""
+        import psutil
+        # Try psutil sensors first (only if available)
+        if hasattr(psutil, 'sensors_temperatures'):
+            try:
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for key in ['coretemp', 'cpu_thermal', 'k10temp', 'zenpower', 'cpu', 'cpu0']:
+                        if key in temps:
+                            entries = temps[key]
+                            if entries:
+                                for entry in entries:
+                                    if hasattr(entry, 'current') and entry.current is not None:
+                                        return float(entry.current)
+            except (AttributeError, Exception):
+                pass
+
+        # Fallback for Windows - try WMI MSAcpi_ThermalZoneTemperature
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["powershell", "-Command",
+                 "(Get-CimInstance MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature"],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.stdout.strip():
+                # Returns temperature in tenths of Kelvin
+                temp_k = float(result.stdout.strip())
+                return temp_k / 10 - 273.15
+        except Exception:
+            pass
+
+        # Try alternative via LibreHardwareMonitor or HWiNFO shared memory
+        try:
+            temp = self._read_hardware_monitor_temp()
+            if temp is not None:
+                return temp
+        except Exception:
+            pass
+
+        return None
+
+    def _read_hardware_monitor_temp(self):
+        """Try to read CPU temp from HWiNFO/LibreHardwareMonitor shared memory"""
+        import ctypes
+        import struct
+
+        # HWiNFO shared memory signatures (V1-V4)
+        HWINFO_SIGNATURES = [
+            b"HWiNFO",   # V1/V2 64-bit
+            b"HWiNFO32", # V1/V2 32-bit
+            b"HWiNFO_V", # V3/V4 signature prefix
+            b"HWiNFO32_V", # V3/V4 32-bit
+        ]
+
+        try:
+            kernel32 = ctypes.windll.kernel32
+
+            # HWiNFO shared memory names (newer versions use _V2, _V3, _V4)
+            HWINFO_NAMES = [
+                "HWiNFO32_Sens", "HWiNFO64_Sens",
+                "HWiNFO32_V2", "HWiNFO64_V2",
+                "HWiNFO32_V3", "HWiNFO64_V3",
+                "HWiNFO32_V4", "HWiNFO64_V4",
+            ]
+
+            # LibreHardwareMonitor shared memory names
+            LHM_NAMES = [
+                "LibreHardwareMonitor",
+                "LHM_Sensor",
+            ]
+
+            memory_map_names = HWINFO_NAMES + LHM_NAMES
+            mapping = None
+            found_name = None
+            handle = None
+
+            for name in memory_map_names:
+                handle = kernel32.OpenFileMappingW(0x0004, False, name)
+                if handle:
+                    found_name = name
+                    break
+
+            if not handle:
+                return None
+
+            try:
+                mapping = kernel32.MapViewOfFile(handle, 0x0004, 0, 0, 8192)
+            finally:
+                kernel32.CloseHandle(handle)
+
+            if not mapping:
+                return None
+
+            try:
+                # Read signature (16 bytes to be safe)
+                sig = ctypes.create_string_buffer(16)
+                ctypes.memmove(sig, mapping, 16)
+
+                # Check if signature matches any HWiNFO variant
+                is_hwinfo = any(sig.raw[:len(s)] == s for s in HWINFO_SIGNATURES)
+
+                if not is_hwinfo:
+                    return None
+
+                # Try multiple offsets to find temperature data
+                # Different HWiNFO versions use different offsets
+                for offset in [0x30, 0x34, 0x38, 0x40, 0x44, 0x48, 0x50, 0x60, 0x80, 0x100]:
+                    try:
+                        temp_raw = ctypes.c_float()
+                        ctypes.memmove(ctypes.addressof(temp_raw), mapping + offset, 4)
+                        temp = temp_raw.value
+                        # Valid CPU temperature range: 0-100°C (some systems may show up to 125°C under load)
+                        if 0 < temp < 125:
+                            return temp
+                    except Exception:
+                        continue
+
+                # Also try reading as Intel/AMD specific format
+                # Some systems store temperature at offset 0xB0 or higher
+                for offset in [0xB0, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4]:
+                    try:
+                        temp_raw = ctypes.c_float()
+                        ctypes.memmove(ctypes.addressof(temp_raw), mapping + offset, 4)
+                        temp = temp_raw.value
+                        if 20 < temp < 100:  # CPUs rarely run below 20°C
+                            return temp
+                    except Exception:
+                        continue
+
+                return None
+            finally:
+                if mapping:
+                    kernel32.UnmapViewOfFile(mapping)
+        except Exception:
+            return None
 
 
 class MemoryCollectorThread(BaseCollector):

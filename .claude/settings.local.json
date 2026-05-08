@@ -34,7 +34,8 @@
       "Bash(pip install *)",
       "Bash(start \"\" python __main__.py)",
       "Read(//e/python - prosjekter/**)",
-      "Bash(C:/Users/RSman/AppData/Local/Python/bin/python.exe __main__.py)"
+      "Bash(C:/Users/RSman/AppData/Local/Python/bin/python.exe __main__.py)",
+      "Bash(C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe *)"
     ]
   }
 }
