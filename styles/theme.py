@@ -1,188 +1,296 @@
 """
-Theme Management - Dark and Light themes
+Theme Management - Professional theme system with 4 distinctive themes
 """
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
-class DarkTheme:
-    """Modern dark theme color palette"""
-    # Backgrounds
-    BG_PRIMARY = "#0a0e14"      # Deepest black
-    BG_SECONDARY = "#111820"    # Sidebar
-    BG_CARD = "#161f2a"         # Cards
-    BG_HOVER = "#1e2936"        # Hover states
-    BG_INPUT = "#0d1117"        # Input fields
-    
-    # Text
-    TEXT_PRIMARY = "#f0f4f8"    # Main text
-    TEXT_SECONDARY = "#94a3b8"  # Secondary text
-    TEXT_MUTED = "#64748b"      # Labels, hints
-    TEXT_DISABLED = "#475569"   # Disabled elements
-    
-    # Accents
-    ACCENT_GREEN = "#10b981"    # Primary - success
-    ACCENT_BLUE = "#3b82f6"     # Info
-    ACCENT_ORANGE = "#f59e0b"   # Warning
-    ACCENT_RED = "#ef4444"      # Error
-    ACCENT_YELLOW = "#ffd740"   # Caution
-    ACCENT_CYAN = "#06b6d4"     # Network download
-    ACCENT_PURPLE = "#8b5cf6"   # Network upload
-    ACCENT_PINK = "#ec4899"     # Extra
-    
-    # UI Elements
-    BORDER = "#2a3441"
-    BORDER_FOCUS = "#3b82f6"
-    GAUGE_BG = "#1e2936"
-    GAUGE_FILL = "#10b981"
-    CHART_FILL = "#064e3b"      # Dark green fill
-    CHART_LINE = "#10b981"
-    SHADOW = "rgba(0, 0, 0, 0.4)"
-    OVERLAY = "rgba(0, 0, 0, 0.7)"
+# Default colors (saved as reference)
+DEFAULT_COLORS = {
+    "BG_PRIMARY": "#101920",
+    "BG_SECONDARY": "#0d1218",
+    "BG_CARD": "#151d28",
+    "BG_HOVER": "#1c2838",
+    "BG_INPUT": "#101920",
+    "BG_ACTIVE": "#0c997f",
+    "TEXT_PRIMARY": "#ffffff",
+    "TEXT_SECONDARY": "#b0b0b0",
+    "TEXT_MUTED": "#707070",
+    "TEXT_DISABLED": "#505050",
+    "ACCENT_GREEN": "#0c997f",
+    "ACCENT_GREEN_BRIGHT": "#0fb89a",
+    "ACCENT_BLUE": "#3b82f6",
+    "ACCENT_ORANGE": "#f97316",
+    "ACCENT_RED": "#ef4444",
+    "ACCENT_YELLOW": "#fbbf24",
+    "ACCENT_CYAN": "#22d3ee",
+    "ACCENT_PURPLE": "#a855f7",
+    "ACCENT_PINK": "#ec4899",
+    "STATUS_RED": "#ef4444",
+    "STATUS_ORANGE": "#f97316",
+    "STATUS_YELLOW": "#fbbf24",
+    "STATUS_GREEN": "#22c55e",
+    "BORDER": "#2a3a4a",
+    "BORDER_SUBTLE": "#1a2530",
+    "BORDER_FOCUS": "#0c997f",
+    "GAUGE_BG": "#1c2838",
+    "GAUGE_FILL": "#0c997f",
+    "CHART_FILL": "#0a1a20",
+    "CHART_LINE": "#0c997f",
+}
 
 
 class MidnightTheme:
-    """OLED-friendly dark theme with true black backgrounds"""
+    """OLED-friendly dark theme with true black backgrounds and teal accent"""
     # Backgrounds
-    BG_PRIMARY = "#000000"       # True black
-    BG_SECONDARY = "#0a0a0a"    # Near black
-    BG_CARD = "#111111"         # Dark gray
-    BG_HOVER = "#1a1a1a"        # Lighter gray
-    BG_INPUT = "#0a0a0a"        # Input fields
+    BG_PRIMARY = "#101920"       # Dark blue-black background
+    BG_SECONDARY = "#0d1218"    # Darker for sidebar
+    BG_CARD = "#151d28"         # Elevated surfaces
+    BG_HOVER = "#1c2838"        # Hover states
+    BG_INPUT = "#101920"        # Input fields
+    BG_ACTIVE = "#0c997f"       # Active/selected
 
-    # Text
-    TEXT_PRIMARY = "#ffffff"    # Pure white
-    TEXT_SECONDARY = "#b0b0b0"  # Light gray
-    TEXT_MUTED = "#707070"      # Medium gray
-    TEXT_DISABLED = "#505050"   # Darker gray
+    # Text - white primary for contrast
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#b0b0b0"
+    TEXT_MUTED = "#707070"
+    TEXT_DISABLED = "#505050"
 
     # Accents
-    ACCENT_GREEN = "#10b981"    # Primary - success
-    ACCENT_BLUE = "#3b82f6"    # Info
-    ACCENT_ORANGE = "#f59e0b"   # Warning
-    ACCENT_RED = "#ef4444"      # Error
-    ACCENT_YELLOW = "#ffd740"   # Caution
-    ACCENT_CYAN = "#06b6d4"    # Network download
-    ACCENT_PURPLE = "#8b5cf6"   # Network upload
-    ACCENT_PINK = "#ec4899"     # Extra
+    ACCENT_GREEN = "#0c997f"    # Primary teal accent
+    ACCENT_GREEN_BRIGHT = "#0fb89a"
+    ACCENT_BLUE = "#3b82f6"
+    ACCENT_ORANGE = "#f97316"
+    ACCENT_RED = "#ef4444"
+    ACCENT_YELLOW = "#fbbf24"
+    ACCENT_CYAN = "#22d3ee"
+    ACCENT_PURPLE = "#a855f7"
+    ACCENT_PINK = "#ec4899"
+
+    # Status colors (for CPU temp, disk %, etc)
+    STATUS_RED = "#ef4444"
+    STATUS_ORANGE = "#f97316"
+    STATUS_YELLOW = "#fbbf24"
+    STATUS_GREEN = "#22c55e"
 
     # UI Elements
-    BORDER = "#2a2a2a"
-    BORDER_FOCUS = "#3b82f6"
-    GAUGE_BG = "#1a1a1a"
-    GAUGE_FILL = "#10b981"
-    CHART_FILL = "#064e3b"
-    CHART_LINE = "#10b981"
-    SHADOW = "rgba(0, 0, 0, 0.8)"
-    OVERLAY = "rgba(0, 0, 0, 0.9)"
-
-
-class OceanTheme:
-    """Dark theme with blue ocean accents"""
-    # Backgrounds
-    BG_PRIMARY = "#0a1628"       # Deep ocean blue
-    BG_SECONDARY = "#0f1f3a"    # Sidebar
-    BG_CARD = "#142247"         # Cards
-    BG_HOVER = "#1a2d5a"        # Hover states
-    BG_INPUT = "#0a1628"        # Input fields
-
-    # Text
-    TEXT_PRIMARY = "#e8f0ff"    # Main text
-    TEXT_SECONDARY = "#8899bb"  # Secondary text
-    TEXT_MUTED = "#556688"      # Labels, hints
-    TEXT_DISABLED = "#3d4d66"   # Disabled elements
-
-    # Accents
-    ACCENT_GREEN = "#06b6d4"    # Cyan accent
-    ACCENT_BLUE = "#3b82f6"     # Info blue
-    ACCENT_ORANGE = "#f59e0b"   # Warning
-    ACCENT_RED = "#ef4444"      # Error
-    ACCENT_YELLOW = "#ffd740"   # Caution
-    ACCENT_CYAN = "#06b6d4"     # Network download
-    ACCENT_PURPLE = "#8b5cf6"   # Network upload
-    ACCENT_PINK = "#ec4899"     # Extra
-
-    # UI Elements
-    BORDER = "#1e3a5f"
-    BORDER_FOCUS = "#3b82f6"
-    GAUGE_BG = "#1a2d5a"
-    GAUGE_FILL = "#06b6d4"
-    CHART_FILL = "#164e63"
-    CHART_LINE = "#06b6d4"
-    SHADOW = "rgba(0, 0, 0, 0.4)"
+    BORDER = "#2a3a4a"
+    BORDER_SUBTLE = "#1a2530"
+    BORDER_FOCUS = "#0c997f"
+    GAUGE_BG = "#1c2838"
+    GAUGE_FILL = "#0c997f"
+    CHART_FILL = "#0a1a20"
+    CHART_LINE = "#0c997f"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
     OVERLAY = "rgba(0, 0, 0, 0.7)"
 
+    SUCCESS_BG = "#0a2015"
+    WARNING_BG = "#201a0a"
+    ERROR_BG = "#200a0a"
+    INFO_BG = "#0a1520"
 
-class SunsetTheme:
-    """Warm-toned dark theme with orange/purple accents"""
-    # Backgrounds
-    BG_PRIMARY = "#1a0f0f"       # Deep burgundy black
-    BG_SECONDARY = "#251a1a"    # Sidebar
-    BG_CARD = "#2d1f1f"         # Cards
-    BG_HOVER = "#3d2929"        # Hover states
-    BG_INPUT = "#1a0f0f"        # Input fields
 
-    # Text
-    TEXT_PRIMARY = "#fff0f0"    # Main text
-    TEXT_SECONDARY = "#cc9999"  # Secondary text
-    TEXT_MUTED = "#886666"      # Labels, hints
-    TEXT_DISABLED = "#553d3d"   # Disabled elements
-
-    # Accents
-    ACCENT_GREEN = "#f59e0b"    # Orange accent
-    ACCENT_BLUE = "#8b5cf6"     # Purple accent
-    ACCENT_ORANGE = "#f97316"   # Warning/Orange
-    ACCENT_RED = "#ef4444"      # Error
-    ACCENT_YELLOW = "#fbbf24"   # Caution/Yellow
-    ACCENT_CYAN = "#06b6d4"     # Cyan
-    ACCENT_PURPLE = "#a855f7"   # Network upload purple
-    ACCENT_PINK = "#ec4899"     # Extra
-
-    # UI Elements
-    BORDER = "#3d2929"
-    BORDER_FOCUS = "#f59e0b"
-    GAUGE_BG = "#3d2929"
-    GAUGE_FILL = "#f59e0b"
-    CHART_FILL = "#78350f"
-    CHART_LINE = "#f59e0b"
-    SHADOW = "rgba(0, 0, 0, 0.4)"
+class CustomTheme:
+    """Custom user theme - loaded from settings"""
+    # These will be set dynamically
+    BG_PRIMARY = "#101920"
+    BG_SECONDARY = "#0d1218"
+    BG_CARD = "#151d28"
+    BG_HOVER = "#1c2838"
+    BG_INPUT = "#101920"
+    BG_ACTIVE = "#0c997f"
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#b0b0b0"
+    TEXT_MUTED = "#707070"
+    TEXT_DISABLED = "#505050"
+    ACCENT_GREEN = "#0c997f"
+    ACCENT_GREEN_BRIGHT = "#0fb89a"
+    ACCENT_BLUE = "#3b82f6"
+    ACCENT_ORANGE = "#f97316"
+    ACCENT_RED = "#ef4444"
+    ACCENT_YELLOW = "#fbbf24"
+    ACCENT_CYAN = "#22d3ee"
+    ACCENT_PURPLE = "#a855f7"
+    ACCENT_PINK = "#ec4899"
+    STATUS_RED = "#ef4444"
+    STATUS_ORANGE = "#f97316"
+    STATUS_YELLOW = "#fbbf24"
+    STATUS_GREEN = "#22c55e"
+    BORDER = "#2a3a4a"
+    BORDER_SUBTLE = "#1a2530"
+    BORDER_FOCUS = "#0c997f"
+    GAUGE_BG = "#1c2838"
+    GAUGE_FILL = "#0c997f"
+    CHART_FILL = "#0a1a20"
+    CHART_LINE = "#0c997f"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
     OVERLAY = "rgba(0, 0, 0, 0.7)"
+    SUCCESS_BG = "#0a2015"
+    WARNING_BG = "#201a0a"
+    ERROR_BG = "#200a0a"
+    INFO_BG = "#0a1520"
+
+    @classmethod
+    def load_from_dict(cls, colors_dict):
+        """Load colors from dictionary"""
+        for key, value in colors_dict.items():
+            if hasattr(cls, key):
+                setattr(cls, key, value)
+
+    @classmethod
+    def save_to_dict(cls):
+        """Save colors to dictionary"""
+        return {key: getattr(cls, key) for key in DEFAULT_COLORS.keys()}
 
 
-class LightTheme:
-    """Modern light theme color palette"""
-    # Backgrounds
-    BG_PRIMARY = "#f5f7fb"      # Light gray background
-    BG_SECONDARY = "#e2e8f0"    # Sidebar
-    BG_CARD = "#ffffff"         # Cards
-    BG_HOVER = "#f1f5f9"        # Hover states
-    BG_INPUT = "#ffffff"        # Input fields
+class CyberpunkTheme:
+    """Neon cyberpunk theme with hot pink and cyan accents"""
+    # Backgrounds - same base with neon accents
+    BG_PRIMARY = "#101920"
+    BG_SECONDARY = "#0d1218"
+    BG_CARD = "#151d28"
+    BG_HOVER = "#1c2838"
+    BG_INPUT = "#101920"
+    BG_ACTIVE = "#ff2d6a"
 
-    # Text
-    TEXT_PRIMARY = "#0f172a"    # Main text
-    TEXT_SECONDARY = "#475569"  # Secondary text
-    TEXT_MUTED = "#64748b"      # Labels, hints
-    TEXT_DISABLED = "#94a3b8"   # Disabled elements
+    # Text - pure white for stability
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#c0c0c0"
+    TEXT_MUTED = "#808080"
+    TEXT_DISABLED = "#505050"
 
-    # Accents
-    ACCENT_GREEN = "#059669"    # Primary - success
-    ACCENT_BLUE = "#2563eb"     # Info
-    ACCENT_ORANGE = "#d97706"   # Warning
-    ACCENT_RED = "#dc2626"      # Error
-    ACCENT_YELLOW = "#ca8a04"   # Caution
-    ACCENT_CYAN = "#0891b2"     # Network download
-    ACCENT_PURPLE = "#7c3aed"   # Network upload
-    ACCENT_PINK = "#db2777"     # Extra
+    # Accents - vibrant neon
+    ACCENT_GREEN = "#00ff9f"
+    ACCENT_GREEN_BRIGHT = "#00ffaa"
+    ACCENT_BLUE = "#00d4ff"
+    ACCENT_ORANGE = "#ff6b35"
+    ACCENT_RED = "#ff0055"
+    ACCENT_YELLOW = "#ffdd00"
+    ACCENT_CYAN = "#00ffff"
+    ACCENT_PURPLE = "#bd93f9"
+    ACCENT_PINK = "#ff2d6a"
+
+    # Status colors
+    STATUS_RED = "#ff0055"
+    STATUS_ORANGE = "#ff6b35"
+    STATUS_YELLOW = "#ffdd00"
+    STATUS_GREEN = "#00ff9f"
 
     # UI Elements
-    BORDER = "#d1d5db"
-    BORDER_FOCUS = "#3b82f6"
-    GAUGE_BG = "#e2e8f0"
-    GAUGE_FILL = "#059669"
-    CHART_FILL = "#d1fae5"      # Light green fill
-    CHART_LINE = "#059669"
-    SHADOW = "rgba(0, 0, 0, 0.1)"
-    OVERLAY = "rgba(0, 0, 0, 0.5)"
+    BORDER = "#2a3a4a"
+    BORDER_SUBTLE = "#1a2530"
+    BORDER_FOCUS = "#ff2d6a"
+    GAUGE_BG = "#1c2838"
+    GAUGE_FILL = "#ff2d6a"
+    CHART_FILL = "#0a1a20"
+    CHART_LINE = "#00ff9f"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
+    OVERLAY = "rgba(16, 25, 32, 0.9)"
+
+    SUCCESS_BG = "#0a2015"
+    WARNING_BG = "#201a0a"
+    ERROR_BG = "#200a0a"
+    INFO_BG = "#0a1520"
+
+
+class NordicTheme:
+    """Nordic inspired theme with soft muted blue accents"""
+    # Backgrounds - same base
+    BG_PRIMARY = "#101920"
+    BG_SECONDARY = "#0d1218"
+    BG_CARD = "#151d28"
+    BG_HOVER = "#1c2838"
+    BG_INPUT = "#101920"
+    BG_ACTIVE = "#5d8aa8"
+
+    # Text - pure white for stability
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#a0adb8"
+    TEXT_MUTED = "#6b7a86"
+    TEXT_DISABLED = "#4a5660"
+
+    # Accents - muted steel blue
+    ACCENT_GREEN = "#5d8aa8"
+    ACCENT_GREEN_BRIGHT = "#7aa8c8"
+    ACCENT_BLUE = "#4a7a9a"
+    ACCENT_ORANGE = "#d08770"
+    ACCENT_RED = "#bf5656"
+    ACCENT_YELLOW = "#ebcb8b"
+    ACCENT_CYAN = "#8fbcbb"
+    ACCENT_PURPLE = "#b48ead"
+    ACCENT_PINK = "#d4789c"
+
+    # Status colors
+    STATUS_RED = "#bf5656"
+    STATUS_ORANGE = "#d08770"
+    STATUS_YELLOW = "#ebcb8b"
+    STATUS_GREEN = "#7cb342"
+
+    # UI Elements
+    BORDER = "#2a3a4a"
+    BORDER_SUBTLE = "#1a2530"
+    BORDER_FOCUS = "#5d8aa8"
+    GAUGE_BG = "#1c2838"
+    GAUGE_FILL = "#5d8aa8"
+    CHART_FILL = "#0a1a20"
+    CHART_LINE = "#5d8aa8"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
+    OVERLAY = "rgba(16, 25, 32, 0.9)"
+
+    SUCCESS_BG = "#1e3328"
+    WARNING_BG = "#332822"
+    ERROR_BG = "#331a1a"
+    INFO_BG = "#1e2833"
+
+
+class EmberTheme:
+    """Warm ember theme with orange and amber accents"""
+    # Backgrounds - warm dark with blue tint
+    BG_PRIMARY = "#101920"
+    BG_SECONDARY = "#0d1218"
+    BG_CARD = "#151d28"
+    BG_HOVER = "#1c2838"
+    BG_INPUT = "#101920"
+    BG_ACTIVE = "#ffab00"
+
+    # Text - warm white
+    TEXT_PRIMARY = "#fff8f0"
+    TEXT_SECONDARY = "#e0c8b0"
+    TEXT_MUTED = "#9a8066"
+    TEXT_DISABLED = "#665544"
+
+    # Accents - warm amber and orange
+    ACCENT_GREEN = "#7cb342"
+    ACCENT_GREEN_BRIGHT = "#8bc34a"
+    ACCENT_BLUE = "#5c9ece"
+    ACCENT_ORANGE = "#ff9100"
+    ACCENT_RED = "#ff5252"
+    ACCENT_YELLOW = "#ffd740"
+    ACCENT_CYAN = "#4dd0e1"
+    ACCENT_PURPLE = "#ce93d8"
+    ACCENT_PINK = "#f48fb1"
+
+    # Status colors
+    STATUS_RED = "#ff5252"
+    STATUS_ORANGE = "#ff9100"
+    STATUS_YELLOW = "#ffd740"
+    STATUS_GREEN = "#7cb342"
+
+    # UI Elements
+    BORDER = "#2a3a4a"
+    BORDER_SUBTLE = "#1a2530"
+    BORDER_FOCUS = "#ffab00"
+    GAUGE_BG = "#1c2838"
+    GAUGE_FILL = "#ffab00"
+    CHART_FILL = "#0a1a20"
+    CHART_LINE = "#ff9100"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
+    OVERLAY = "rgba(16, 25, 32, 0.9)"
+
+    SUCCESS_BG = "#1a2d14"
+    WARNING_BG = "#2d2210"
+    ERROR_BG = "#2d1414"
+    INFO_BG = "#141a20"
 
 
 class ThemeManager(QObject):
@@ -192,19 +300,19 @@ class ThemeManager(QObject):
     _instance = None
 
     _themes = {
-        "dark": DarkTheme,
         "midnight": MidnightTheme,
-        "ocean": OceanTheme,
-        "sunset": SunsetTheme,
-        "light": LightTheme,
+        "custom": CustomTheme,
+        "cyberpunk": CyberpunkTheme,
+        "nordic": NordicTheme,
+        "ember": EmberTheme,
     }
 
     _theme_names = {
-        "dark": "Dark",
-        "midnight": "Midnight (OLED)",
-        "ocean": "Ocean",
-        "sunset": "Sunset",
-        "light": "Light",
+        "midnight": "Midnight",
+        "custom": "Custom",
+        "cyberpunk": "Cyberpunk",
+        "nordic": "Nordic",
+        "ember": "Ember",
     }
 
     def __new__(cls):
@@ -218,8 +326,8 @@ class ThemeManager(QObject):
             return
         super().__init__()
         self._initialized = True
-        self._current_theme = "dark"
-        self._colors = DarkTheme
+        self._current_theme = "midnight"
+        self._colors = MidnightTheme()
 
     @property
     def current_theme(self) -> str:
@@ -230,31 +338,53 @@ class ThemeManager(QObject):
         return self._colors
 
     def get_available_themes(self) -> list:
-        """Get list of available theme names"""
+        """Get list of available theme keys"""
         return list(self._themes.keys())
 
     def get_theme_display_name(self, theme_key: str) -> str:
         """Get human-readable theme name"""
         return self._theme_names.get(theme_key, theme_key.title())
 
+    def load_custom_theme(self, colors_dict):
+        """Load custom theme colors from dictionary"""
+        CustomTheme.load_from_dict(colors_dict)
+
     def set_theme(self, theme_name: str):
         """Switch between themes"""
         if theme_name not in self._themes:
-            theme_name = "dark"
+            theme_name = "midnight"
 
         if theme_name == self._current_theme:
             return
 
-        self._current_theme = theme_name
-        self._colors = self._themes[theme_name]
+        old_theme = self._current_theme
+        try:
+            # Always create a fresh instance to avoid class attribute issues
+            theme_class = self._themes[theme_name]
+            self._current_theme = theme_name
+            self._colors = theme_class()
+            self.theme_changed.emit(theme_name)
+        except Exception as e:
+            print(f"Theme error: {e}")
+            import traceback
+            traceback.print_exc()
+            # Roll back to previous theme if error
+            if old_theme != theme_name:
+                self._current_theme = old_theme
+                self._colors = self._themes[old_theme]()
+                self.theme_changed.emit(old_theme)
 
-        self.theme_changed.emit(theme_name)
-    
+    def reset_to_default(self):
+        """Reset custom theme to default colors"""
+        CustomTheme.load_from_dict(DEFAULT_COLORS)
+        # Always emit so UI can update even if not on custom theme
+        self.theme_changed.emit("custom")
+
     def toggle_theme(self):
         """Toggle between dark and light"""
-        new_theme = "light" if self._current_theme == "dark" else "dark"
+        new_theme = "light" if self._current_theme == "midnight" else "midnight"
         self.set_theme(new_theme)
-    
+
     def get_stylesheet(self) -> str:
         """Generate global stylesheet based on current theme"""
         c = self._colors
@@ -264,51 +394,51 @@ class ThemeManager(QObject):
             color: {c.TEXT_PRIMARY};
             border: none;
         }}
-        
+
         QWidget {{
             background-color: {c.BG_PRIMARY};
             color: {c.TEXT_PRIMARY};
         }}
-        
+
         QFrame {{
             background-color: {c.BG_PRIMARY};
             color: {c.TEXT_PRIMARY};
             border: none;
         }}
-        
+
         QLabel {{
             background-color: transparent;
             color: {c.TEXT_PRIMARY};
             border: none;
         }}
-        
+
         QPushButton {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 8px 16px;
             font-family: "Segoe UI", sans-serif;
             font-size: 13px;
         }}
-        
+
         QPushButton:hover {{
             background-color: {c.BG_HOVER};
-            border-color: {c.BORDER_FOCUS};
+            border-color: {c.BORDER};
         }}
-        
+
         QPushButton:pressed {{
             background-color: {c.ACCENT_GREEN};
-            color: #000000;
+            color: #ffffff;
             border-color: {c.ACCENT_GREEN};
         }}
-        
+
         QPushButton:disabled {{
             background-color: {c.BG_SECONDARY};
             color: {c.TEXT_DISABLED};
             border-color: {c.BORDER};
         }}
-        
+
         QLineEdit {{
             background-color: {c.BG_INPUT};
             color: {c.TEXT_PRIMARY};
@@ -318,11 +448,11 @@ class ThemeManager(QObject):
             font-family: "Segoe UI", sans-serif;
             font-size: 13px;
         }}
-        
+
         QLineEdit:focus {{
             border-color: {c.BORDER_FOCUS};
         }}
-        
+
         QComboBox {{
             background-color: {c.BG_INPUT};
             color: {c.TEXT_PRIMARY};
@@ -332,16 +462,16 @@ class ThemeManager(QObject):
             font-family: "Segoe UI", sans-serif;
             font-size: 13px;
         }}
-        
+
         QComboBox:hover {{
             border-color: {c.BORDER_FOCUS};
         }}
-        
+
         QComboBox::drop-down {{
             border: none;
             width: 24px;
         }}
-        
+
         QComboBox QAbstractItemView {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
@@ -349,49 +479,49 @@ class ThemeManager(QObject):
             border-radius: 6px;
             selection-background-color: {c.BG_HOVER};
         }}
-        
+
         QScrollBar:vertical {{
             background-color: {c.BG_SECONDARY};
-            width: 12px;
-            border-radius: 6px;
+            width: 10px;
+            border-radius: 5px;
         }}
-        
+
         QScrollBar::handle:vertical {{
             background-color: {c.BORDER};
-            border-radius: 6px;
+            border-radius: 5px;
             min-height: 30px;
         }}
-        
+
         QScrollBar::handle:vertical:hover {{
             background-color: {c.TEXT_MUTED};
         }}
-        
+
         QScrollBar::add-line:vertical,
         QScrollBar::sub-line:vertical {{
             height: 0px;
         }}
-        
+
         QScrollBar:horizontal {{
             background-color: {c.BG_SECONDARY};
-            height: 12px;
-            border-radius: 6px;
+            height: 10px;
+            border-radius: 5px;
         }}
-        
+
         QScrollBar::handle:horizontal {{
             background-color: {c.BORDER};
-            border-radius: 6px;
+            border-radius: 5px;
             min-width: 30px;
         }}
-        
+
         QScrollBar::handle:horizontal:hover {{
             background-color: {c.TEXT_MUTED};
         }}
-        
+
         QScrollBar::add-line:horizontal,
         QScrollBar::sub-line:horizontal {{
             width: 0px;
         }}
-        
+
         QTableWidget {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
@@ -399,17 +529,17 @@ class ThemeManager(QObject):
             border-radius: 8px;
             gridline-color: {c.BORDER};
         }}
-        
+
         QTableWidget::item {{
             padding: 8px;
             border-bottom: 1px solid {c.BORDER};
         }}
-        
+
         QTableWidget::item:selected {{
             background-color: {c.BG_HOVER};
             color: {c.TEXT_PRIMARY};
         }}
-        
+
         QHeaderView::section {{
             background-color: {c.BG_SECONDARY};
             color: {c.TEXT_SECONDARY};
@@ -418,17 +548,17 @@ class ThemeManager(QObject):
             border-bottom: 2px solid {c.BORDER};
             font-weight: bold;
         }}
-        
+
         QHeaderView::section:hover {{
             background-color: {c.BG_HOVER};
         }}
-        
+
         QTabWidget::pane {{
             border: 1px solid {c.BORDER};
             border-radius: 8px;
             background-color: {c.BG_CARD};
         }}
-        
+
         QTabBar::tab {{
             background-color: {c.BG_SECONDARY};
             color: {c.TEXT_SECONDARY};
@@ -436,17 +566,17 @@ class ThemeManager(QObject):
             border: none;
             border-bottom: 2px solid transparent;
         }}
-        
+
         QTabBar::tab:selected {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border-bottom: 2px solid {c.ACCENT_GREEN};
         }}
-        
+
         QTabBar::tab:hover:!selected {{
             background-color: {c.BG_HOVER};
         }}
-        
+
         QProgressBar {{
             background-color: {c.BG_SECONDARY};
             border: none;
@@ -454,12 +584,12 @@ class ThemeManager(QObject):
             text-align: center;
             color: {c.TEXT_PRIMARY};
         }}
-        
+
         QProgressBar::chunk {{
             background-color: {c.ACCENT_GREEN};
             border-radius: 4px;
         }}
-        
+
         QToolTip {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};

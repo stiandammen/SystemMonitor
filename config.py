@@ -84,15 +84,15 @@ class SettingsManager:
     
     DEFAULT_SETTINGS = {
         # Appearance
-        'theme': 'dark',
+        'theme': 'midnight',
         'accent_color': '#10b981',
         'sidebar_collapsed': False,
-        
+
         # Performance
         'update_interval': 500,
         'history_duration': 300,
         'enable_animations': True,
-        
+
         # Alerts
         'alerts_enabled': True,
         'alert_cpu_threshold': 80,
@@ -100,21 +100,55 @@ class SettingsManager:
         'alert_disk_threshold': 90,
         'alert_temperature_threshold': 80,
         'alert_gpu_threshold': 85,
-        
+
         # Features
         'show_gpu': True,
         'show_network': True,
         'show_processes': True,
         'decimal_places': 1,
-        
+
         # System
         'autostart': False,
         'minimize_to_tray': False,
         'start_minimized': False,
-        
+
         # Export
         'export_format': 'csv',
         'export_directory': str(Path.home() / 'Documents'),
+
+        # Custom theme (default colors)
+        'custom_theme_colors': {
+            "BG_PRIMARY": "#101920",
+            "BG_SECONDARY": "#0d1218",
+            "BG_CARD": "#151d28",
+            "BG_HOVER": "#1c2838",
+            "BG_INPUT": "#101920",
+            "BG_ACTIVE": "#0c997f",
+            "TEXT_PRIMARY": "#ffffff",
+            "TEXT_SECONDARY": "#b0b0b0",
+            "TEXT_MUTED": "#707070",
+            "TEXT_DISABLED": "#505050",
+            "ACCENT_GREEN": "#0c997f",
+            "ACCENT_GREEN_BRIGHT": "#0fb89a",
+            "ACCENT_BLUE": "#3b82f6",
+            "ACCENT_ORANGE": "#f97316",
+            "ACCENT_RED": "#ef4444",
+            "ACCENT_YELLOW": "#fbbf24",
+            "ACCENT_CYAN": "#22d3ee",
+            "ACCENT_PURPLE": "#a855f7",
+            "ACCENT_PINK": "#ec4899",
+            "STATUS_RED": "#ef4444",
+            "STATUS_ORANGE": "#f97316",
+            "STATUS_YELLOW": "#fbbf24",
+            "STATUS_GREEN": "#22c55e",
+            "BORDER": "#2a3a4a",
+            "BORDER_SUBTLE": "#1a2530",
+            "BORDER_FOCUS": "#0c997f",
+            "GAUGE_BG": "#1c2838",
+            "GAUGE_FILL": "#0c997f",
+            "CHART_FILL": "#0a1a20",
+            "CHART_LINE": "#0c997f",
+        },
     }
     
     def __init__(self):

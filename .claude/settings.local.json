@@ -37,7 +37,10 @@
       "Bash(C:/Users/RSman/AppData/Local/Python/bin/python.exe __main__.py)",
       "Bash(C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe *)",
       "Bash(\"C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" \"e:/[python - prosjekter]/SystemMonitor/__main__.py\")",
-      "Bash(\"C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -m py_compile \"e:/[python - prosjekter]/SystemMonitor/core/window.py\")"
+      "Bash(\"C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe\" -m py_compile \"e:/[python - prosjekter]/SystemMonitor/core/window.py\")",
+      "Bash(pkill -f \"__main__.py\")",
+      "Bash(.venv/Scripts/python.exe __main__.py)",
+      "Bash(.venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

@@ -5,15 +5,17 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush
 from PyQt6.QtCore import Qt, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
 
+from styles.theme import theme_manager
+
 
 class DonutGauge(QWidget):
     """
     Donut gauge widget with animated value display
     """
 
-    def __init__(self, color="#3b82f6", label="", size=100, parent=None):
+    def __init__(self, color=None, label="", size=100, parent=None):
         super().__init__(parent)
-        self._color = color
+        self._color = color  # None means use theme accent
         self._label = label
         self._size = size
         self._value = 0.0
@@ -21,12 +23,10 @@ class DonutGauge(QWidget):
 
         self.setFixedSize(size, size)
         self._setup_animation()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
 
-    def _setup_animation(self):
-        """Setup value animation"""
-        self._animator = QPropertyAnimation(self, b"animated_value")
-        self._animator.setDuration(500)
-        self._animator.setEasingCurve(QEasingCurve.Type.InOutQuad)
+    def _on_theme_changed(self, theme_name: str):
+        self.update()
 
     def get_animated_value(self):
         return self._animated_value
@@ -36,6 +36,12 @@ class DonutGauge(QWidget):
         self.update()
 
     animated_value = pyqtProperty(float, get_animated_value, set_animated_value)
+
+    def _get_effective_color(self):
+        """Get the effective gauge color"""
+        if self._color:
+            return self._color
+        return theme_manager.colors.ACCENT_GREEN
 
     def set_value(self, value):
         """Set gauge value with animation"""
@@ -62,9 +68,11 @@ class DonutGauge(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Colors
-        bg_color = QColor("#1e2936")
-        gauge_color = QColor(self._color)
+        colors = theme_manager.colors
+
+        # Colors - use theme colors
+        bg_color = QColor(colors.BG_CARD)
+        gauge_color = QColor(self._get_effective_color())
 
         # Geometry
         margin = 8
@@ -94,7 +102,7 @@ class DonutGauge(QWidget):
         center_y = self._size / 2
 
         painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        painter.setPen(QColor("#f0f4f8"))
+        painter.setPen(QColor(colors.TEXT_PRIMARY))
         value_text = f"{self._animated_value:.0f}%"
         fm = painter.fontMetrics()
         text_width = fm.horizontalAdvance(value_text)
@@ -105,7 +113,7 @@ class DonutGauge(QWidget):
         # Label text (positioned below value)
         if self._label:
             painter.setFont(QFont("Segoe UI", 9))
-            painter.setPen(QColor("#64748b"))
+            painter.setPen(QColor(colors.TEXT_MUTED))
             label_width = fm.horizontalAdvance(self._label)
             # Position label below value, not overlapping
             label_y = int(center_y + 26)

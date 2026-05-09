@@ -4,6 +4,9 @@ Utility helper functions
 from typing import Union
 from datetime import timedelta
 
+# Import theme manager for color functions
+from styles.theme import theme_manager
+
 
 def format_bytes(bytes_value: Union[int, float], precision: int = 2) -> str:
     """
@@ -102,27 +105,29 @@ def truncate_string(text: str, max_length: int, suffix: str = "...") -> str:
 
 
 def get_cpu_color(percentage: float) -> str:
-    """Get color based on CPU percentage"""
+    """Get color based on CPU percentage - theme aware"""
+    c = theme_manager.colors
     if percentage >= 90:
-        return "#ef4444"  # Red
+        return c.STATUS_RED
     elif percentage >= 70:
-        return "#f59e0b"  # Orange
+        return c.STATUS_ORANGE
     elif percentage >= 50:
-        return "#ffd740"  # Yellow
+        return c.STATUS_YELLOW
     else:
-        return "#10b981"  # Green
+        return c.STATUS_GREEN
 
 
 def get_temperature_color(temp: float) -> str:
-    """Get color based on temperature"""
+    """Get color based on temperature - theme aware"""
+    c = theme_manager.colors
     if temp >= 80:
-        return "#ef4444"  # Red
+        return c.STATUS_RED
     elif temp >= 70:
-        return "#f59e0b"  # Orange
+        return c.STATUS_ORANGE
     elif temp >= 60:
-        return "#ffd740"  # Yellow
+        return c.STATUS_YELLOW
     else:
-        return "#10b981"  # Green
+        return c.STATUS_GREEN
 
 
 def clamp(value: Union[int, float], min_val: Union[int, float], max_val: Union[int, float]) -> Union[int, float]:

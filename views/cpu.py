@@ -200,15 +200,26 @@ class CPUView(QWidget, ScaleMixin):
 
     def _on_theme_changed(self, theme_name: str):
         """Re-apply styles when theme changes"""
-        # The view uses theme_manager.colors via c() function, so just trigger repaint
         self._reapply_styles()
         self._update_display()
+        self.update()  # Trigger repaint of the whole view
 
     def _reapply_styles(self):
         """Re-apply styles to widgets"""
         colors = c()
         if hasattr(self, '_usage_indicator'):
             self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_BLUE}; font-size: 18px; font-weight: bold; background: transparent;")
+        # Reapply style to StatTiles
+        for attr_name in ['_stat_cores', '_stat_threads', '_stat_freq', '_stat_uptime']:
+            if hasattr(self, attr_name):
+                tile = getattr(self, attr_name)
+                tile.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {colors.BG_CARD};
+                        border: 1px solid {colors.BORDER};
+                        border-radius: 8px;
+                    }}
+                """)
 
     def set_data_collector(self, collector):
         """Set data collector and connect signals"""

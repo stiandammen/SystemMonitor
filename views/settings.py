@@ -1,11 +1,11 @@
 """
 Settings View - Professional application settings
-Simple and stable implementation
+Clean enterprise-grade settings interface
 """
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QPushButton, QComboBox, QSlider, QFileDialog, QMessageBox
+    QPushButton, QComboBox, QSlider, QFileDialog, QMessageBox, QFrame
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QRect
 from PyQt6.QtGui import QFont, QPainter, QColor
@@ -13,10 +13,11 @@ from PyQt6.QtGui import QFont, QPainter, QColor
 from config import settings
 from utils.autostart import AutostartManager
 from scaler import S, ScaleMixin
+from styles.theme import theme_manager
 
 
 class ToggleWidget(QWidget, ScaleMixin):
-    """Toggle switch widget with green/off colors"""
+    """Toggle switch widget with green active state"""
 
     toggled = pyqtSignal(bool)
 
@@ -25,6 +26,7 @@ class ToggleWidget(QWidget, ScaleMixin):
         self._checked = False
         self.setFixedSize(50, 26)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        theme_manager.theme_changed.connect(lambda _: self.update())
 
     def setChecked(self, checked: bool):
         self._checked = checked
@@ -43,12 +45,13 @@ class ToggleWidget(QWidget, ScaleMixin):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        c = theme_manager.colors
 
-        # Green track when on, gray when off
+        # Track color
         if self._checked:
-            track_color = QColor(16, 185, 129)  # Green
+            track_color = QColor(c.ACCENT_GREEN)
         else:
-            track_color = QColor(42, 52, 65)   # Gray
+            track_color = QColor(c.BORDER)
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(track_color)
@@ -58,11 +61,6 @@ class ToggleWidget(QWidget, ScaleMixin):
         handle_x = 26 if self._checked else 4
         handle_rect = QRect(handle_x, 4, 22, 22)
 
-        # Shadow
-        painter.setBrush(QColor(0, 0, 0, 40))
-        painter.drawEllipse(handle_rect.adjusted(0, 2, 0, 2))
-
-        # White handle
         painter.setBrush(QColor(255, 255, 255))
         painter.drawEllipse(handle_rect)
 
@@ -75,6 +73,11 @@ class SettingsView(QWidget, ScaleMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.scale_connect()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+        self._setup_ui()
+
+    def _on_theme_changed(self, theme_name: str):
+        """Rebuild UI when theme changes"""
         self._setup_ui()
 
     def scale_disconnect(self):
@@ -92,14 +95,30 @@ class SettingsView(QWidget, ScaleMixin):
         self.update()
 
     def _setup_ui(self):
-        # Dark background
-        self.setStyleSheet("background-color: #0a0e14;")
+        # Clear existing layout
+        while self.layout():
+            old_layout = self.layout()
+            while old_layout.count():
+                old_layout.takeAt(0).widget().setParent(None)
+            old_layout.setParent(None)
+
+        c = theme_manager.colors
+        self.setStyleSheet(f"background-color: {c.BG_PRIMARY};")
 
         # Main scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {c.BG_PRIMARY};
+                border: none;
+            }}
+            QScrollArea > QWidget {{
+                background-color: {c.BG_PRIMARY};
+            }}
+        """)
 
         # Content container
         content = QWidget()
@@ -119,7 +138,7 @@ class SettingsView(QWidget, ScaleMixin):
         # Title
         title = QLabel("Settings")
         title.setFont(QFont("Segoe UI", 24, QFont.Weight.DemiBold))
-        title.setStyleSheet("color: #f0f4f8;")
+        title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         main_layout.addWidget(title)
 
         # Appearance section
@@ -154,6 +173,7 @@ class SettingsView(QWidget, ScaleMixin):
 
     def _create_section(self, title: str, parent_layout):
         """Create a settings section"""
+        c = theme_manager.colors
         section = QWidget()
         section_layout = QVBoxLayout()
         section_layout.setContentsMargins(0, 0, 0, 0)
@@ -163,13 +183,18 @@ class SettingsView(QWidget, ScaleMixin):
         # Section title
         title_label = QLabel(title)
         title_label.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
-        title_label.setStyleSheet("color: #f0f4f8;")
+        title_label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         section_layout.addWidget(title_label)
 
         # Content area
         content_widget = QWidget()
+        content_widget.setStyleSheet(f"""
+            background-color: {c.BG_CARD};
+            border-radius: 12px;
+            border: 1px solid {c.BORDER};
+        """)
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 8, 0, 0)
+        content_layout.setContentsMargins(0, 4, 0, 4)
         content_layout.setSpacing(0)
         content_widget.setLayout(content_layout)
         section_layout.addWidget(content_widget)
@@ -179,15 +204,24 @@ class SettingsView(QWidget, ScaleMixin):
 
     def _add_row(self, layout, label_text, control):
         """Add a row to a section layout"""
+        c = theme_manager.colors
         row = QWidget()
+        row.setStyleSheet(f"""
+            QWidget {{
+                background-color: transparent;
+            }}
+            QWidget:hover {{
+                background-color: {c.BG_HOVER};
+            }}
+        """)
         row_layout = QHBoxLayout()
-        row_layout.setContentsMargins(0, 12, 0, 12)
+        row_layout.setContentsMargins(16, 12, 16, 12)
         row_layout.setSpacing(16)
         row.setLayout(row_layout)
 
         label = QLabel(label_text)
         label.setFont(QFont("Segoe UI", 13))
-        label.setStyleSheet("color: #f0f4f8;")
+        label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         row_layout.addWidget(label, 1)
 
         row_layout.addWidget(control)
@@ -195,38 +229,82 @@ class SettingsView(QWidget, ScaleMixin):
 
     def _create_combo(self, items, current_index=0):
         """Create a styled combo box"""
+        c = theme_manager.colors
         combo = QComboBox()
         combo.addItems(items)
         combo.setCurrentIndex(current_index)
-        combo.setStyleSheet("""
-            QComboBox {
-                background-color: #0d1117;
-                color: #f0f4f8;
-                border: 1px solid #2a3441;
+        combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {c.BG_INPUT};
+                color: {c.TEXT_PRIMARY};
+                border: 1px solid {c.BORDER};
                 border-radius: 6px;
                 padding: 8px 12px;
                 min-width: 100px;
-            }
-            QComboBox::down-arrow {
+            }}
+            QComboBox::down-arrow {{
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 5px solid #94a3b8;
+                border-top: 5px solid {c.TEXT_MUTED};
                 margin-right: 8px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #161f2a;
-                color: #f0f4f8;
-                border: 1px solid #2a3441;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {c.BG_CARD};
+                color: {c.TEXT_PRIMARY};
+                border: 1px solid {c.BORDER};
                 border-radius: 6px;
-            }
+            }}
         """)
         return combo
 
     def _add_appearance_section(self, layout):
-        combo = self._create_combo(["Dark", "Light"])
-        combo.setCurrentText(settings.get('theme', 'dark').title())
-        combo.currentIndexChanged.connect(lambda idx: self._on_setting_changed('theme', combo.currentText().lower()))
+        # Get available themes with display names
+        available_themes = theme_manager.get_available_themes()
+        theme_display_names = [theme_manager.get_theme_display_name(t) for t in available_themes]
+
+        combo = self._create_combo(theme_display_names)
+        current_theme = settings.get('theme', 'midnight')
+        try:
+            current_index = available_themes.index(current_theme)
+        except ValueError:
+            current_index = 0  # Default to 'midnight' (index 0)
+        combo.setCurrentIndex(current_index)
+        combo.currentIndexChanged.connect(lambda idx: self._on_theme_changed(available_themes[idx]))
         self._add_row(layout, "Theme", combo)
+
+        # Reset to default button (for custom theme)
+        c = theme_manager.colors
+        reset_btn = QPushButton("Reset Custom to Default")
+        reset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c.ACCENT_GREEN};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {c.ACCENT_GREEN_BRIGHT};
+            }}
+        """)
+        reset_btn.clicked.connect(self._on_reset_custom_theme)
+        self._add_row(layout, "Reset Custom Theme", reset_btn)
+
+    def _on_reset_custom_theme(self):
+        """Reset custom theme to default colors"""
+        from styles.theme import DEFAULT_COLORS
+        settings.set('custom_theme_colors', DEFAULT_COLORS.copy())
+        theme_manager.reset_to_default()
+
+    def _on_theme_changed(self, theme_name: str):
+        settings.set('theme', theme_name)
+        if theme_name == 'custom':
+            custom_colors = settings.get('custom_theme_colors', {})
+            if custom_colors:
+                theme_manager.load_custom_theme(custom_colors)
+        theme_manager.set_theme(theme_name)
+        self.settings_changed.emit('theme', theme_name)
 
     def _add_performance_section(self, layout):
         combo = self._create_combo(["250ms", "500ms", "1000ms", "2000ms"])
@@ -244,24 +322,25 @@ class SettingsView(QWidget, ScaleMixin):
         slider = QSlider(Qt.Orientation.Horizontal)
         slider.setRange(50, 100)
         slider.setValue(settings.get('alert_cpu_threshold', 80))
-        slider.setStyleSheet("""
-            QSlider::groove:horizontal {
+        c = theme_manager.colors
+        slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{
                 border: none;
                 height: 4px;
-                background-color: #2a3441;
+                background-color: {c.BORDER};
                 border-radius: 2px;
-            }
-            QSlider::sub-page:horizontal {
-                background-color: #10b981;
+            }}
+            QSlider::sub-page:horizontal {{
+                background-color: {c.ACCENT_GREEN};
                 border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                background-color: #f0f4f8;
+            }}
+            QSlider::handle:horizontal {{
+                background-color: {c.TEXT_PRIMARY};
                 width: 14px;
                 height: 14px;
                 border-radius: 7px;
                 margin: -5px 0;
-            }
+            }}
         """)
         slider.valueChanged.connect(lambda v: self._on_setting_changed('alert_cpu_threshold', v))
         self._add_row(layout, "CPU Alert Threshold", slider)
@@ -299,31 +378,39 @@ class SettingsView(QWidget, ScaleMixin):
         combo.currentIndexChanged.connect(lambda idx: self._on_setting_changed('export_format', combo.currentText().lower()))
         self._add_row(layout, "Export Format", combo)
 
+        c = theme_manager.colors
         btn = QPushButton("Browse...")
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
-                color: #000000;
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c.ACCENT_GREEN};
+                color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-weight: bold;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {c.ACCENT_GREEN_BRIGHT};
+            }}
         """)
         btn.clicked.connect(self._on_browse_export_directory)
         self._add_row(layout, "Export Directory", btn)
 
     def _add_reset_section(self, layout):
+        c = theme_manager.colors
         btn = QPushButton("Reset to Defaults")
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ef4444;
-                color: #ffffff;
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c.ACCENT_RED};
+                color: white;
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-weight: bold;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {c.STATUS_RED};
+            }}
         """)
         btn.clicked.connect(self._on_reset_clicked)
         self._add_row(layout, "Reset All Settings", btn)

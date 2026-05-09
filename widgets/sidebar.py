@@ -2,6 +2,14 @@
 Nexus Monitor - Premium Sidebar Navigation Widget
 Modern enterprise-grade design with dark theme
 """
+import sys
+import os
+
+# Add project root to sys.path for standalone script execution
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QIcon, QPainter, QLinearGradient, QColor
@@ -17,19 +25,19 @@ NAV_STRUCTURE = {
     "main": {
         "title": None,
         "items": [
-            {"key": "overview", "label": "Dashboard", "icon": "mdi.view-dashboard", "accent": "#00ab84"},
-            {"key": "cpu", "label": "Processor", "icon": "ph.cpu", "accent": "#3b82f6"},
-            {"key": "gpu", "label": "Graphics", "icon": "ph.monitor", "accent": "#ec4899"},
-            {"key": "network", "label": "Network", "icon": "ph.wifi-high", "accent": "#06b6d4"},
-            {"key": "memory", "label": "Memory", "icon": "mdi.memory", "accent": "#8b5cf6"},
-            {"key": "disks", "label": "Storage", "icon": "fa5s.database", "accent": "#f59e0b"},
+            {"key": "overview", "label": "Dashboard", "icon": "mdi.view-dashboard"},
+            {"key": "cpu", "label": "Processor", "icon": "ph.cpu"},
+            {"key": "gpu", "label": "Graphics", "icon": "ph.monitor"},
+            {"key": "network", "label": "Network", "icon": "ph.wifi-high"},
+            {"key": "memory", "label": "Memory", "icon": "mdi.memory"},
+            {"key": "storage", "label": "Storage", "icon": "ph.database"},
+            {"key": "cmd", "label": "Terminal", "icon": "fa5s.terminal"},
         ]
     },
     "tools": {
-        "title": "TERMINAL & TOOLS",
+        "title": None,
         "items": [
-            {"key": "cmd", "label": "Terminal", "icon": "fa5s.terminal", "accent": "#10b981"},
-            {"key": "settings", "label": "Settings", "icon": "ph.gear", "accent": "#94a3b8"},
+            {"key": "settings", "label": "Settings", "icon": "ph.gear"},
         ]
     }
 }
@@ -41,12 +49,12 @@ class PremiumNavItem(QPushButton, ScaleMixin):
     clicked_with_name = pyqtSignal(str)
 
     def __init__(self, key: str, label: str, icon_name: str,
-                 accent: str = "#00ab84", parent=None):
+                 accent: str = None, parent=None):
         super().__init__(parent)
         self._key = key
         self._label = label
         self._icon_name = icon_name
-        self._accent = accent
+        self._accent = accent  # None means use theme default
         self._is_active = False
         self._is_hovered = False
 
@@ -77,8 +85,9 @@ class PremiumNavItem(QPushButton, ScaleMixin):
     def _setup_icon(self):
         """Setup premium icon from qtawesome"""
         try:
-            normal_color = QColor("#64748b")
-            active_color = QColor(self._accent)
+            c = theme_manager.colors
+            normal_color = QColor(c.TEXT_MUTED)
+            active_color = QColor(self._accent or c.ACCENT_GREEN)
             icon = qta.icon(
                 self._icon_name,
                 color=normal_color,
@@ -93,50 +102,42 @@ class PremiumNavItem(QPushButton, ScaleMixin):
     def _apply_style(self):
         """Apply premium navigation item style"""
         c = theme_manager.colors
-        accent = QColor(self._accent)
+        accent = self._accent or c.ACCENT_GREEN
 
-        # Active background with gradient mix
-        active_bg = f"""
-            background-color: qlineargradient(
-                x1: 0, y1: 0, x2: 1, y2: 0,
-                stop: 0 {self._accent}22,
-                stop: 1 {self._accent}11
-            );
+        # Subtle glow border for active state (no solid background)
+        glow_border = f"""
+            border-left: 2px solid {accent};
         """
-
-        hover_bg = f"""
-            background-color: {c.BG_HOVER};
-        """
-
-        normal_bg = "background-color: transparent;"
-
-        active_border = f"border-left: {S.px(3)}px solid {self._accent};"
-        normal_border = "border-left: 3px solid transparent;"
+        normal_border = "border-left: 2px solid transparent;"
 
         self.setStyleSheet(f"""
             QPushButton {{
-                {normal_bg}
+                background-color: transparent;
                 color: {c.TEXT_SECONDARY};
                 border: none;
                 {normal_border}
-                padding: {S.px(14)}px {S.px(18)}px;
+                padding: {S.px(12)}px {S.px(16)}px;
                 text-align: left;
-                border-radius: {S.px(8)}px;
+                border-radius: {S.px(6)}px;
                 font-family: "Segoe UI", sans-serif;
-                font-size: {S.px(14)}px;
+                font-size: {S.px(13)}px;
                 font-weight: 500;
             }}
 
             QPushButton:hover {{
-                background-color: rgba(255, 255, 255, 0.05);
+                background-color: {c.BG_HOVER};
                 color: {c.TEXT_PRIMARY};
             }}
 
             QPushButton:checked {{
-                {active_bg}
-                color: {self._accent};
-                {active_border}
-                font-weight: 600;
+                background-color: transparent;
+                color: {c.TEXT_PRIMARY};
+                {glow_border}
+            }}
+
+            QPushButton:pressed {{
+                background-color: {c.BG_HOVER};
+                color: {c.TEXT_PRIMARY};
             }}
         """)
 
@@ -150,8 +151,10 @@ class PremiumNavItem(QPushButton, ScaleMixin):
     def _update_icon(self):
         """Update icon color based on state"""
         try:
-            color = self._accent if self._is_active else "#64748b"
-            icon = qta.icon(self._icon_name, color=color, color_active=self._accent)
+            c = theme_manager.colors
+            accent = self._accent or c.ACCENT_GREEN
+            color = accent if self._is_active else c.TEXT_MUTED
+            icon = qta.icon(self._icon_name, color=color, color_active=accent)
             self.setIcon(icon)
         except Exception:
             pass
@@ -223,8 +226,7 @@ class PremiumSidebar(QFrame, ScaleMixin):
                 item = PremiumNavItem(
                     key=item_data["key"],
                     label=item_data["label"],
-                    icon_name=item_data["icon"],
-                    accent=item_data["accent"]
+                    icon_name=item_data["icon"]
                 )
                 item.clicked_with_name.connect(self._on_item_clicked)
                 nav_layout.addWidget(item)
@@ -240,33 +242,29 @@ class PremiumSidebar(QFrame, ScaleMixin):
         c = theme_manager.colors
 
         header = QFrame()
-        header.setFixedHeight(80)
+        header.setFixedHeight(70)
         header.setStyleSheet(f"""
             QFrame {{
-                background-color: {c.BG_CARD};
+                background-color: {c.BG_PRIMARY};
                 border: none;
                 border-radius: 0px;
             }}
         """)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(24, 16, 24, 16)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 12, 20, 12)
+        layout.setSpacing(12)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setLayout(layout)
 
-        # Premium icon container - centered
+        # App icon - modern styled container
         icon_container = QFrame()
-        icon_container.setFixedSize(48, 48)
-        icon_container.setStyleSheet("""
-            QFrame {
-                background-color: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #00ab84,
-                    stop: 1 #00bcd4
-                );
-                border-radius: 12px;
-            }
+        icon_container.setFixedSize(44, 44)
+        icon_container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {c.ACCENT_GREEN};
+                border-radius: 10px;
+            }}
         """)
 
         icon_layout = QVBoxLayout()
@@ -275,18 +273,36 @@ class PremiumSidebar(QFrame, ScaleMixin):
         icon_container.setLayout(icon_layout)
 
         try:
-            icon = qta.icon("ph.monitor", color="#ffffff", color_active="#ffffff")
+            icon = qta.icon("mdi.server", color=c.TEXT_PRIMARY, color_active=c.TEXT_PRIMARY)
             icon_label = QLabel()
-            icon_label.setPixmap(icon.pixmap(24, 24))
+            icon_label.setPixmap(icon.pixmap(22, 22))
             icon_layout.addWidget(icon_label)
         except Exception:
-            icon_label = QLabel("N")
-            icon_label.setFont(QFont("Segoe UI", 20, QFont.Bold))
-            icon_label.setStyleSheet("color: #ffffff;")
+            icon_label = QLabel("SM")
+            icon_label.setFont(QFont("Segoe UI", 14, QFont.Bold))
+            icon_label.setStyleSheet(f"color: {c.TEXT_PRIMARY};")
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_layout.addWidget(icon_label)
 
         layout.addWidget(icon_container)
+
+        # App title
+        title_container = QVBoxLayout()
+        title_container.setSpacing(0)
+        title_container.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        title = QLabel("System Monitor")
+        title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
+        title_container.addWidget(title)
+
+        version = QLabel("v2.0")
+        version.setFont(QFont("Segoe UI", 9))
+        version.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
+        title_container.addWidget(version)
+
+        layout.addLayout(title_container)
+        layout.addStretch()
 
         # Add header to main layout
         self.layout().insertWidget(0, header)
@@ -297,29 +313,29 @@ class PremiumSidebar(QFrame, ScaleMixin):
 
         footer = QFrame()
         footer.setFrameShape(QFrame.Shape.NoFrame)
-        footer.setFixedHeight(80)
+        footer.setFixedHeight(60)
         footer.setStyleSheet(f"""
             QFrame {{
-                background-color: {c.BG_CARD};
+                background-color: {c.BG_PRIMARY};
                 border: none;
                 border-radius: 0px;
             }}
         """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(6)
         footer.setLayout(layout)
 
         # Status row
         status_layout = QHBoxLayout()
-        status_layout.setSpacing(10)
+        status_layout.setSpacing(8)
 
         status_indicator = QFrame()
-        status_indicator.setFixedSize(10, 10)
+        status_indicator.setFixedSize(8, 8)
         status_indicator.setStyleSheet(f"""
             background-color: {c.ACCENT_GREEN};
-            border-radius: 5px;
+            border-radius: 4px;
         """)
         status_layout.addWidget(status_indicator)
 
@@ -330,19 +346,6 @@ class PremiumSidebar(QFrame, ScaleMixin):
         status_layout.addStretch()
 
         layout.addLayout(status_layout)
-
-        # Version row
-        version_layout = QHBoxLayout()
-        version_layout.setSpacing(10)
-
-        version_text = QLabel("v2.0.0")
-        version_text.setFont(QFont("Segoe UI", 10))
-        version_text.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-        version_layout.addWidget(version_text)
-
-        version_layout.addStretch()
-
-        layout.addLayout(version_layout)
 
         self.layout().insertWidget(self.layout().count(), footer)
 

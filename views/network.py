@@ -26,7 +26,7 @@ from widgets.card import Card
 
 class MiniSparkline(QWidget):
     """Mini sparkline graph for KPI cards"""
-    def __init__(self, color="#10b981", parent=None):
+    def __init__(self, color=None, parent=None):
         super().__init__(parent)
         self._color = color
         self._history = deque(maxlen=30)
@@ -299,9 +299,19 @@ class DonutChart(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data: Dict[str, float] = {}
-        self._colors = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"]
+        self._colors = []
 
         self.setFixedSize(140, 140)
+        self._refresh_colors()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self, theme_name: str):
+        self._refresh_colors()
+        self.update()
+
+    def _refresh_colors(self):
+        c = theme_manager.colors
+        self._colors = [c.ACCENT_GREEN, c.ACCENT_BLUE, c.ACCENT_ORANGE, c.ACCENT_PINK, c.ACCENT_PURPLE]
 
     def set_data(self, data: Dict[str, float]):
         self._data = data
@@ -732,16 +742,16 @@ class NetworkView(QWidget, ScaleMixin):
         kpi_layout = QHBoxLayout()
         kpi_layout.setSpacing(S.px(16))
 
-        self._traffic_card = KpiCard("Total Traffic", "mdi.network", "#06b6d4", "Mbps")
+        self._traffic_card = KpiCard("Total Traffic", "mdi.network", theme_manager.colors.ACCENT_GREEN, "Mbps")
         kpi_layout.addWidget(self._traffic_card, stretch=1)
 
-        self._connections_card = KpiCard("Active Connections", "mdi.link", "#10b981", "")
+        self._connections_card = KpiCard("Active Connections", "mdi.link", theme_manager.colors.ACCENT_GREEN, "")
         kpi_layout.addWidget(self._connections_card, stretch=1)
 
-        self._devices_card = KpiCard("Online Devices", "mdi.lan", "#3b82f6", "")
+        self._devices_card = KpiCard("Online Devices", "mdi.lan", theme_manager.colors.ACCENT_GREEN, "")
         kpi_layout.addWidget(self._devices_card, stretch=1)
 
-        self._ping_card = KpiCard("Average Ping", "mdi.access-point", "#f59e0b", "ms")
+        self._ping_card = KpiCard("Average Ping", "mdi.access-point", theme_manager.colors.ACCENT_GREEN, "ms")
         kpi_layout.addWidget(self._ping_card, stretch=1)
 
         main_layout.addLayout(kpi_layout)
@@ -1146,9 +1156,9 @@ class NetworkView(QWidget, ScaleMixin):
 
         c = theme_manager.colors
         legend_items = [
-            ("TCP", tcp_count, "#3b82f6"),
-            ("UDP", udp_count, "#10b981"),
-            ("Other", other, "#8b5cf6"),
+            ("TCP", tcp_count, c.ACCENT_GREEN),
+            ("UDP", udp_count, c.ACCENT_BLUE),
+            ("Other", other, c.ACCENT_ORANGE),
         ]
 
         for label, count, color in legend_items:

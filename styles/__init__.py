@@ -1,6 +1,6 @@
 """
 Styles module - Theme management
 """
-from .theme import ThemeManager, DarkTheme, LightTheme
+from .theme import ThemeManager, MidnightTheme, CyberpunkTheme, NordicTheme, EmberTheme
 
-__all__ = ['ThemeManager', 'DarkTheme', 'LightTheme']
+__all__ = ['ThemeManager', 'MidnightTheme', 'CyberpunkTheme', 'NordicTheme', 'EmberTheme']

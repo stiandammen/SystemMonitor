@@ -36,25 +36,28 @@ COLORS = {
 
 def sync_colors():
     """Sync COLORS dict with theme_manager.colors"""
-    c = theme_manager.colors
-    COLORS.update({
-        'bg_primary': c.BG_PRIMARY,
-        'bg_card': c.BG_CARD,
-        'bg_deeper': c.BG_HOVER,
-        'bg_hover': c.BG_HOVER,
-        'border': c.BORDER,
-        'border_card': c.BORDER,
-        'text_primary': c.TEXT_PRIMARY,
-        'text_secondary': c.TEXT_SECONDARY,
-        'text_muted': c.TEXT_MUTED,
-        'accent_blue': c.ACCENT_BLUE,
-        'accent_green': c.ACCENT_GREEN,
-        'accent_purple': c.ACCENT_PURPLE,
-        'accent_orange': c.ACCENT_ORANGE,
-        'accent_cyan': c.ACCENT_CYAN,
-        'accent_red': c.ACCENT_RED,
-        'accent_yellow': c.ACCENT_YELLOW,
-    })
+    try:
+        c = theme_manager.colors
+        COLORS.update({
+            'bg_primary': c.BG_PRIMARY,
+            'bg_card': c.BG_CARD,
+            'bg_deeper': c.BG_HOVER,
+            'bg_hover': c.BG_HOVER,
+            'border': c.BORDER,
+            'border_card': c.BORDER,
+            'text_primary': c.TEXT_PRIMARY,
+            'text_secondary': c.TEXT_SECONDARY,
+            'text_muted': c.TEXT_MUTED,
+            'accent_blue': c.ACCENT_BLUE,
+            'accent_green': c.ACCENT_GREEN,
+            'accent_purple': c.ACCENT_PURPLE,
+            'accent_orange': c.ACCENT_ORANGE,
+            'accent_cyan': c.ACCENT_CYAN,
+            'accent_red': c.ACCENT_RED,
+            'accent_yellow': c.ACCENT_YELLOW,
+        })
+    except Exception as e:
+        print(f"sync_colors error: {e}")
 
 
 class GlassCard(QFrame, ScaleMixin):
@@ -123,10 +126,10 @@ class GPUGauge(QFrame, ScaleMixin):
 
     def _get_color_for_value(self, percentage: float) -> str:
         if percentage >= self._crit_threshold:
-            return COLORS['accent_red']
+            return COLORS.get('accent_red', '#ef4444')
         elif percentage >= self._warn_threshold:
-            return COLORS['accent_orange']
-        return COLORS['accent_green']
+            return COLORS.get('accent_orange', '#f97316')
+        return COLORS.get('accent_green', '#0c997f')
 
     def paintEvent(self, a0):
         painter = QPainter(self)
@@ -334,6 +337,7 @@ class GPUView(QWidget, ScaleMixin):
         super().__init__(parent)
         self._last_gpu_data = None
         self.scale_connect()
+        sync_colors()  # Sync colors before setup
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -343,15 +347,38 @@ class GPUView(QWidget, ScaleMixin):
 
     def _on_theme_changed(self, theme_name: str):
         """Re-apply styles when theme changes"""
-        sync_colors()
-        self._reapply_widget_styles()
-        if self._last_gpu_data is not None:
-            self.update_data(self._last_gpu_data)
+        try:
+            # Sync colors first
+            sync_colors()
+            # Full rebuild like overview_page does
+            self._setup_ui()
+            self.update()
+        except Exception as e:
+            print(f"GPU theme change error: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _reapply_widget_styles(self):
         """Re-apply styles to widgets that use COLORS"""
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
-        self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
+        try:
+            self._status_dot.setStyleSheet(f"color: {COLORS.get('accent_green', '#0c997f')}; font-size: 14px; background: transparent;")
+            self._gpu_name_label.setStyleSheet(f"color: {COLORS.get('accent_cyan', '#22d3ee')}; background: transparent;")
+        except Exception as e:
+            print(f"GPU style reapply error: {e}")
+
+    def _refresh_all_widgets(self):
+        """Refresh all styled widgets"""
+        try:
+            if hasattr(self, '_header'):
+                self._header.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {COLORS.get('bg_card', '#151d28')};
+                        border-radius: 10px;
+                        border: 1px solid {COLORS.get('border', '#2a3a4a')};
+                    }}
+                """)
+        except Exception as e:
+            print(f"Widget refresh error: {e}")
 
     def _setup_ui(self):
         """Setup GPU view UI"""

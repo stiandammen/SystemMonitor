@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient
 from PyQt6.QtCore import Qt, QSize
 
+from styles.theme import theme_manager
+
 
 class SparklineWidget(QWidget):
     """
@@ -17,7 +19,7 @@ class SparklineWidget(QWidget):
 
     def __init__(self, colors=None, max_points=60, parent=None):
         super().__init__(parent)
-        self._colors = list(colors) if colors else ["#3b82f6"]
+        self._colors = list(colors) if colors else [theme_manager.colors.ACCENT_BLUE]
         self._max_points = max_points
         self._data = [deque(maxlen=max_points) for _ in self._colors]
         self._max_value = None  # None = auto-scale
