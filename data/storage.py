@@ -156,80 +156,130 @@ class StorageCollector(QThread):
         import psutil
         disks = []
 
-        try:
-            import wmi
-            w = wmi.WMI()
+        # Retry logic for transient WMI failures
+        max_retries = 3
+        retry_delay = 0.5
 
-            # Get physical disk info from Win32_DiskDrive
-            for drive in w.Win32_DiskDrive():
-                disk_info = {
-                    'device': f"\\\\.\\{drive.Index}",
-                    'name': drive.Name or 'Unknown',
-                    'model': drive.Model or 'Unknown',
-                    'vendor': drive.Manufacturer or 'Unknown',
-                    'serial': drive.SerialNumber or 'N/A',
-                    'size': int(drive.Size) if drive.Size else 0,
-                    'disk_type': self._parse_disk_type(drive.Model or ''),
-                    'is_removable': drive.Removable,
+        for attempt in range(max_retries):
+            try:
+                import wmi
+                import pywintypes
+
+                w = wmi.WMI()
+
+                # Get physical disk info from Win32_DiskDrive
+                for drive in w.Win32_DiskDrive():
+                    try:
+                        disk_info = {
+                            'device': f"\\\\.\\{drive.Index}",
+                            'name': drive.Name or 'Unknown',
+                            'model': drive.Model or 'Unknown',
+                            'vendor': drive.Manufacturer or 'Unknown',
+                            'serial': drive.SerialNumber or 'N/A',
+                            'size': int(drive.Size) if drive.Size else 0,
+                            'disk_type': self._parse_disk_type(drive.Model or ''),
+                            'is_removable': bool(drive.Removable) if drive.Removable is not None else False,
+                            'partitions': [],
+                            'interface_type': drive.InterfaceType or 'Unknown',
+                            'status': drive.Status or 'Unknown',
+                            'read_rate': 0,
+                            'write_rate': 0,
+                            'temperature': None,
+                            'smart': None,
+                        }
+
+                        # Get partitions for this disk
+                        try:
+                            for partition in w.Win32_DiskPartition():
+                                if partition.DiskIndex == drive.Index:
+                                    for logical in partition.associators("Win32_LogicalDisk"):
+                                        try:
+                                            usage = psutil.disk_usage(logical.Name)
+                                            logical_info = {
+                                                'device': logical.Name,
+                                                'mountpoint': logical.Name,
+                                                'fstype': logical.FileSystem or 'Unknown',
+                                                'total': usage.total,
+                                                'used': usage.used,
+                                                'free': usage.free,
+                                                'percent': usage.percent,
+                                            }
+                                            disk_info['partitions'].append(logical_info)
+                                        except (PermissionError, OSError):
+                                            # Logical disk not accessible, skip partition
+                                            pass
+                        except pywintypes.com_error:
+                            # Partition query failed, skip but don't fail entire disk
+                            pass
+
+                        disks.append(disk_info)
+
+                    except pywintypes.com_error as e:
+                        # Individual disk query failed (e.g., removable disk removed during enumeration)
+                        if e.args[0] == -2147217406:  # 0x80041002 - Object not found
+                            log_info(LogCategory.DISK, "Skipping disk that became unavailable during query")
+                            continue
+                        raise  # Re-raise for retry if not an "Object not found" error
+                    except AttributeError:
+                        # Drive property doesn't exist, skip this disk
+                        continue
+
+                # Success - exit retry loop
+                break
+
+            except pywintypes.com_error as e:
+                error_code = e.args[0] if e.args else 0
+                if error_code == -2147217406:  # 0x80041002 - Object not found
+                    # WMI object not found - common with removable disks
+                    # This is non-recoverable, exit retry loop and use fallback
+                    log_info(LogCategory.DISK, "WMI object not found (removable disk issue), using fallback")
+                    break
+                if attempt < max_retries - 1:
+                    log_info(LogCategory.DISK, f"WMI query failed (attempt {attempt + 1}/{max_retries}), retrying: {e}")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    log_warning(LogCategory.DISK, f"WMI disk query failed after {max_retries} attempts: {e}")
+                    # Fall through to fallback
+            except Exception as e:
+                log_warning(LogCategory.DISK, f"WMI disk query failed: {e}")
+                break
+
+        # Fallback to psutil if WMI failed or returned no disks
+        if not disks:
+            log_info(LogCategory.DISK, "Using psutil fallback for disk list")
+            disks = self._get_psutil_disks()
+
+        return disks
+
+    def _get_psutil_disks(self) -> List[Dict[str, Any]]:
+        """Fallback method to get disk list using psutil"""
+        import psutil
+        disks = []
+
+        for part in psutil.disk_partitions(all=False):
+            if not part.fstype:
+                continue
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+                disks.append({
+                    'device': part.device,
+                    'mountpoint': part.mountpoint,
+                    'fstype': part.fstype,
+                    'total': usage.total,
+                    'used': usage.used,
+                    'free': usage.free,
+                    'percent': usage.percent,
+                    'name': self._guess_disk_name(part.device),
+                    'model': 'Unknown',
+                    'vendor': 'Unknown',
+                    'disk_type': self._guess_disk_type(part.device),
+                    'serial': 'N/A',
+                    'is_removable': part.fstype == '' or 'removable' in str(part.opts).lower(),
                     'partitions': [],
-                    'interface_type': drive.InterfaceType or 'Unknown',
-                    'status': drive.Status or 'Unknown',
-                    'read_rate': 0,
-                    'write_rate': 0,
-                    'temperature': None,
-                    'smart': None,
-                }
-
-                # Get partitions for this disk
-                try:
-                    for partition in w.Win32_DiskPartition():
-                        if partition.DiskIndex == drive.Index:
-                            for logical in partition.associators("Win32_LogicalDisk"):
-                                try:
-                                    usage = psutil.disk_usage(logical.Name)
-                                    logical_info = {
-                                        'device': logical.Name,
-                                        'mountpoint': logical.Name,
-                                        'fstype': logical.FileSystem or 'Unknown',
-                                        'total': usage.total,
-                                        'used': usage.used,
-                                        'free': usage.free,
-                                        'percent': usage.percent,
-                                    }
-                                    disk_info['partitions'].append(logical_info)
-                                except Exception:
-                                    pass
-                except Exception:
-                    pass
-
-                disks.append(disk_info)
-
-        except Exception as e:
-            log_warning(LogCategory.DISK, f"WMI disk query failed: {e}")
-            # Fallback to psutil
-            for part in psutil.disk_partitions(all=False):
-                if not part.fstype:
-                    continue
-                try:
-                    usage = psutil.disk_usage(part.mountpoint)
-                    disks.append({
-                        'device': part.device,
-                        'mountpoint': part.mountpoint,
-                        'fstype': part.fstype,
-                        'total': usage.total,
-                        'used': usage.used,
-                        'free': usage.free,
-                        'percent': usage.percent,
-                        'name': self._guess_disk_name(part.device),
-                        'model': 'Unknown',
-                        'vendor': 'Unknown',
-                        'disk_type': self._guess_disk_type(part.device),
-                        'serial': 'N/A',
-                        'is_removable': False,
-                        'partitions': [],
-                    })
-                except (PermissionError, OSError):
-                    pass
+                })
+            except (PermissionError, OSError):
+                pass
 
         return disks
 

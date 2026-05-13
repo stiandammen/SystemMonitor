@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "WebSearch",
+      "Bash(python -c \"from data.storage import StorageCollector; print\\('Import successful'\\)\")",
+      "Bash(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Filter \"*.bat\")",
+      "Bash(Select-Object Name)",
+      "Bash(pwsh *)",
+      "Bash(python *)",
+      "Bash(where python *)",
+      "Bash(E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Scripts\\\\python.exe *)"
     ]
   }
 }
