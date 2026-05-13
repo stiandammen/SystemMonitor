@@ -57,26 +57,23 @@ class AppConfig:
 
 class FontConfig:
     """Font configuration"""
-    
+
+    # Predefined fonts
+    TITLE = QFont(AppConfig.FONT_FAMILY, 20, QFont.Weight.Bold)
+    SUBTITLE = QFont(AppConfig.FONT_FAMILY, 16, QFont.Weight.Bold)
+    HEADING = QFont(AppConfig.FONT_FAMILY, 14, QFont.Weight.Bold)
+    BODY = QFont(AppConfig.FONT_FAMILY, 13)
+    BODY_BOLD = QFont(AppConfig.FONT_FAMILY, 13, QFont.Weight.Bold)
+    SMALL = QFont(AppConfig.FONT_FAMILY, 11)
+    SMALL_BOLD = QFont(AppConfig.FONT_FAMILY, 11, QFont.Weight.Bold)
+    CAPTION = QFont(AppConfig.FONT_FAMILY, 10)
+    VALUE_LARGE = QFont(AppConfig.FONT_FAMILY, 24, QFont.Weight.Bold)
+    VALUE_MEDIUM = QFont(AppConfig.FONT_FAMILY, 18, QFont.Weight.Bold)
+
     @staticmethod
     def get_font(size: int, bold: bool = False) -> QFont:
         """Get font with specified size and weight"""
-        font = QFont(AppConfig.FONT_FAMILY, size)
-        if bold:
-            font.setBold(True)
-        return font
-    
-    # Predefined fonts
-    TITLE = get_font(20, True)
-    SUBTITLE = get_font(16, True)
-    HEADING = get_font(14, True)
-    BODY = get_font(13)
-    BODY_BOLD = get_font(13, True)
-    SMALL = get_font(11)
-    SMALL_BOLD = get_font(11, True)
-    CAPTION = get_font(10)
-    VALUE_LARGE = get_font(24, True)
-    VALUE_MEDIUM = get_font(18, True)
+        return QFont(AppConfig.FONT_FAMILY, size, QFont.Weight.Bold if bold else QFont.Weight.Normal)
 
 
 class SettingsManager:

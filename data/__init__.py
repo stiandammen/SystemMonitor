@@ -1,8 +1,8 @@
 """
 Data module - System data collection
 """
-from .collector import DataCollector, BaseCollector, CPUCollectorThread, MemoryCollectorThread, DiskCollectorThread, NetworkCollectorThread, GPUCollectorThread, SystemInfoCollectorThread
-from .coordinator import DataCollectorCoordinator
+from .coordinator import DataCollectorCoordinator, DataCollector  # DataCollector is alias for backwards compat
+from .collector import BaseCollector, CPUCollectorThread, MemoryCollectorThread, DiskCollectorThread, NetworkCollectorThread, GPUCollectorThread, SystemInfoCollectorThread
 from .history import MetricHistory
 from .alerts import AlertManager
 

@@ -12,7 +12,6 @@ class ViewName(Enum):
     NETWORK = "network"
     MEMORY = "memory"
     DISKS = "disks"
-    CMD = "cmd"
     SETTINGS = "settings"
 
 
@@ -51,7 +50,6 @@ VIEW_TITLES = {
     ViewName.NETWORK: "Network",
     ViewName.MEMORY: "Memory",
     ViewName.DISKS: "Disks",
-    ViewName.CMD: "CMD",
     ViewName.SETTINGS: "Settings",
 }
 
@@ -63,7 +61,6 @@ VIEW_ICONS = {
     ViewName.NETWORK: "mdi.network",
     ViewName.MEMORY: "mdi.memory",
     ViewName.DISKS: "fa5s.server",
-    ViewName.CMD: "fa5s.terminal",
     ViewName.SETTINGS: "fa5s.cog",
 }
 

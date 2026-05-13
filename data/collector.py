@@ -558,5 +558,7 @@ class SystemInfoCollectorThread(BaseCollector):
             return "Unknown"
 
 
-# Alias for backwards compatibility
-DataCollector = SystemInfoCollectorThread
+# Legacy alias - SystemInfoCollectorThread is the old single-collector approach
+# Use data.coordinator.DataCollectorCoordinator for the new multi-threaded approach
+SystemInfoCollector = SystemInfoCollectorThread
+LegacyDataCollector = SystemInfoCollectorThread

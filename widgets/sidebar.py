@@ -31,8 +31,7 @@ NAV_STRUCTURE = {
             {"key": "network", "label": "Network", "icon": "ph.wifi-high"},
             {"key": "memory", "label": "Memory", "icon": "mdi.memory"},
             {"key": "storage", "label": "Storage", "icon": "ph.database"},
-            {"key": "cmd", "label": "Terminal", "icon": "fa5s.terminal"},
-        ]
+                    ]
     },
     "tools": {
         "title": None,

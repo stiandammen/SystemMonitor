@@ -271,7 +271,6 @@ class MainWindow(QMainWindow, ScaleMixin):
             from views.network import NetworkView
             from views.memory import MemoryView
             from views.storage import StorageView
-            from views.powershell import CommandPromptView
             from views.settings import SettingsView
 
             view_classes = {
@@ -281,7 +280,6 @@ class MainWindow(QMainWindow, ScaleMixin):
                 "network": NetworkView,
                 "memory": MemoryView,
                 "storage": StorageView,
-                "cmd": CommandPromptView,
                 "settings": SettingsView,
             }
 
