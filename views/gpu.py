@@ -2,11 +2,12 @@
 GPU View - GPU monitoring with gauges, charts, and real-time data
 Modern glassmorphism design with responsive layout
 """
+from typing import Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QFrame, QGridLayout, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty
 from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
 
 from styles.theme import theme_manager
@@ -77,7 +78,7 @@ class GlassCard(QFrame, ScaleMixin):
 
 class GPUGauge(QFrame, ScaleMixin):
     """
-    Circular gauge with glow effect - optimized with throttled repaints
+    Circular gauge with glow effect and pulse animation on value changes
     """
     def __init__(self, title: str = "", unit: str = "%",
                  min_val: float = 0.0, max_val: float = 100.0,
@@ -94,6 +95,10 @@ class GPUGauge(QFrame, ScaleMixin):
         self._display_value = 0.0
         self._target_value = 0.0
         self._pending_update = False
+        self._subtitle = ""
+        self._is_animating = False
+        self._glow_intensity = 0.0
+        self._last_color = COLORS.get('accent_green', '#0c997f')
 
         self.setFixedSize(size, size)
         self.setStyleSheet("background-color: transparent; border: none;")
@@ -102,6 +107,10 @@ class GPUGauge(QFrame, ScaleMixin):
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
         self._update_timer.timeout.connect(self._do_update)
+
+        # Animation timer for pulse effect
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._animate_pulse)
 
         self.scale_connect()
 
@@ -112,17 +121,38 @@ class GPUGauge(QFrame, ScaleMixin):
         self._pending_update = False
         self.update()
 
+    def _animate_pulse(self):
+        """Animate the glow pulse effect"""
+        if self._glow_intensity > 0:
+            self._glow_intensity -= 0.05
+            if self._glow_intensity <= 0:
+                self._glow_intensity = 0
+                self._anim_timer.stop()
+        self.update()
+
     def set_value(self, value: float):
-        """Update gauge value with throttling"""
+        """Update gauge value with throttling and trigger animation"""
         if value is None:
             value = 0
+        old_target = self._target_value
         self._target_value = max(self._min_val, min(value, self._max_val))
+
+        # Trigger pulse animation on significant change
+        if abs(self._target_value - old_target) > 1.0 and not self._is_animating:
+            self._glow_intensity = 0.8
+            if not self._anim_timer.isActive():
+                self._anim_timer.start(16)  # ~60fps
+
         if not self._pending_update:
             self._pending_update = True
-            self._update_timer.start(33)  # ~30fps throttle
+            self._update_timer.start(16)  # ~60fps for smoother animation
 
     def set_max_value(self, max_val: float):
         self._max_val = max_val if max_val is not None else 100.0
+
+    def set_subtitle(self, text: str):
+        """Set subtitle text shown below the main value (e.g., '/ 16 GB')"""
+        self._subtitle = text
 
     def _get_color_for_value(self, percentage: float) -> str:
         if percentage >= self._crit_threshold:
@@ -134,14 +164,14 @@ class GPUGauge(QFrame, ScaleMixin):
     def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         size = self._size
         center = size / 2
 
-        # Smooth animation
+        # Smooth animation towards target
         diff = self._target_value - self._display_value
         if abs(diff) > 0.1:
-            self._display_value += diff * 0.12
+            self._display_value += diff * 0.15
         else:
             self._display_value = self._target_value
 
@@ -149,6 +179,7 @@ class GPUGauge(QFrame, ScaleMixin):
         range_val = self._max_val - self._min_val
         progress = (self._display_value - self._min_val) / range_val if range_val > 0 else 0
         progress = max(0.0, min(1.0, progress))
+        current_color = self._get_color_for_value(progress * 100)
 
         pen_width = 8
         arc_rect = 14
@@ -159,38 +190,58 @@ class GPUGauge(QFrame, ScaleMixin):
         painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
                        135 * 16, -270 * 16)
 
-        # Glow effect
-        glow_color = QColor(self._get_color_for_value(progress * 100))
-        glow_color.setAlpha(40)
-        glow_pen = QPen(glow_color, pen_width + 6, Qt.PenStyle.SolidLine)
+        # Animated glow effect - enhanced during pulse
+        glow_alpha = 40 + int(self._glow_intensity * 80)
+        glow_color = QColor(current_color)
+        glow_color.setAlpha(glow_alpha)
+        glow_pen = QPen(glow_color, pen_width + 6 + int(self._glow_intensity * 8), Qt.PenStyle.SolidLine)
         glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(glow_pen)
         painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
                        135 * 16, -270 * 16)
 
-        # Progress arc
-        progress_color = QColor(self._get_color_for_value(progress * 100))
+        # Progress arc with smooth color transition
+        progress_color = QColor(current_color)
         progress_pen = QPen(progress_color, pen_width, Qt.PenStyle.SolidLine)
         progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(progress_pen)
         painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
                        135 * 16, int(-270 * 16 * progress))
 
-        # Center value
+        # Outer ring pulse effect during animation
+        if self._glow_intensity > 0:
+            pulse_color = QColor(current_color)
+            pulse_color.setAlpha(int(self._glow_intensity * 30))
+            pulse_pen = QPen(pulse_color, 2, Qt.PenStyle.SolidLine)
+            painter.setPen(pulse_pen)
+            painter.drawArc(arc_rect - 4, arc_rect - 4, size - arc_rect * 2 + 8, size - arc_rect * 2 + 8,
+                           135 * 16, -270 * 16)
+
+        # Center value - for VRAM gauge show total memory (16) at center with GB below
         painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Light))
         painter.setPen(QColor(COLORS['text_primary']))
-        value_text = f"{self._display_value:.0f}{self._unit}"
-        fm = painter.fontMetrics()
-        text_width = fm.width(value_text)
-        painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
+        if self._title == "VRAM":
+            max_val = self._max_val if self._max_val > 0 else 16
+            value_text = f"{max_val:.0f}"
+            fm = painter.fontMetrics()
+            text_width = fm.width(value_text)
+            painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
+            painter.setFont(QFont("Segoe UI", 9))
+            painter.setPen(QColor(COLORS['text_secondary']))
+            gb_width = fm.width("GB")
+            painter.drawText(int(center - gb_width / 2), int(center + 20), "GB")
+        else:
+            value_text = f"{self._display_value:.0f}{self._unit}"
+            fm = painter.fontMetrics()
+            text_width = fm.width(value_text)
+            painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
 
         # Title
         if self._title:
             painter.setFont(QFont("Segoe UI", 8))
             painter.setPen(QColor(COLORS['text_muted']))
             title_width = fm.width(self._title)
-            # Draw below the center to avoid overlapping with value
-            painter.drawText(int(center - title_width / 2), int(center + 32), self._title)
+            painter.drawText(int(center - title_width / 2), int(center + 35), self._title)
 
         painter.end()
 
@@ -486,11 +537,12 @@ class GPUView(QWidget, ScaleMixin):
 
         self._card_model = StatTile("GPU Model", "—", COLORS['accent_cyan'])
         self._card_driver = StatTile("Driver", "—", COLORS['text_secondary'])
-        self._card_vram = StatTile("VRAM Total", "—", COLORS['accent_purple'])
+        self._card_vram = StatTile("VRAM Used", "—", COLORS['accent_purple'])
+        self._card_vram_total = StatTile("VRAM Total", "—", COLORS['accent_purple'])
         self._card_vendor = StatTile("Vendor", "—", COLORS['accent_green'])
 
         for card in [self._card_model, self._card_driver,
-                     self._card_vram, self._card_vendor]:
+                     self._card_vram, self._card_vram_total, self._card_vendor]:
             layout.addWidget(card, stretch=1)
 
         return container
@@ -537,7 +589,6 @@ class GPUView(QWidget, ScaleMixin):
             return
 
         gpu = data['gpu']
-        gpu_info = data.get('gpu_info', {})
 
         if not gpu.get('available', False):
             self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: 14px; background: transparent;")
@@ -545,13 +596,17 @@ class GPUView(QWidget, ScaleMixin):
 
         self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
 
-        if gpu_info:
-            self._gpu_name_label.setText(gpu_info.get('name', '—'))
-            self._card_model.set_value(gpu_info.get('name', 'Unknown')[:35])
-            self._card_driver.set_value(gpu_info.get('driver_version', 'N/A'))
-            vram_gb = gpu_info.get('vram_mb', 0) / 1024
-            self._card_vram.set_value(f"{vram_gb:.1f} GB")
-            self._card_vendor.set_value(gpu_info.get('vendor', 'Unknown'))
+        # GPU info is embedded in the gpu dict itself (name, vendor, vram_mb, driver_version)
+        gpu_name = gpu.get('name', '—')
+        gpu_vendor = gpu.get('vendor', 'Unknown')
+        gpu_vram = gpu.get('vram_mb', 0)
+        gpu_driver = gpu.get('driver_version', 'N/A')
+
+        self._gpu_name_label.setText(gpu_name)
+        self._card_model.set_value(gpu_name[:35] if gpu_name else 'Unknown')
+        self._card_driver.set_value(gpu_driver)
+        self._card_vram.set_value(f"{gpu_vram / 1024:.1f} GB" if gpu_vram else "—")
+        self._card_vendor.set_value(gpu_vendor)
 
         load = gpu.get('load', 0)
         mem_used = gpu.get('memory_used', 0)
@@ -562,8 +617,23 @@ class GPUView(QWidget, ScaleMixin):
 
         self._gauge_load.set_value(load)
         self._gauge_temp.set_value(temp)
-        self._gauge_vram.set_value(mem_used)
+        self._gauge_vram.set_value(mem_used if mem_used else 0)
         self._gauge_vram.set_max_value(mem_total if mem_total else 16)
+
+        # Set VRAM gauge to show total memory (16) at center with GB below
+        if mem_total and mem_total > 0:
+            self._gauge_vram.set_subtitle(f"/ {mem_total:.0f} GB")
+        else:
+            self._gauge_vram.set_subtitle("")
+
+        # Update VRAM info cards
+        if mem_total and mem_total > 0:
+            self._card_vram.set_value(f"{mem_used:.1f} GB" if mem_used else "—")
+            self._card_vram_total.set_value(f"{mem_total:.1f} GB")
+        else:
+            self._card_vram.set_value("—")
+            self._card_vram_total.set_value("—")
+
         self._gauge_power.set_value(power)
         self._gauge_fan.set_value(fan)
         self._chart.update_chart(load, temp)

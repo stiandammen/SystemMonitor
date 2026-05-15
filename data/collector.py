@@ -96,18 +96,23 @@ class CPUCollectorThread(BaseCollector):
 
             freq = psutil.cpu_freq()
 
-            # Get temperature
-            temperature = self._get_cpu_temperature()
+            # Get CPU stats for interrupts and ctx switches
+            stats = psutil.cpu_stats()
 
-            return {
+            result = {
                 'percent': percent,
                 'per_core': per_core,
                 'core_count': psutil.cpu_count(logical=False) or 1,
                 'thread_count': psutil.cpu_count(logical=True) or 1,
                 'frequency_current': freq.current if freq else 0,
                 'frequency_max': freq.max if freq else 0,
-                'temperature': temperature,
+                'frequency_min': freq.min if freq else 0,
+                'temperature': self._get_cpu_temperature(),
+                'interrupts': stats.interrupts if hasattr(stats, 'interrupts') else 0,
+                'ctx_switches': stats.ctx_switches if hasattr(stats, 'ctx_switches') else 0,
             }
+
+            return result
 
         except Exception as e:
             log_exception(LogCategory.CPU, "CPU collection failed", e)
@@ -146,9 +151,9 @@ class CPUCollectorThread(BaseCollector):
         except Exception:
             pass
 
-        # Try alternative via LibreHardwareMonitor or HWiNFO shared memory
+        # Try alternative via HWiNFO shared memory
         try:
-            temp = self._read_hardware_monitor_temp()
+            temp = self._read_hwinfo_temp()
             if temp is not None:
                 return temp
         except Exception:
@@ -156,10 +161,9 @@ class CPUCollectorThread(BaseCollector):
 
         return None
 
-    def _read_hardware_monitor_temp(self):
-        """Try to read CPU temp from HWiNFO/LibreHardwareMonitor shared memory"""
+    def _read_hwinfo_temp(self):
+        """Try to read CPU temp from HWiNFO shared memory"""
         import ctypes
-        import struct
 
         # HWiNFO shared memory signatures (V1-V4)
         HWINFO_SIGNATURES = [
@@ -180,18 +184,11 @@ class CPUCollectorThread(BaseCollector):
                 "HWiNFO32_V4", "HWiNFO64_V4",
             ]
 
-            # LibreHardwareMonitor shared memory names
-            LHM_NAMES = [
-                "LibreHardwareMonitor",
-                "LHM_Sensor",
-            ]
-
-            memory_map_names = HWINFO_NAMES + LHM_NAMES
             mapping = None
             found_name = None
             handle = None
 
-            for name in memory_map_names:
+            for name in HWINFO_NAMES:
                 handle = kernel32.OpenFileMappingW(0x0004, False, name)
                 if handle:
                     found_name = name
@@ -285,20 +282,27 @@ class MemoryCollectorThread(BaseCollector):
 class DiskCollectorThread(BaseCollector):
     """Disk data collector - runs in background thread"""
 
-    REFRESH_INTERVAL = 2.0  # 2 seconds for disk (slower changing data)
+    REFRESH_INTERVAL = 1.0  # 1 second for disk (higher frequency for speed tracking)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._previous_io = None
         self._previous_time = 0
+        self._io_per_disk = {}  # device -> previous_io tuple
+        self._disk_mapping = {}  # physical disk key -> drive letters
 
     def _collect(self) -> dict:
         """Collect disk data"""
         try:
             import psutil
 
+            # Build mapping of physical disks to drive letters
+            self._update_disk_mapping()
+
             # Get partition info
             partitions = []
+            partition_io = {}  # mountpoint -> {read_rate, write_rate}
+
             for part in psutil.disk_partitions(all=False):
                 if not part.fstype:
                     continue
@@ -313,24 +317,116 @@ class DiskCollectorThread(BaseCollector):
                         'free': usage.free,
                         'percent': usage.percent,
                     })
+
+                    # Calculate per-partition IO rate using disk mapping
+                    io_rates = self._get_partition_io_rates(part)
+                    if io_rates:
+                        partition_io[part.mountpoint] = io_rates
+
                 except (PermissionError, OSError):
                     pass
 
-            # Get IO rates
-            io_stats = self._get_io_stats()
+            # Get total IO rates
+            io_stats = self._get_total_io_stats()
 
             return {
                 'partitions': partitions,
                 'read_rate': io_stats.get('read_rate', 0),
                 'write_rate': io_stats.get('write_rate', 0),
+                'partition_io': partition_io,  # Per-partition IO rates
             }
 
         except Exception as e:
             log_exception(LogCategory.DISK, "Disk collection failed", e)
             return {}
 
-    def _get_io_stats(self) -> dict:
-        """Get disk I/O with rate calculation"""
+    def _update_disk_mapping(self):
+        """Build mapping of physical disks to drive letters using WMI"""
+        if platform.system() != 'Windows':
+            return
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["powershell", "-Command",
+                 "Get-CimInstance Win32_DiskDrive | ForEach-Object { $dd = $_; "
+                 "Get-CimInstance -Query \"ASSOCIATORS OF {Win32_DiskDrive.DeviceID='$($dd.DeviceID)'} WHERE AssocClass=Win32_DiskDriveToDiskPartition\" | "
+                 "ForEach-Object { Get-CimInstance -Query \"ASSOCIATORS OF {Win32_DiskPartition.DeviceID='$($_.DeviceID)'} WHERE AssocClass=Win32_LogicalDiskToPartition\" | "
+                 "ForEach-Object { \"$($dd.Index)|$($_.DeviceID)\" } } }"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.stdout.strip():
+                for line in result.stdout.strip().split('\n'):
+                    if '|' in line:
+                        parts = line.strip().split('|')
+                        if len(parts) >= 2:
+                            disk_idx = parts[0]
+                            drive_letter = parts[1].replace(':', '').strip()
+                            key = f"\\\\.\\PhysicalDrive{disk_idx}"
+                            if key not in self._disk_mapping:
+                                self._disk_mapping[key] = []
+                            self._disk_mapping[key].append(f"{drive_letter}:\\")
+        except Exception:
+            pass
+
+    def _get_partition_io_rates(self, partition) -> dict:
+        """Get IO rates for a specific partition by mapping to physical disk"""
+        try:
+            import psutil
+
+            current_io = psutil.disk_io_counters(perdisk=True)
+            current_time = time.time()
+
+            # Find the physical disk key for this partition's device
+            partition_device = partition.device.replace('\\\\', '\\\\\\\\')
+
+            # Try to match via our disk mapping
+            physical_disk_key = None
+            for disk_key, drive_letters in self._disk_mapping.items():
+                if partition_device in drive_letters or partition.mountpoint in drive_letters:
+                    physical_disk_key = disk_key
+                    break
+
+            # If no mapping found, try to find by device name pattern
+            if physical_disk_key is None:
+                for key in current_io.keys():
+                    # Check if device matches partition device
+                    if partition.device.replace('\\\\', '') in key.replace('\\\\', ''):
+                        physical_disk_key = key
+                        break
+                    # Check if it's a drive letter match (e.g., partition.device = 'C:\\')
+                    if partition.mountpoint and partition.mountpoint.rstrip('\\\\') in key:
+                        physical_disk_key = key
+                        break
+
+            if physical_disk_key and physical_disk_key in current_io:
+                io = current_io[physical_disk_key]
+                prev = self._io_per_disk.get(physical_disk_key)
+
+                if prev:
+                    time_delta = current_time - prev['time']
+                    if time_delta > 0:
+                        read_rate = (io.read_bytes - prev['io'].read_bytes) / time_delta
+                        write_rate = (io.write_bytes - prev['io'].write_bytes) / time_delta
+                        self._io_per_disk[physical_disk_key] = {
+                            'io': io,
+                            'time': current_time
+                        }
+                        return {
+                            'read_rate': max(0, read_rate),
+                            'write_rate': max(0, write_rate)
+                        }
+
+                self._io_per_disk[physical_disk_key] = {
+                    'io': io,
+                    'time': current_time
+                }
+
+            return {}
+        except Exception:
+            return {}
+
+    def _get_total_io_stats(self) -> dict:
+        """Get total disk I/O with rate calculation"""
         try:
             import psutil
 
@@ -558,7 +654,6 @@ class SystemInfoCollectorThread(BaseCollector):
             return "Unknown"
 
 
-# Legacy alias - SystemInfoCollectorThread is the old single-collector approach
-# Use data.coordinator.DataCollectorCoordinator for the new multi-threaded approach
+# Legacy alias
 SystemInfoCollector = SystemInfoCollectorThread
 LegacyDataCollector = SystemInfoCollectorThread

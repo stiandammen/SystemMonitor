@@ -5,6 +5,7 @@ Professional enterprise-grade design with clean metrics and real-time data.
 import platform
 import time
 import psutil
+import subprocess
 from collections import deque
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
@@ -587,6 +588,11 @@ class OverviewPage(QWidget, ScaleMixin):
         self._net_sparkline = net_chart.sparkline
         layout.addWidget(net_chart, stretch=1)
 
+        # GPU Chart
+        gpu_chart = self._create_chart_panel("GPU Load", color=colors.ACCENT_PURPLE)
+        self._gpu_sparkline = gpu_chart.sparkline
+        layout.addWidget(gpu_chart, stretch=1)
+
         return section
 
     def _create_chart_panel(self, title: str, color: str = None):
@@ -770,9 +776,8 @@ class OverviewPage(QWidget, ScaleMixin):
         return p
 
     def _short_cpu(self):
-        cpu = self._get_cpu_name()
-        if not cpu:
-            cpu = platform.processor()
+        # Use platform.processor() directly - it's instant and sufficient for display
+        cpu = platform.processor()
         if not cpu:
             return "Unknown"
         if len(cpu) > 28:
@@ -780,30 +785,34 @@ class OverviewPage(QWidget, ScaleMixin):
         return cpu
 
     def _get_cpu_name(self):
+        # Use platform.processor() directly - instant, no WMI needed
         now = time.time()
         if now - self._system_info_cache_time < self._system_info_cache_ttl and 'cpu_name' in self._system_info_cache:
             return self._system_info_cache['cpu_name']
-        try:
-            import wmi
-            w = wmi.WMI()
-            for cpu in w.Win32_Processor():
-                self._system_info_cache['cpu_name'] = cpu.Name
-                self._system_info_cache_time = now
-                return cpu.Name
-        except:
-            return None
+        cpu = platform.processor()
+        if cpu:
+            self._system_info_cache['cpu_name'] = cpu
+            self._system_info_cache_time = now
+            return cpu
+        return None
 
     def _short_gpu(self):
+        # Use WMI directly for GPU name - faster than GPUtil
         now = time.time()
         if now - self._system_info_cache_time < self._system_info_cache_ttl and 'gpu_name' in self._system_info_cache:
             return self._system_info_cache['gpu_name']
         try:
-            import GPUtil
-            gpus = GPUtil.getGPUs()
-            if gpus:
-                name = gpus[0].name
+            result = subprocess.run(
+                ["powershell", "-Command",
+                 "(Get-CimInstance Win32_VideoController).Name | Select-Object -First 1"],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.stdout.strip():
+                name = result.stdout.strip()
                 if len(name) > 24:
-                    return name[:24] + "..."
+                    name = name[:24] + "..."
+                self._system_info_cache['gpu_name'] = name
+                self._system_info_cache_time = now
                 return name
         except:
             pass

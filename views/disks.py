@@ -23,7 +23,7 @@ class DiskIcon(QWidget):
         self.setFixedSize(size, size)
         theme_manager.theme_changed.connect(self.update)
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -136,7 +136,7 @@ class SpeedGaugeWidget(QWidget):
             return f"{bps / 1024:.0f} KB/s"
         return f"{bps:.0f} B/s"
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         c = theme_manager.colors
@@ -195,7 +195,7 @@ class TemperatureWidget(QWidget):
             return QColor(c.ACCENT_ORANGE)
         return QColor(c.ACCENT_GREEN)
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         c = theme_manager.colors
@@ -479,136 +479,74 @@ class DisksView(QWidget, ScaleMixin):
     """
     Disk monitoring view with comprehensive metrics
     Shows all disks with space usage, read/write speeds, and temperature
-    Real-time updates via timer
+    Real-time updates via data collector
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._disk_cards = {}  # device -> DiskCard
-        self._previous_io = None
-        self._previous_time = None
         self._temps = {}  # device -> temperature
+        self._data_collector = None
+        self._pending_update = False
         self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
-    def _setup_ui(self):
-        """Setup the disk monitoring view"""
-        c = theme_manager.colors
+    def set_data_collector(self, collector):
+        """Set data collector for receiving updates"""
+        self._data_collector = collector
+        if collector:
+            collector.data_ready.connect(self._on_data_ready)
 
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        self.setLayout(main_layout)
+    def _on_data_ready(self, data: dict):
+        """Handle data from collector"""
+        if 'disk' not in data:
+            return
+        disk_data = data['disk']
 
-        # Header
-        header = QFrame()
-        header.setFixedHeight(80)
-        header.setStyleSheet(f"background-color: {c.BG_SECONDARY}; border: none;")
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(24, 0, 24, 0)
-        header.setLayout(header_layout)
+        # Update partition space info and IO rates
+        partitions = disk_data.get('partitions', [])
+        partition_io = disk_data.get('partition_io', {})
 
-        # Title section
-        title_layout = QVBoxLayout()
-        title_layout.setSpacing(2)
+        # Build lookup by mountpoint
+        io_by_mountpoint = {}
+        for part in partitions:
+            mountpoint = part.get('mountpoint')
+            if mountpoint in partition_io:
+                io_by_mountpoint[mountpoint] = partition_io[mountpoint]
 
-        title = QLabel("Storage")
-        title.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
-        title_layout.addWidget(title)
+        for part in partitions:
+            device = part.get('device')
+            mountpoint = part.get('mountpoint')
 
-        subtitle = QLabel("Disk space, speed, and temperature")
-        subtitle.setFont(QFont("Segoe UI", 11))
-        subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-        title_layout.addWidget(subtitle)
+            if device in self._disk_cards:
+                card = self._disk_cards[device]
+                # Update space
+                card.update_space(
+                    part.get('used', 0),
+                    part.get('free', 0),
+                    part.get('total', 0),
+                    part.get('percent', 0)
+                )
+                # Update IO rates - use mountpoint-based lookup if available
+                if mountpoint and mountpoint in io_by_mountpoint:
+                    io = io_by_mountpoint[mountpoint]
+                    card.update_speeds(
+                        io.get('read_rate', 0),
+                        io.get('write_rate', 0)
+                    )
+                else:
+                    # Fallback to total IO rates
+                    total_read = disk_data.get('read_rate', 0)
+                    total_write = disk_data.get('write_rate', 0)
+                    card.update_speeds(total_read, total_write)
 
-        header_layout.addLayout(title_layout)
-        header_layout.addStretch()
-
-        # Live indicator
-        live_layout = QHBoxLayout()
-        live_layout.setSpacing(8)
-
-        self._live_dot = QFrame()
-        self._live_dot.setFixedSize(10, 10)
-        self._live_dot.setStyleSheet(f"""
-            background-color: {c.ACCENT_GREEN};
-            border-radius: 5px;
-        """)
-        live_layout.addWidget(self._live_dot)
-
-        self._live_label = QLabel("Live")
-        self._live_label.setFont(QFont("Segoe UI", 10))
-        self._live_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; background: transparent;")
-        live_layout.addWidget(self._live_label)
-
-        header_layout.addLayout(live_layout)
-
-        main_layout.addWidget(header)
-
-        # Scroll area for disk cards
-        self._scroll_area = QScrollArea()
-        self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll_area.setStyleSheet(f"""
-            QScrollArea {{
-                background-color: {c.BG_PRIMARY};
-                border: none;
-            }}
-            QScrollArea > QWidget {{
-                background-color: {c.BG_PRIMARY};
-            }}
-        """)
-
-        self._content_widget = QWidget()
-        self._content_widget.setMaximumWidth(1200)
-
-        self._cards_layout = QVBoxLayout()
-        self._cards_layout.setContentsMargins(24, 16, 24, 24)
-        self._cards_layout.setSpacing(12)
-        self._content_widget.setLayout(self._cards_layout)
-
-        self._scroll_area.setWidget(self._content_widget)
-        main_layout.addWidget(self._scroll_area, stretch=1)
-
-        # Start update timer
-        self._update_timer = QTimer(self)
-        self._update_timer.timeout.connect(self._on_update)
-        self._update_timer.start(1000)  # Update every second
-
-        # Initial scan
-        self._scan_disks()
-
-    def _on_update(self):
-        """Periodic update - collect IO stats and temperature"""
-        self._collect_io_stats()
+        # Temperature is collected separately via timer
         self._collect_temperature()
 
-    def _collect_io_stats(self):
-        """Collect read/write speed statistics"""
-        try:
-            current_io = psutil.disk_io_counters()
-            current_time = time.time()
-
-            if self._previous_io is None:
-                self._previous_io = current_io
-                self._previous_time = current_time
-                return
-
-            time_delta = current_time - self._previous_time
-            if time_delta > 0:
-                read_rate = (current_io.read_bytes - self._previous_io.read_bytes) / time_delta
-                write_rate = (current_io.write_bytes - self._previous_io.write_bytes) / time_delta
-
-                for card in self._disk_cards.values():
-                    card.update_speeds(read_rate, write_rate)
-
-            self._previous_io = current_io
-            self._previous_time = current_time
-
-        except Exception as e:
-            print(f"IO stats collection error: {e}")
+    def _on_update(self):
+        """Periodic update - collect temperature only (IO comes via collector)"""
+        self._collect_temperature()
 
     def _collect_temperature(self):
         """Collect disk temperature using WMI on Windows"""
@@ -691,5 +629,4 @@ class DisksView(QWidget, ScaleMixin):
 
     def update_data(self, data):
         """Update view with new data from data collector"""
-        # Re-scan disks to reflect any changes
-        self._scan_disks()
+        self._on_data_ready(data)
