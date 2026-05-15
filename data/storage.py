@@ -154,6 +154,8 @@ class StorageCollector(QThread):
     def _get_windows_disks(self) -> List[Dict[str, Any]]:
         """Get detailed Windows disk information via WMI"""
         import psutil
+        import wmi
+        import pywintypes
         disks = []
 
         # Retry logic for transient WMI failures
@@ -162,9 +164,6 @@ class StorageCollector(QThread):
 
         for attempt in range(max_retries):
             try:
-                import wmi
-                import pywintypes
-
                 w = wmi.WMI()
 
                 # Get physical disk info from Win32_DiskDrive

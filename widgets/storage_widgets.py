@@ -76,7 +76,7 @@ class LiveGraphWidget(QWidget):
             return f"{bps / 1024:.0f} KB/s"
         return f"{bps:.0f} B/s"
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         colors = c()
@@ -152,8 +152,7 @@ class LiveGraphWidget(QWidget):
         gradient = QLinearGradient(0, 0, 0, h)
         gradient.setColorAt(0, fill_color.lighter(130))
         gradient.setColorAt(0.5, fill_color)
-        gradient.setColorAt(1, QColor(color))
-        gradient.setColorAt(1, fill_color.name())
+        gradient.setColorAt(1, fill_color)
         painter.setOpacity(0.25 if not is_read else 0.3)
         painter.fillPath(fill_path, QColor(color))
         painter.setOpacity(1.0)
@@ -194,7 +193,7 @@ class TemperatureGauge(QWidget):
             return QColor(colors.ACCENT_ORANGE)
         return QColor(colors.ACCENT_GREEN)
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         colors = c()
@@ -250,7 +249,7 @@ class TemperatureBar(QWidget):
             return QColor(colors.ACCENT_ORANGE)
         return QColor(colors.ACCENT_GREEN)
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         colors = c()
@@ -833,7 +832,7 @@ class StatTile(QFrame):
     Compact statistic tile for displaying key metrics.
     Professional glassmorphism style with icon and value.
     """
-    def __init__(self, label: str, value: str = "--", accent: str = None, parent=None):
+    def __init__(self, label: str, value: str = "--", accent: Optional[str] = None, parent=None):
         super().__init__(parent)
         self._label = label
         self._value = value

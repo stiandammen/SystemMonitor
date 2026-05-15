@@ -35,7 +35,8 @@
       "Bash(echo \"Exit code: $?\")",
       "Bash(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Recurse -Filter \"*.py\")",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(powershell.exe *)"
+      "Bash(powershell.exe *)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }
