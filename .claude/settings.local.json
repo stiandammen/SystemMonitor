@@ -53,7 +53,8 @@
       "Bash('/e/[python - prosjekter]/SystemMonitor/.venv/Scripts/python.exe' -m py_compile views/network.py)",
       "Bash(ls *)",
       "Bash(E: *)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\SystemMonitor\")"
     ]
   }
 }
