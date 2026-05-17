@@ -1,22 +1,23 @@
 """
 Main Window - Application main window
-Professional enterprise-grade design with clean window chrome
+Professional enterprise-grade design with responsive layout and overlay mode
 """
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QFrame, QStackedWidget
+    QLabel, QPushButton, QFrame, QStackedWidget, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer
-from PyQt6.QtGui import QFont, QPainter, QPen, QColor, QIcon
+from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer, QSize
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor, QIcon, QCursor
 
 from widgets.glass_sidebar import GlassSidebar
+from widgets.responsive import OverlayWidget
 from styles.theme import theme_manager
-from scaler import S, ScaleMixin
+from scaler import S, ScaleMixin, LayoutMode
 from utils.logger import get_logger, LogCategory, log_info, log_debug
 
 
 class TitleBar(QWidget, ScaleMixin):
-    """Premium glass title bar with modern controls"""
+    """Premium glass title bar with modern controls - responsive"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -41,9 +42,9 @@ class TitleBar(QWidget, ScaleMixin):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Setup premium glass title bar UI"""
         colors = theme_manager.colors
-        self.setFixedHeight(S.px(40))
+        self.setMinimumHeight(S.px(40))
+        self.setMaximumHeight(S.px(48))
 
         if theme_manager.current_theme == "heimdal":
             self.setStyleSheet(f"""
@@ -59,95 +60,64 @@ class TitleBar(QWidget, ScaleMixin):
             """)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(16), 0, S.px(8), 0)
-        layout.setSpacing(S.px(8))
+        layout.setContentsMargins(S.px(12), 0, S.px(8), 0)
+        layout.setSpacing(S.px(6))
         self.setLayout(layout)
 
-        # Draggable area with app title
-        if theme_manager.current_theme == "heimdal":
-            title = QLabel("System Monitor")
-            title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Medium))
-            title.setStyleSheet(f"color: #8A92B2; background: transparent;")
-        else:
-            title = QLabel("System Monitor")
-            title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Medium))
-            title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
+        title = QLabel("System Monitor")
+        title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         title.setCursor(Qt.CursorShape.SizeAllCursor)
         layout.addWidget(title)
 
         layout.addStretch()
-
-        # Window control buttons
         self._create_buttons(layout)
 
     def _create_buttons(self, layout):
-        """Create premium window control buttons"""
         colors = theme_manager.colors
 
-        # Minimize button
-        min_btn = QPushButton()
-        min_btn.setFixedSize(S.px(36), S.px(28))
-        min_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        min_btn.setText("─")
-        min_btn.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Medium))
-        min_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {colors.TEXT_MUTED};
-                border: none;
-                border-radius: {S.px(6)}px;
-            }}
-            QPushButton:hover {{
-                background-color: {colors.BG_HOVER};
-                color: {colors.TEXT_PRIMARY};
-            }}
-        """)
-        min_btn.clicked.connect(self._minimize_window)
-        layout.addWidget(min_btn)
+        for text, slot, style_key in [
+            ("─", self._minimize_window, "min"),
+            ("□", self._toggle_maximize, "max"),
+            ("✕", self._close_window, "close"),
+        ]:
+            btn = QPushButton()
+            btn.setFixedSize(S.px(36), S.px(28))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setText(text)
+            btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
 
-        # Maximize/Restore button
-        max_btn = QPushButton()
-        max_btn.setFixedSize(S.px(36), S.px(28))
-        max_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        max_btn.setText("□")
-        max_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
-        max_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {colors.TEXT_MUTED};
-                border: none;
-                border-radius: {S.px(6)}px;
-            }}
-            QPushButton:hover {{
-                background-color: {colors.BG_HOVER};
-                color: {colors.TEXT_PRIMARY};
-            }}
-        """)
-        max_btn.clicked.connect(self._toggle_maximize)
-        self._max_btn = max_btn
-        layout.addWidget(max_btn)
+            if style_key == "close":
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: transparent;
+                        color: {colors.TEXT_MUTED};
+                        border: none;
+                        border-radius: {S.px(6)}px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {colors.ACCENT_RED};
+                        color: white;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: transparent;
+                        color: {colors.TEXT_MUTED};
+                        border: none;
+                        border-radius: {S.px(6)}px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {colors.BG_HOVER};
+                        color: {colors.TEXT_PRIMARY};
+                    }}
+                """)
 
-        # Close button
-        close_btn = QPushButton()
-        close_btn.setFixedSize(S.px(36), S.px(28))
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setText("✕")
-        close_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {colors.TEXT_MUTED};
-                border: none;
-                border-radius: {S.px(6)}px;
-            }}
-            QPushButton:hover {{
-                background-color: {colors.ACCENT_RED};
-                color: white;
-            }}
-        """)
-        close_btn.clicked.connect(self._close_window)
-        self._close_btn = close_btn
-        layout.addWidget(close_btn)
+            btn.clicked.connect(slot)
+            layout.addWidget(btn)
+            if style_key == "max":
+                self._max_btn = btn
 
     def _minimize_window(self):
         if self._parent:
@@ -202,61 +172,8 @@ class TitleBar(QWidget, ScaleMixin):
         super().changeEvent(event)
 
 
-class ResizeCorner(QWidget, ScaleMixin):
-    """Custom resize grip in bottom-right corner"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._parent = parent
-        self.setFixedWidth(S.px(16))
-        self.setMinimumHeight(S.px(16))
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self._start_geometry = None
-        self._start_pos = None
-        self.scale_connect()
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def on_scale_changed(self, factor: float):
-        self.update()
-
-    def _on_theme_changed(self, theme_name: str):
-        self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        colors = theme_manager.colors
-        painter.setPen(QPen(QColor(colors.BORDER), 1))
-        h = self.height()
-        w = self.width()
-        for i in range(2):
-            painter.drawLine(w - 4 - i * 4, h, w, h - 4 - i * 4)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._start_geometry = self._parent.geometry()
-            self._start_pos = event.globalPos()
-            self._parent._in_drag_resize = True
-            event.accept()
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton and self._start_geometry:
-            delta = event.globalPos() - self._start_pos
-            new_width = max(self._parent.minimumWidth(), self._start_geometry.width() + delta.x())
-            new_height = max(self._parent.minimumHeight(), self._start_geometry.height() + delta.y())
-            self._parent.resize(int(new_width), int(new_height))
-            event.accept()
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._start_geometry = None
-            self._start_pos = None
-            self._parent._in_drag_resize = False
-            event.accept()
-
-
 class TopHeader(QWidget, ScaleMixin):
-    """Professional top header bar with branding, search, and window controls"""
+    """Professional top header bar - responsive"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -281,12 +198,12 @@ class TopHeader(QWidget, ScaleMixin):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Setup top header UI"""
         colors = theme_manager.colors
-        self.setFixedHeight(S.px(56))
+        self.setMinimumHeight(S.px(48))
+        self.setMaximumHeight(S.px(60))
 
         if theme_manager.current_theme == "heimdal":
-            self.setStyleSheet(f"""
+            self.setStyleSheet("""
                 background-color: #12152A;
                 border: none;
                 border-bottom: 1px solid rgba(74, 108, 247, 0.2);
@@ -298,175 +215,107 @@ class TopHeader(QWidget, ScaleMixin):
                 border-bottom: 1px solid {colors.BORDER};
             """)
 
-        # Main layout
         layout = QHBoxLayout()
         layout.setContentsMargins(S.px(16), 0, S.px(8), 0)
-        layout.setSpacing(S.px(16))
+        layout.setSpacing(S.px(12))
         self.setLayout(layout)
 
-        # App icon
         self._create_icon(layout)
 
-        # App title
         title = QLabel("System Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.DemiBold))
-        if theme_manager.current_theme == "heimdal":
-            title.setStyleSheet("color: #E8ECFF; background: transparent;")
-        else:
-            title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+        title.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.DemiBold))
+        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         title.setCursor(Qt.CursorShape.SizeAllCursor)
         layout.addWidget(title)
 
-        # Draggable spacer
         spacer = QWidget()
         spacer.setCursor(Qt.CursorShape.SizeAllCursor)
         layout.addWidget(spacer, stretch=1)
 
-        # Search placeholder (optional, styled but non-functional)
-        if theme_manager.current_theme == "heimdal":
-            search = QLabel("Search...")
-            search.setFont(QFont("Segoe UI", S.font_pt(11)))
-            search.setStyleSheet("""
-                color: #525A7A;
-                background: rgba(30, 35, 64, 0.6);
-                border: 1px solid rgba(74, 108, 247, 0.15);
-                border-radius: 8px;
-                padding: 8px 16px;
-            """)
-            search.setFixedHeight(32)
-            search.setMinimumWidth(200)
-            layout.addWidget(search)
-
-        # Window control buttons
         self._create_window_controls(layout)
 
     def _create_icon(self, layout):
-        """Create app icon"""
         icon_container = QFrame()
-        icon_container.setFixedSize(S.px(36), S.px(36))
+        icon_container.setMinimumSize(S.px(32), S.px(32))
+        icon_container.setMaximumSize(S.px(40), S.px(40))
+        icon_container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
-        if theme_manager.current_theme == "heimdal":
-            icon_container.setStyleSheet(f"""
-                background-color: #4A6CF7;
-                border-radius: {S.px(8)}px;
-            """)
-        else:
-            icon_container.setStyleSheet(f"""
-                background-color: {theme_manager.colors.ACCENT_GREEN};
-                border-radius: {S.px(8)}px;
-            """)
+        accent = theme_manager.colors.ACCENT_GREEN
+        icon_container.setStyleSheet(f"""
+            background-color: {accent};
+            border-radius: {S.px(8)}px;
+        """)
 
         icon_layout = QVBoxLayout()
         icon_layout.setContentsMargins(0, 0, 0, 0)
         icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_container.setLayout(icon_layout)
 
-        # Use SM text for icon
         icon_label = QLabel("SM")
-        icon_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        icon_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         icon_label.setStyleSheet("color: white;")
         icon_layout.addWidget(icon_label)
 
         layout.addWidget(icon_container)
 
     def _create_window_controls(self, layout):
-        """Create window control buttons"""
         colors = theme_manager.colors
+        is_heimdal = theme_manager.current_theme == "heimdal"
 
-        # Minimize button
-        min_btn = QPushButton()
-        min_btn.setFixedSize(S.px(40), S.px(32))
-        min_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        min_btn.setText("─")
-        min_btn.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Medium))
+        for text, slot, is_close in [
+            ("─", self._minimize_window, False),
+            ("□", self._toggle_maximize, False),
+            ("✕", self._close_window, True),
+        ]:
+            btn = QPushButton()
+            btn.setFixedSize(S.px(36), S.px(28))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setText(text)
+            btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
 
-        if theme_manager.current_theme == "heimdal":
-            min_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: transparent;
-                    color: #8A92B2;
-                    border: none;
-                    border-radius: 6px;
-                }
-                QPushButton:hover {
-                    background-color: #252A47;
-                    color: #E8ECFF;
-                }
-            """)
-        else:
-            min_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {colors.TEXT_MUTED};
-                    border: none;
-                    border-radius: {S.px(6)}px;
-                }}
-                QPushButton:hover {{
-                    background-color: {colors.BG_HOVER};
-                    color: {colors.TEXT_PRIMARY};
-                }}
-            """)
-        min_btn.clicked.connect(self._minimize_window)
-        layout.addWidget(min_btn)
-
-        # Maximize/Restore button
-        max_btn = QPushButton()
-        max_btn.setFixedSize(S.px(40), S.px(32))
-        max_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        max_btn.setText("□")
-        max_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
-
-        if theme_manager.current_theme == "heimdal":
-            max_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: transparent;
-                    color: #8A92B2;
-                    border: none;
-                    border-radius: 6px;
-                }
-                QPushButton:hover {
-                    background-color: #252A47;
-                    color: #E8ECFF;
-                }
-            """)
-        else:
-            max_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {colors.TEXT_MUTED};
-                    border: none;
-                    border-radius: {S.px(6)}px;
-                }}
-                QPushButton:hover {{
-                    background-color: {colors.BG_HOVER};
-                    color: {colors.TEXT_PRIMARY};
-                }}
-            """)
-        max_btn.clicked.connect(self._toggle_maximize)
-        self._max_btn = max_btn
-        layout.addWidget(max_btn)
-
-        # Close button
-        close_btn = QPushButton()
-        close_btn.setFixedSize(S.px(40), S.px(32))
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setText("✕")
-        close_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #8A92B2;
-                border: none;
-                border-radius: 6px;
-            }
-            QPushButton:hover {
-                background-color: #FF4757;
-                color: white;
-            }
-        """)
-        close_btn.clicked.connect(self._close_window)
-        self._close_btn = close_btn
-        layout.addWidget(close_btn)
+            if is_close:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        color: #8A92B2;
+                        border: none;
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: #FF4757;
+                        color: white;
+                    }
+                """)
+            elif is_heimdal:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        color: #8A92B2;
+                        border: none;
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: #252A47;
+                        color: #E8ECFF;
+                    }
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: transparent;
+                        color: {colors.TEXT_MUTED};
+                        border: none;
+                        border-radius: {S.px(6)}px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {colors.BG_HOVER};
+                        color: {colors.TEXT_PRIMARY};
+                    }}
+                """)
+            btn.clicked.connect(slot)
+            layout.addWidget(btn)
+            if "□" in text or "❐" in text:
+                self._max_btn = btn
 
     def _minimize_window(self):
         if self._parent:
@@ -522,7 +371,7 @@ class TopHeader(QWidget, ScaleMixin):
 
 
 class MainWindow(QMainWindow, ScaleMixin):
-    """Main application window - professional enterprise design"""
+    """Main application window - responsive enterprise design with overlay support"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -531,9 +380,11 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._pending_scale_update = False
         self._view_cache = {}
         self._active_view = None
+        self._overlay_mode = False
+        self._overlay_widget = None
         self._resize_debounce_timer = QTimer()
         self._resize_debounce_timer.setSingleShot(True)
-        self._resize_debounce_timer.timeout.connect(self._update_resize_corner)
+        self._resize_debounce_timer.timeout.connect(self._on_debounced_resize)
 
         self.scale_connect()
         theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -541,11 +392,9 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._preload_overview()
 
     def _preload_overview(self):
-        """Preload the default overview view"""
         self._get_view("overview")
 
     def _get_view(self, view_name: str) -> QWidget:
-        """Get or create a view lazily"""
         if view_name not in self._view_cache:
             from views.overview_page import OverviewPage
             from views.cpu import CPUView
@@ -579,15 +428,24 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._pending_scale_update = True
         QTimer.singleShot(100, self._debounced_setup_ui)
 
+    def on_layout_mode_changed(self, mode):
+        if self._in_drag_resize:
+            return
+        if mode == LayoutMode.COMPACT:
+            if hasattr(self, '_sidebar') and not self._sidebar._collapsed:
+                self._sidebar._toggle_collapse()
+        else:
+            if hasattr(self, '_sidebar') and self._sidebar._collapsed:
+                self._sidebar._toggle_collapse()
+        self._debounced_setup_ui()
+
     def _debounced_setup_ui(self):
         if not self._in_drag_resize:
             self._setup_ui()
             self.update()
 
     def _on_theme_changed(self, theme_name: str):
-        """Handle theme change - rebuild UI"""
         try:
-            # Apply global stylesheet to update all widgets
             self.setStyleSheet(theme_manager.get_stylesheet())
             if hasattr(self, '_top_header'):
                 self._top_header._setup_ui()
@@ -597,7 +455,6 @@ class MainWindow(QMainWindow, ScaleMixin):
                     item._apply_style()
             if hasattr(self, '_resize_corner'):
                 self._resize_corner._on_theme_changed(theme_name)
-            # Update all cached views so they repaint with new theme colors
             if hasattr(self, '_view_cache'):
                 for view in self._view_cache.values():
                     view.update()
@@ -605,43 +462,44 @@ class MainWindow(QMainWindow, ScaleMixin):
             print(f"Theme change error: {e}")
 
     def _setup_ui(self):
-        """Setup window UI"""
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-
         self.setWindowTitle("System Monitor")
-        self.setGeometry(100, 100, 1400, 900)
-        self.setMinimumSize(900, 600)
+
+        screen = self.screen()
+        if screen:
+            geom = screen.availableGeometry()
+            self.setGeometry(geom.x() + 50, geom.y() + 50,
+                           min(1400, geom.width() - 100),
+                           min(900, geom.height() - 100))
+        else:
+            self.setGeometry(100, 100, 1400, 900)
+
+        self.setMinimumSize(S.px(700), S.px(500))
 
         colors = theme_manager.colors
 
-        # Central widget
         central = QWidget()
         self.setCentralWidget(central)
 
-        # Main layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         central.setLayout(main_layout)
 
-        # Top header bar (56px)
         self._top_header = TopHeader(self)
         main_layout.addWidget(self._top_header)
 
-        # Content area
         content_layout = QHBoxLayout()
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
         main_layout.addLayout(content_layout)
 
-        # Sidebar (collapsible)
         self._sidebar = self._create_sidebar()
         content_layout.addWidget(self._sidebar)
 
-        # Content area
         self._content = QStackedWidget()
+        self._content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        # Apply stylesheet to content area based on theme
         if theme_manager.current_theme == "heimdal":
             self._content.setStyleSheet(f"""
                 QStackedWidget {{
@@ -657,12 +515,10 @@ class MainWindow(QMainWindow, ScaleMixin):
             """)
         content_layout.addWidget(self._content, stretch=1)
 
-        # Load overview as default
         overview = self._get_view("overview")
         self._content.setCurrentWidget(overview)
         self._active_view = "overview"
 
-        # Resize corner in bottom-right
         self._resize_corner = ResizeCorner(self)
         self._update_resize_corner_position()
 
@@ -671,26 +527,48 @@ class MainWindow(QMainWindow, ScaleMixin):
             self._resize_corner.move(self.width() - 16, self.height() - 16)
 
     def _create_sidebar(self):
-        """Create sidebar navigation using premium glass sidebar widget"""
         sidebar = GlassSidebar()
         sidebar.view_selected.connect(self._switch_view)
+        if S.is_compact():
+            sidebar._collapsed = True
+            sidebar.setFixedWidth(S.px(64))
         return sidebar
 
     def _switch_view(self, view_name: str):
-        """Switch to different view - lazy loading"""
         view = self._get_view(view_name)
         self._content.setCurrentWidget(view)
         self._active_view = view_name
         log_info(LogCategory.UI, f"Switched to view: {view_name}")
 
     def update_data(self, data: dict):
-        """Update all active views with new data"""
+        if self._overlay_mode and self._overlay_widget:
+            self._overlay_widget.update_data(data)
+            return
+
         if self._active_view and self._active_view in self._view_cache:
             view = self._view_cache[self._active_view]
             if hasattr(view, 'update_data'):
                 view.update_data(data)
-        elif hasattr(self, '_overview_page'):
-            self._overview_page.update_data(data)
+
+    def toggle_overlay_mode(self):
+        if self._overlay_mode:
+            self._exit_overlay_mode()
+        else:
+            self._enter_overlay_mode()
+
+    def _enter_overlay_mode(self):
+        self._overlay_mode = True
+        self._overlay_widget = OverlayWidget()
+        self._overlay_widget.show()
+        self.hide()
+
+    def _exit_overlay_mode(self):
+        self._overlay_mode = False
+        if self._overlay_widget:
+            self._overlay_widget.close()
+            self._overlay_widget = None
+        self.showNormal()
+        self.activateWindow()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and event.globalY() < self._top_header.height():
@@ -718,8 +596,61 @@ class MainWindow(QMainWindow, ScaleMixin):
         super().resizeEvent(event)
         if not getattr(self, '_resize_debounce_active', False):
             self._resize_debounce_active = True
-            QTimer.singleShot(16, self._update_resize_corner)
+            QTimer.singleShot(16, self._on_debounced_resize)
 
-    def _update_resize_corner(self):
+    def _on_debounced_resize(self):
         self._resize_debounce_active = False
         self._update_resize_corner_position()
+
+
+class ResizeCorner(QWidget, ScaleMixin):
+    """Custom resize grip in bottom-right corner"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._parent = parent
+        self.setMinimumSize(S.px(16), S.px(16))
+        self.setMaximumSize(S.px(24), S.px(24))
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self._start_geometry = None
+        self._start_pos = None
+        self.scale_connect()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def on_scale_changed(self, factor: float):
+        self.update()
+
+    def _on_theme_changed(self, theme_name: str):
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        colors = theme_manager.colors
+        painter.setPen(QPen(QColor(colors.BORDER), 1))
+        h = self.height()
+        w = self.width()
+        for i in range(2):
+            painter.drawLine(w - 4 - i * 4, h, w, h - 4 - i * 4)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._start_geometry = self._parent.geometry()
+            self._start_pos = event.globalPos()
+            self._parent._in_drag_resize = True
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton and self._start_geometry:
+            delta = event.globalPos() - self._start_pos
+            new_width = max(self._parent.minimumWidth(), self._start_geometry.width() + delta.x())
+            new_height = max(self._parent.minimumHeight(), self._start_geometry.height() + delta.y())
+            self._parent.resize(int(new_width), int(new_height))
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._start_geometry = None
+            self._start_pos = None
+            self._parent._in_drag_resize = False
+            event.accept()

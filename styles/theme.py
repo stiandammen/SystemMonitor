@@ -598,13 +598,17 @@ class ThemeManager(QObject):
         self.set_theme(new_theme)
 
     def get_stylesheet(self) -> str:
-        """Generate global stylesheet based on current theme"""
+        """Generate responsive global stylesheet based on current theme"""
         c = self._colors
+        accent_dim = getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.15)')
+        glass_bg = getattr(c, 'GLASS_BG', 'rgba(13, 17, 23, 0.6)')
+        glass_border = getattr(c, 'GLASS_BORDER', 'rgba(48, 54, 61, 0.6)')
+
         return f"""
         QMainWindow {{
             background-color: {c.BG_PRIMARY};
             color: {c.TEXT_PRIMARY};
-            border: 1px solid {c.BORDER};
+            border: none;
         }}
 
         QWidget {{
@@ -625,13 +629,13 @@ class ThemeManager(QObject):
         }}
 
         QPushButton {{
-            background-color: {c.ACCENT_GREEN_DIM};
+            background-color: {accent_dim};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-family: "Segoe UI", sans-serif;
-            font-size: 13px;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-family: "Segoe UI", "Inter", sans-serif;
+            font-size: 12px;
         }}
 
         QPushButton:hover {{
@@ -640,9 +644,9 @@ class ThemeManager(QObject):
         }}
 
         QPushButton:pressed {{
-            background-color: {c.ACCENT_GREEN_BRIGHT};
+            background-color: {getattr(c, 'ACCENT_GREEN_BRIGHT', '#34d399')};
             color: #ffffff;
-            border-color: {c.ACCENT_GREEN_BRIGHT};
+            border-color: {getattr(c, 'ACCENT_GREEN_BRIGHT', '#34d399')};
         }}
 
         QPushButton:disabled {{
@@ -652,13 +656,13 @@ class ThemeManager(QObject):
         }}
 
         QLineEdit {{
-            background-color: {c.GLASS_BG};
+            background-color: {glass_bg};
             color: {c.TEXT_PRIMARY};
-            border: 1px solid {c.BORDER};
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-family: "Segoe UI", sans-serif;
-            font-size: 13px;
+            border: 1px solid {glass_border};
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: "Segoe UI", "Inter", sans-serif;
+            font-size: 12px;
         }}
 
         QLineEdit:focus {{
@@ -666,13 +670,13 @@ class ThemeManager(QObject):
         }}
 
         QComboBox {{
-            background-color: {c.GLASS_BG};
+            background-color: {glass_bg};
             color: {c.TEXT_PRIMARY};
-            border: 1px solid {c.BORDER};
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-family: "Segoe UI", sans-serif;
-            font-size: 13px;
+            border: 1px solid {glass_border};
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: "Segoe UI", "Inter", sans-serif;
+            font-size: 12px;
         }}
 
         QComboBox:hover {{
@@ -681,26 +685,32 @@ class ThemeManager(QObject):
 
         QComboBox::drop-down {{
             border: none;
-            width: 24px;
+            width: 20px;
         }}
 
         QComboBox QAbstractItemView {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 8px;
+            border-radius: 6px;
             selection-background-color: {c.BG_HOVER};
+        }}
+
+        QScrollArea {{
+            background-color: transparent;
+            border: none;
         }}
 
         QScrollBar:vertical {{
             background-color: {c.BG_SECONDARY};
-            width: 8px;
-            border-radius: 4px;
+            width: 6px;
+            border-radius: 3px;
+            margin: 0px;
         }}
 
         QScrollBar::handle:vertical {{
             background-color: rgba(74, 108, 247, 0.3);
-            border-radius: 4px;
+            border-radius: 3px;
             min-height: 30px;
         }}
 
@@ -715,13 +725,14 @@ class ThemeManager(QObject):
 
         QScrollBar:horizontal {{
             background-color: {c.BG_SECONDARY};
-            height: 8px;
-            border-radius: 4px;
+            height: 6px;
+            border-radius: 3px;
+            margin: 0px;
         }}
 
         QScrollBar::handle:horizontal {{
             background-color: rgba(74, 108, 247, 0.3);
-            border-radius: 4px;
+            border-radius: 3px;
             min-width: 30px;
         }}
 
@@ -738,12 +749,12 @@ class ThemeManager(QObject):
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 12px;
+            border-radius: 8px;
             gridline-color: {c.BORDER};
         }}
 
         QTableWidget::item {{
-            padding: 12px;
+            padding: 10px;
             border-bottom: 1px solid {c.BORDER};
         }}
 
@@ -759,13 +770,12 @@ class ThemeManager(QObject):
         QHeaderView::section {{
             background-color: {c.BG_PRIMARY};
             color: {c.TEXT_SECONDARY};
-            padding: 12px;
+            padding: 10px;
             border: none;
             border-bottom: 2px solid {c.BORDER};
             font-weight: 600;
             font-size: 11px;
             letter-spacing: 0.5px;
-            text-transform: uppercase;
         }}
 
         QHeaderView::section:hover {{
@@ -774,14 +784,14 @@ class ThemeManager(QObject):
 
         QTabWidget::pane {{
             border: 1px solid {c.BORDER};
-            border-radius: 12px;
+            border-radius: 8px;
             background-color: {c.BG_CARD};
         }}
 
         QTabBar::tab {{
             background-color: {c.BG_SECONDARY};
             color: {c.TEXT_SECONDARY};
-            padding: 12px 24px;
+            padding: 10px 20px;
             border: none;
             border-bottom: 2px solid transparent;
         }}
@@ -799,22 +809,33 @@ class ThemeManager(QObject):
         QProgressBar {{
             background-color: {c.BG_SECONDARY};
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             text-align: center;
             color: {c.TEXT_PRIMARY};
         }}
 
         QProgressBar::chunk {{
             background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c.ACCENT_GREEN}, stop:1 {c.ACCENT_PURPLE});
-            border-radius: 6px;
+            border-radius: 4px;
         }}
 
         QToolTip {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 8px;
-            padding: 10px;
+            border-radius: 6px;
+            padding: 8px;
+            font-family: "Segoe UI", sans-serif;
+        }}
+
+        QSplitter::handle {{
+            background-color: {c.BORDER};
+            width: 2px;
+            height: 2px;
+        }}
+
+        QSplitter::handle:hover {{
+            background-color: {c.ACCENT_GREEN};
         }}
         """
 

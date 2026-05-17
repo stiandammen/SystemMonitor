@@ -2,14 +2,15 @@
 Sparkline Widget - Mini line charts with gradient fill
 """
 from collections import deque
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QSizePolicy
 from PyQt6.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient
 from PyQt6.QtCore import Qt, QSize
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
-class SparklineWidget(QWidget):
+class SparklineWidget(QWidget, ScaleMixin):
     """
     Mini sparkline chart widget.
     Supports single or multi-line display with gradient fill.
@@ -26,8 +27,10 @@ class SparklineWidget(QWidget):
         self._fixed_min = 0.0
         self._pending_update = False
 
-        self.setFixedHeight(50)
-        self.setMinimumWidth(100)
+        self.scale_connect()
+        self.setMinimumHeight(S.px(50))
+        self.setMinimumWidth(S.px(100))
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         # Throttle updates to ~30fps max
@@ -172,4 +175,4 @@ class SparklineWidget(QWidget):
         painter.end()
 
     def sizeHint(self):
-        return QSize(100, 50)
+        return QSize(S.px(100), S.px(50))

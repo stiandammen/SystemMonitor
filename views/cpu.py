@@ -21,7 +21,7 @@ def c():
     return theme_manager.colors
 
 
-class CpuGraphWidget(QWidget):
+class CpuGraphWidget(QWidget, ScaleMixin):
     """Individual CPU core graph that adapts to container size - optimized with throttled repaints"""
 
     def __init__(self, core_index: int = 0, parent=None):
@@ -32,8 +32,9 @@ class CpuGraphWidget(QWidget):
         self._display_value = 0.0
         self._pending_update = False
 
+        self.scale_connect()
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumSize(100, 80)
+        self.setMinimumSize(S.px(100), S.px(80))
 
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
@@ -69,16 +70,16 @@ class CpuGraphWidget(QWidget):
             painter.end()
             return
 
-        pad = 8
+        pad = S.px(8)
         graph_w = w - pad * 2
-        graph_h = h - pad * 2 - 20
+        graph_h = h - pad * 2 - S.px(20)
 
         painter.setBrush(QColor(colors.BG_CARD))
         painter.setPen(QPen(QColor(colors.BORDER), 0))  # No border
-        painter.drawRoundedRect(0, 0, int(w), int(h), 8, 8)
+        painter.drawRoundedRect(0, 0, int(w), int(h), S.px(8), S.px(8))
 
         if not self._history:
-            painter.setFont(QFont("Segoe UI", 8))
+            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
             painter.setPen(QColor(colors.TEXT_MUTED))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Loading...")
             painter.end()
@@ -116,18 +117,18 @@ class CpuGraphWidget(QWidget):
             if len(qpoints) >= 3:
                 painter.drawPolygon(*qpoints)
 
-            painter.setPen(QPen(line_color, 1.5, Qt.PenStyle.SolidLine))
+            painter.setPen(QPen(line_color, S.fpx(1.5), Qt.PenStyle.SolidLine))
             for i in range(len(points) - 1):
                 painter.drawLine(int(points[i][0]), int(points[i][1]),
                                int(points[i + 1][0]), int(points[i + 1][1]))
 
-        painter.setFont(QFont("Segoe UI", 8))
+        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_SECONDARY))
-        painter.drawText(pad + 4, pad + 12, f"Core {self._core_index}")
+        painter.drawText(pad + S.px(4), pad + S.px(12), f"Core {self._core_index}")
 
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        painter.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
-        painter.drawText(w - pad - 40, pad + 12, f"{current:.0f}%")
+        painter.drawText(w - pad - S.px(40), pad + S.px(12), f"{current:.0f}%")
 
         painter.end()
 
@@ -197,7 +198,7 @@ class CPUView(QWidget, ScaleMixin):
                 usage_color = colors.ACCENT_BLUE
 
             if hasattr(self, '_usage_indicator'):
-                self._usage_indicator.setStyleSheet(f"color: {usage_color}; font-size: 18px; font-weight: bold; background: transparent;")
+                self._usage_indicator.setStyleSheet(f"color: {usage_color}; font-size: {S.font_pt(18)}px; font-weight: bold; background: transparent;")
                 self._usage_indicator.setText(f"{total_usage:.0f}%")
 
             for i, usage in enumerate(per_core if isinstance(per_core, list) else []):
@@ -211,8 +212,8 @@ class CPUView(QWidget, ScaleMixin):
         colors = c()
 
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 16, 20, 16)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
+        main_layout.setSpacing(S.px(16))
         self.setLayout(main_layout)
 
         header = self._create_header()
@@ -228,25 +229,27 @@ class CPUView(QWidget, ScaleMixin):
         colors = c()
 
         header = QFrame()
-        header.setFixedHeight(50)
+        header.setMinimumHeight(S.px(50))
+        header.setMaximumHeight(S.px(60))
+        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         header.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_CARD};
                 border: none;
-                border-radius: 10px;
+                border-radius: {S.px(10)}px;
             }}
         """)
         layout = QHBoxLayout()
-        layout.setContentsMargins(16, 0, 16, 0)
+        layout.setContentsMargins(S.px(16), 0, S.px(16), 0)
         header.setLayout(layout)
 
         title = QLabel("CPU Monitor")
-        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self._usage_indicator = QLabel("0%")
-        self._usage_indicator.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self._usage_indicator.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
         self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_BLUE}; background: transparent;")
         layout.addWidget(self._usage_indicator)
 
@@ -265,18 +268,18 @@ class CPUView(QWidget, ScaleMixin):
             }}
         """)
         layout = QVBoxLayout()
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(S.px(12), S.px(10), S.px(12), S.px(10))
+        layout.setSpacing(S.px(10))
         section.setLayout(layout)
 
         title = QLabel("Per-Core Usage")
-        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(title)
 
         grid_container = QWidget()
         self._graphs_grid = QGridLayout()
-        self._graphs_grid.setSpacing(8)
+        self._graphs_grid.setSpacing(S.px(8))
         self._graphs_grid.setContentsMargins(0, 0, 0, 0)
         grid_container.setLayout(self._graphs_grid)
 

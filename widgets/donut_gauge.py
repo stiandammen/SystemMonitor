@@ -1,14 +1,15 @@
 """
 DonutGauge Widget - Circular progress indicator
 """
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QSizePolicy
 from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush, QConicalGradient
 from PyQt6.QtCore import Qt, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
 
 from styles.theme import theme_manager
+from scaler import S, ScaleMixin
 
 
-class DonutGauge(QWidget):
+class DonutGauge(QWidget, ScaleMixin):
     """
     Donut gauge widget with animated value display
     """
@@ -21,7 +22,10 @@ class DonutGauge(QWidget):
         self._value = 0.0
         self._animated_value = 0.0
 
-        self.setFixedSize(size, size)
+        self.scale_connect()
+        self.setMinimumSize(S.px(size), S.px(size))
+        self.setMaximumSize(S.px(size * 2), S.px(size * 2))
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._setup_animation()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -70,10 +74,16 @@ class DonutGauge(QWidget):
 
         colors = theme_manager.colors
 
+        # Use actual widget size for responsive rendering
+        size = min(self.width(), self.height())
+        if size <= 0:
+            painter.end()
+            return
+
         # Geometry
-        margin = 8
-        rect = QRectF(margin, margin, self._size - 2 * margin, self._size - 2 * margin)
-        pen_width = 10
+        margin = S.px(8)
+        rect = QRectF(margin, margin, size - 2 * margin, size - 2 * margin)
+        pen_width = S.px(10)
 
         # Background circle (full arc)
         painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -81,14 +91,14 @@ class DonutGauge(QWidget):
         bg_pen.setWidth(pen_width)
         bg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(bg_pen)
-        painter.drawArc(int(margin), int(margin), int(self._size - 2 * margin), int(self._size - 2 * margin), 225 * 16, -270 * 16)
+        painter.drawArc(int(margin), int(margin), int(size - 2 * margin), int(size - 2 * margin), 225 * 16, -270 * 16)
 
         # Progress arc with gradient
         progress = self._animated_value / 100.0
         angle = int(progress * 270)
 
-        cx = self._size / 2
-        cy = self._size / 2
+        cx = size / 2
+        cy = size / 2
 
         # Check if theme is heimdal for gradient, otherwise use solid color
         if theme_manager.current_theme == "heimdal":
@@ -102,32 +112,32 @@ class DonutGauge(QWidget):
         progress_pen.setWidth(pen_width)
         progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(progress_pen)
-        painter.drawArc(int(margin), int(margin), int(self._size - 2 * margin), int(self._size - 2 * margin), 225 * 16, -angle * 16)
+        painter.drawArc(int(margin), int(margin), int(size - 2 * margin), int(size - 2 * margin), 225 * 16, -angle * 16)
 
         # Center text - value
-        center_x = self._size / 2
-        center_y = self._size / 2
+        center_x = size / 2
+        center_y = size / 2
 
-        painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        painter.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
         value_text = f"{self._animated_value:.0f}%"
         fm = painter.fontMetrics()
         text_width = fm.horizontalAdvance(value_text)
         # Center text vertically with padding to avoid truncation
-        text_y = int(center_y + 6)
+        text_y = int(center_y + S.px(6))
         painter.drawText(int(center_x - text_width / 2), text_y, value_text)
 
         # Label text (positioned below value)
         if self._label:
-            painter.setFont(QFont("Segoe UI", 9))
+            painter.setFont(QFont("Segoe UI", S.font_pt(9)))
             painter.setPen(QColor(colors.TEXT_MUTED))
             label_width = fm.horizontalAdvance(self._label)
             # Position label below value, not overlapping
-            label_y = int(center_y + 26)
+            label_y = int(center_y + S.px(26))
             painter.drawText(int(center_x - label_width / 2), label_y, self._label)
 
         painter.end()
 
     def sizeHint(self):
         from PyQt6.QtCore import QSize
-        return QSize(self._size, self._size)
+        return QSize(S.px(self._size), S.px(self._size))

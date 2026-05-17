@@ -22,7 +22,7 @@ def c():
     return theme_manager.colors
 
 
-class MemoryKpiCard(QFrame):
+class MemoryKpiCard(QFrame, ScaleMixin):
     """Premium KPI stat card for memory metrics"""
     def __init__(self, title: str, icon: str, accent: str, parent=None):
         super().__init__(parent)
@@ -31,6 +31,7 @@ class MemoryKpiCard(QFrame):
         self._accent = accent
         self._value = "--"
         self._unit = ""
+        self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -94,15 +95,16 @@ class MemoryKpiCard(QFrame):
         self._unit_label.setText(unit)
 
 
-class MemoryDonutChart(QWidget):
+class MemoryDonutChart(QWidget, ScaleMixin):
     """Donut chart showing memory distribution"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self._used_pct = 0
         self._cached_pct = 0
         self._available_pct = 0
-        self.setMinimumSize(160, 160)
-        self.setMaximumSize(180, 180)
+        self.scale_connect()
+        self.setMinimumSize(S.px(160), S.px(160))
+        self.setMaximumSize(S.px(200), S.px(200))
         theme_manager.theme_changed.connect(lambda _: self.update())
 
     def set_values(self, used: float, cached: float, available: float):
@@ -158,20 +160,21 @@ class MemoryDonutChart(QWidget):
 
         # Center text
         total_mem = getattr(psutil.virtual_memory(), 'total', 0) / (1024**3)
-        painter.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        painter.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
-        painter.drawText(int(center - 25), int(center + 5), f"{total_mem:.0f} GB")
+        painter.drawText(int(center - S.px(25)), int(center + S.px(5)), f"{total_mem:.0f} GB")
 
         painter.end()
 
 
-class MemoryPressureGraph(QWidget):
+class MemoryPressureGraph(QWidget, ScaleMixin):
     """Real-time memory pressure graph"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self._history = []
         self._max_points = 60
-        self.setMinimumHeight(120)
+        self.scale_connect()
+        self.setMinimumHeight(S.px(120))
 
     def add_value(self, value: float):
         self._history.append(value)
@@ -211,12 +214,12 @@ class MemoryPressureGraph(QWidget):
         painter.drawRect(0, int(zone_h * 1.4), w, int(zone_h * 2.6))
 
         # Zone labels
-        painter.setFont(QFont("Segoe UI", 7))
+        painter.setFont(QFont("Segoe UI", S.font_pt(7)))
         painter.setPen(QColor(colors.TEXT_MUTED))
-        painter.drawText(4, 10, "90-100%")
-        painter.drawText(4, int(zone_h * 0.4 + 10), "70-90%")
-        painter.drawText(4, int(zone_h * 0.8 + 10), "40-70%")
-        painter.drawText(4, int(zone_h * 1.4 + 10), "0-40%")
+        painter.drawText(S.px(4), S.px(10), "90-100%")
+        painter.drawText(S.px(4), int(zone_h * 0.4 + S.px(10)), "70-90%")
+        painter.drawText(S.px(4), int(zone_h * 0.8 + S.px(10)), "40-70%")
+        painter.drawText(S.px(4), int(zone_h * 1.4 + S.px(10)), "0-40%")
 
         # Grid lines
         painter.setPen(QPen(QColor(colors.BORDER), 1, Qt.PenStyle.DotLine))
@@ -254,13 +257,14 @@ class MemoryPressureGraph(QWidget):
         painter.end()
 
 
-class MemoryUsageGraph(QWidget):
+class MemoryUsageGraph(QWidget, ScaleMixin):
     """Modern real-time memory usage line graph with smooth rendering"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self._history = []
         self._max_points = 60
-        self.setMinimumHeight(140)
+        self.scale_connect()
+        self.setMinimumHeight(S.px(140))
 
     def add_value(self, value: float):
         self._history.append(value)
@@ -297,7 +301,7 @@ class MemoryUsageGraph(QWidget):
         painter.drawRect(int(graph_x), int(graph_y), int(graph_w), int(graph_h))
 
         # Grid lines and labels
-        painter.setFont(QFont("Segoe UI", 8))
+        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_MUTED))
 
         # Horizontal grid (0%, 25%, 50%, 75%, 100%)
@@ -382,38 +386,38 @@ class MemoryUsageGraph(QWidget):
                 badge_color = colors.ACCENT_GREEN
 
             # Badge background (positioned top-right, away from graph content)
-            badge_x = w - 65
-            badge_y = 8
+            badge_x = w - S.px(65)
+            badge_y = S.px(8)
             painter.setBrush(QColor(colors.BG_SECONDARY))
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(int(badge_x), int(badge_y), 55, 22, 4, 4)
+            painter.drawRoundedRect(int(badge_x), int(badge_y), S.px(55), S.px(22), S.px(4), S.px(4))
 
             # Badge text
-            painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            painter.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
             painter.setPen(QColor(badge_color))
-            painter.drawText(int(badge_x + 8), int(badge_y + 15), f"{val:.1f}%")
+            painter.drawText(int(badge_x + S.px(8)), int(badge_y + S.px(15)), f"{val:.1f}%")
 
         # Time indicator (positioned to avoid overlapping with badge)
-        painter.setFont(QFont("Segoe UI", 8))
+        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_MUTED))
-        painter.drawText(int(graph_x), int(h - 5), "60s ago")
+        painter.drawText(int(graph_x), int(h - S.px(5)), "60s ago")
         # Position "now" text with padding from right edge
-        now_x = int(graph_x + graph_w - 35)
-        painter.drawText(now_x, int(h - 5), "now")
+        now_x = int(graph_x + graph_w - S.px(35))
+        painter.drawText(now_x, int(h - S.px(5)), "now")
 
         # Y-axis label (rotated)
         painter.save()
-        painter.translate(12, h / 2)
+        painter.translate(S.px(12), h / 2)
         painter.rotate(-90)
-        painter.setFont(QFont("Segoe UI", 8))
+        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_MUTED))
-        painter.drawText(-15, 0, "Usage %")
+        painter.drawText(-S.px(15), 0, "Usage %")
         painter.restore()
 
         painter.end()
 
 
-class ProcessRow(QFrame):
+class ProcessRow(QFrame, ScaleMixin):
     """Single process memory consumption row"""
     killed = None  # Class variable for callback
 
@@ -423,6 +427,7 @@ class ProcessRow(QFrame):
         self._pid = None
         self._memory_mb = memory_mb
         self._percent = percent
+        self.scale_connect()
         self._setup_ui()
         self.update_values(name, memory_mb, percent, rank)
 
@@ -449,7 +454,7 @@ class ProcessRow(QFrame):
         self._rank_lbl = QLabel()
         self._rank_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
         self._rank_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        self._rank_lbl.setFixedWidth(22)
+        self._rank_lbl.setMinimumWidth(S.px(22))
         layout.addWidget(self._rank_lbl)
 
         self._name_lbl = QLabel()
@@ -602,7 +607,8 @@ class MemoryView(QWidget, ScaleMixin):
 
         # ===== HEADER BAR =====
         header = QFrame()
-        header.setFixedHeight(S.px(48))
+        header.setMinimumHeight(S.px(48))
+        header.setMaximumHeight(S.px(58))
         header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         header.setStyleSheet(f"""
             QFrame {{
@@ -721,7 +727,7 @@ class MemoryView(QWidget, ScaleMixin):
 
         self._view_all_btn = QPushButton("View all")
         self._view_all_btn.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self._view_all_btn.setFixedHeight(S.px(24))
+        self._view_all_btn.setMinimumHeight(S.px(24))
         self._view_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._view_all_btn.clicked.connect(self._show_all_processes)
         self._view_all_btn.setStyleSheet(f"""
@@ -789,7 +795,7 @@ class MemoryView(QWidget, ScaleMixin):
 
         for i in range(10):
             row = ProcessRow(name="--", memory_mb=0, percent=0, rank=i + 1)
-            row.setFixedHeight(S.px(30))
+            row.setMinimumHeight(S.px(30))
             self._process_rows.append(row)
             process_vlayout.addWidget(row)
 
@@ -1033,22 +1039,23 @@ class MemoryView(QWidget, ScaleMixin):
 
         # Title bar
         title_bar = QFrame()
-        title_bar.setFixedHeight(50)
+        title_bar.setMinimumHeight(S.px(50))
+        title_bar.setMaximumHeight(S.px(60))
         title_bar.setStyleSheet(f"background-color: {colors.BG_CARD}; border-bottom: 1px solid {colors.BORDER};")
         title_layout = QHBoxLayout()
         title_layout.setContentsMargins(20, 0, 10, 0)
         title_bar.setLayout(title_layout)
 
         title = QLabel("All Processes by Memory")
-        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         title_layout.addWidget(title)
 
         title_layout.addStretch()
 
         close_btn = QPushButton("X")
-        close_btn.setFixedSize(36, 36)
-        close_btn.setFont(QFont("Segoe UI", 12))
+        close_btn.setFixedSize(S.px(36), S.px(36))
+        close_btn.setFont(QFont("Segoe UI", S.font_pt(12)))
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(f"""
             QPushButton {{
@@ -1070,8 +1077,8 @@ class MemoryView(QWidget, ScaleMixin):
         table = QTableWidget()
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels(["Process", "PID", "Memory (MB)", "Memory %", "Status"])
-        table.setFont(QFont("Segoe UI", 10))
-        table.horizontalHeader().setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        table.setFont(QFont("Segoe UI", S.font_pt(10)))
+        table.horizontalHeader().setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)

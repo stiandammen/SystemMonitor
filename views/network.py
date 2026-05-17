@@ -26,7 +26,7 @@ from core.signals import signal_bus
 from widgets.card import Card
 
 
-class MiniSparkline(QWidget):
+class MiniSparkline(QWidget, ScaleMixin):
     """Mini sparkline graph for KPI cards"""
     def __init__(self, color=None, parent=None):
         super().__init__(parent)
@@ -34,8 +34,9 @@ class MiniSparkline(QWidget):
         self._history = deque(maxlen=30)
         self._pending_update = False
 
-        self.setFixedHeight(40)
-        self.setMinimumWidth(80)
+        self.scale_connect()
+        self.setMinimumHeight(S.px(40))
+        self.setMinimumWidth(S.px(80))
 
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
@@ -93,7 +94,7 @@ class MiniSparkline(QWidget):
         painter.end()
 
 
-class KpiCard(QFrame):
+class KpiCard(QFrame, ScaleMixin):
     """Premium KPI stat card with mini graph"""
     def __init__(self, title: str, icon: str, accent: str, unit: str = "", parent=None):
         super().__init__(parent)
@@ -104,6 +105,7 @@ class KpiCard(QFrame):
         self._value = "0"
         self._sub_text = ""
 
+        self.scale_connect()
         self._setup_ui()
         self._apply_theme()
 
@@ -152,7 +154,8 @@ class KpiCard(QFrame):
         value_row.addStretch()
 
         self._sparkline = MiniSparkline(color=self._accent)
-        self._sparkline.setFixedWidth(S.px(80))
+        self._sparkline.setMinimumWidth(S.px(80))
+        self._sparkline.setMaximumWidth(S.px(100))
         value_row.addWidget(self._sparkline)
 
         layout.addLayout(value_row)
@@ -180,7 +183,7 @@ class KpiCard(QFrame):
         self._sparkline.add_point(float(value) if value.replace(".", "").replace(",", "").isdigit() else 0)
 
 
-class NetworkTrafficGraph(QWidget):
+class NetworkTrafficGraph(QWidget, ScaleMixin):
     """Main real-time network traffic graph"""
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -189,7 +192,8 @@ class NetworkTrafficGraph(QWidget):
         self._pending_update = False
         self._max_value = 100.0
 
-        self.setMinimumHeight(200)
+        self.scale_connect()
+        self.setMinimumHeight(S.px(200))
 
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
@@ -224,7 +228,7 @@ class NetworkTrafficGraph(QWidget):
         painter.fillRect(self.rect(), QColor(c.BG_CARD))
 
         # Margins
-        ml, mr, mt, mb = 50, 20, 20, 30
+        ml, mr, mt, mb = S.px(50), S.px(20), S.px(20), S.px(30)
         graph_w = w - ml - mr
         graph_h = h - mt - mb
 
@@ -235,14 +239,14 @@ class NetworkTrafficGraph(QWidget):
             painter.drawLine(int(ml), int(y), int(w - mr), int(y))
 
         # Y-axis labels
-        painter.setFont(QFont("Segoe UI", 8))
+        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(c.TEXT_MUTED))
         for i in range(5):
             val = self._max_value * (4 - i) / 4
             y = mt + graph_h * i / 4
             label = self._format_value(val)
             fm = painter.fontMetrics()
-            painter.drawText(int(ml - fm.horizontalAdvance(label) - 5), int(y + 4), label)
+            painter.drawText(int(ml - fm.horizontalAdvance(label) - S.px(5)), int(y + S.px(4)), label)
 
         # Draw data
         def draw_series(history, color):
@@ -277,15 +281,15 @@ class NetworkTrafficGraph(QWidget):
             draw_series(self._upload_history, c.ACCENT_PURPLE)
 
         # Legend (positioned above bottom edge to avoid truncation)
-        legend_y = h - 20
-        painter.setFont(QFont("Segoe UI", 9))
+        legend_y = h - S.px(20)
+        painter.setFont(QFont("Segoe UI", S.font_pt(9)))
 
         # Download
         painter.setPen(QColor(c.ACCENT_CYAN))
-        painter.drawText(int(w / 2 - 60), legend_y, "▼ Download")
+        painter.drawText(int(w / 2 - S.px(60)), legend_y, "▼ Download")
         # Upload
         painter.setPen(QColor(c.ACCENT_PURPLE))
-        painter.drawText(int(w / 2 + 20), legend_y, "▲ Upload")
+        painter.drawText(int(w / 2 + S.px(20)), legend_y, "▲ Upload")
 
         painter.end()
 
@@ -297,14 +301,16 @@ class NetworkTrafficGraph(QWidget):
         return f"{val:.0f}"
 
 
-class DonutChart(QWidget):
+class DonutChart(QWidget, ScaleMixin):
     """Donut chart for protocol distribution"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data: Dict[str, float] = {}
         self._colors = []
 
-        self.setFixedSize(140, 140)
+        self.scale_connect()
+        self.setMinimumSize(S.px(140), S.px(140))
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._refresh_colors()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -358,13 +364,14 @@ class DonutChart(QWidget):
         painter.end()
 
 
-class AlertCard(QFrame):
+class AlertCard(QFrame, ScaleMixin):
     """Premium alert notification card"""
     def __init__(self, severity: str, message: str, timestamp: str, parent=None):
         super().__init__(parent)
         self._severity = severity
         self._message = message
         self._timestamp = timestamp
+        self.scale_connect()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -404,11 +411,12 @@ class AlertCard(QFrame):
         layout.addWidget(time_label)
 
 
-class InterfaceStatusCard(QFrame):
+class InterfaceStatusCard(QFrame, ScaleMixin):
     """Network interface status card"""
     def __init__(self, name: str, parent=None):
         super().__init__(parent)
         self._name = name
+        self.scale_connect()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -432,10 +440,10 @@ class InterfaceStatusCard(QFrame):
         header.setSpacing(S.px(8))
 
         status_dot = QFrame()
-        status_dot.setFixedSize(8, 8)
+        status_dot.setFixedSize(S.px(8), S.px(8))
         status_dot.setStyleSheet(f"""
             background-color: {c.ACCENT_GREEN};
-            border-radius: 4px;
+            border-radius: {S.px(4)}px;
         """)
         header.addWidget(status_dot)
 
@@ -450,7 +458,7 @@ class InterfaceStatusCard(QFrame):
 
         # Progress bar
         self._progress = QProgressBar()
-        self._progress.setFixedHeight(6)
+        self._progress.setFixedHeight(S.px(6))
         self._progress.setStyleSheet(f"""
             QProgressBar {{
                 background-color: {c.BG_SECONDARY};
@@ -488,10 +496,11 @@ class InterfaceStatusCard(QFrame):
         self._progress.setValue(int(usage))
 
 
-class DeviceRow(QFrame):
+class DeviceRow(QFrame, ScaleMixin):
     """Top device by traffic row with animated bar"""
     def __init__(self, rank: int, ip: str, hostname: str, traffic: str, percentage: float, parent=None):
         super().__init__(parent)
+        self.scale_connect()
         self._setup_ui(rank, ip, hostname, traffic, percentage)
 
     def _setup_ui(self, rank: int, ip: str, hostname: str, traffic: str, percentage: float):
@@ -516,7 +525,7 @@ class DeviceRow(QFrame):
 
         rank_label = QLabel(f"#{rank}")
         rank_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-        rank_label.setFixedWidth(24)
+        rank_label.setMinimumWidth(S.px(24))
         rank_label.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         row.addWidget(rank_label)
 
@@ -534,7 +543,7 @@ class DeviceRow(QFrame):
         traffic_label = QLabel(traffic)
         traffic_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         traffic_label.setStyleSheet(f"color: {c.ACCENT_CYAN}; background: transparent;")
-        traffic_label.setFixedWidth(70)
+        traffic_label.setMinimumWidth(S.px(70))
         traffic_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         row.addWidget(traffic_label)
 
@@ -542,7 +551,7 @@ class DeviceRow(QFrame):
 
         # Progress bar
         bar = QProgressBar()
-        bar.setFixedHeight(4)
+        bar.setFixedHeight(S.px(4))
         bar.setStyleSheet(f"""
             QProgressBar {{
                 background-color: {c.BG_SECONDARY};
@@ -558,11 +567,12 @@ class DeviceRow(QFrame):
         layout.addWidget(bar)
 
 
-class JarvisRadar(QWidget):
+class JarvisRadar(QWidget, ScaleMixin):
     """Premium military-grade radar with authentic professional styling"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(240)
+        self.scale_connect()
+        self.setMinimumHeight(S.px(240))
         self._angle = 0
         self._refresh_colors()
         theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -708,7 +718,7 @@ class JarvisRadar(QWidget):
 
             # Range label
             range_label = f"{int(frac * 100)}%"
-            painter.setFont(QFont("Segoe UI", 6))
+            painter.setFont(QFont("Segoe UI", S.font_pt(6)))
             painter.setPen(QColor(self._grid))
             fm = painter.fontMetrics()
             lw = fm.horizontalAdvance(range_label)
@@ -782,7 +792,7 @@ class JarvisRadar(QWidget):
                 elif deg == 270:
                     label = "W"
 
-                painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+                painter.setFont(QFont("Segoe UI", S.font_pt(7), QFont.Weight.Bold))
                 fm = painter.fontMetrics()
                 lw = fm.horizontalAdvance(label)
 
@@ -976,7 +986,7 @@ class JarvisRadar(QWidget):
 
             # Label
             label = node["id"]
-            painter.setFont(QFont("Segoe UI", 8, QFont.Weight.Medium))
+            painter.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Medium))
             fm = painter.fontMetrics()
             lw = fm.horizontalAdvance(label)
             lh = fm.height()
@@ -1098,14 +1108,14 @@ class JarvisRadar(QWidget):
 
         # Digital bearing readout
         bearing_text = f"{bearing:03.0f}°"
-        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.setFont(QFont("Segoe UI", S.font_pt(7), QFont.Weight.Bold))
         fm = painter.fontMetrics()
         bw = fm.horizontalAdvance(bearing_text)
         painter.setPen(QColor(self._primary))
-        painter.drawText(int(cx - bw/2), int(cy + r + 36), bearing_text)
+        painter.drawText(int(cx - bw/2), int(cy + r + S.px(36)), bearing_text)
 
         # Subtle corner brackets for framing
-        corner_size = 15
+        corner_size = S.px(15)
         corner_alpha = 40
         corner_color = QColor(self._primary)
         corner_color.setAlpha(corner_alpha)
@@ -1144,11 +1154,11 @@ class ConnectionsTable(QTableWidget):
         self.setHorizontalHeaderLabels(["Local IP", "Local Port", "Remote", "Remote Port", "Protocol", "State", "Duration"])
 
         header = self.horizontalHeader()
-        header.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        header.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
 
-        self.setFont(QFont("Segoe UI", 10))
+        self.setFont(QFont("Segoe UI", S.font_pt(10)))
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -1199,7 +1209,7 @@ class ConnectionsTable(QTableWidget):
 
             for col, text in enumerate(items):
                 item = QTableWidgetItem(text)
-                item.setFont(QFont("Segoe UI", 9))
+                item.setFont(QFont("Segoe UI", S.font_pt(9)))
                 self.setItem(row, col, item)
 
 
@@ -1280,7 +1290,7 @@ class NetworkView(QWidget, ScaleMixin):
 
         content_layout.addWidget(left_widget, stretch=2)
 
-        # RIGHT COLUMN - Alerts and interfaces stacked
+        # RIGHT COLUMN - Protocol distribution and top devices
         right_widget = QWidget()
         right_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         right_layout = QVBoxLayout()
@@ -1288,41 +1298,16 @@ class NetworkView(QWidget, ScaleMixin):
         right_layout.setSpacing(S.px(10))
         right_widget.setLayout(right_layout)
 
-        alerts_card = Card(title="Active Alerts", icon="⚠️")
-        alerts_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._alerts_container = QVBoxLayout()
-        self._alerts_container.setSpacing(S.px(6))
-        alerts_widget = QWidget()
-        alerts_widget.setLayout(self._alerts_container)
-        alerts_card.add_widget(alerts_widget)
-        right_layout.addWidget(alerts_card)
-
-        interfaces_card = Card(title="Interface Status", icon="🌐")
-        interfaces_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._interfaces_container = QVBoxLayout()
-        self._interfaces_container.setSpacing(S.px(6))
-        interfaces_widget = QWidget()
-        interfaces_widget.setLayout(self._interfaces_container)
-        interfaces_card.add_widget(interfaces_widget)
-        right_layout.addWidget(interfaces_card, stretch=1)
-
-        content_layout.addWidget(right_widget, stretch=1)
-
-        main_layout.addWidget(content_container, stretch=1)
-
-        # ===== BOTTOM ROW - 3 panels =====
-        bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(S.px(12))
-
         # Traffic distribution
         dist_card = Card(title="Traffic Distribution", icon="🥧")
-        dist_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        dist_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         dist_content = QHBoxLayout()
         dist_content.setSpacing(S.px(16))
         dist_content.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self._donut_chart = DonutChart()
-        self._donut_chart.setFixedSize(100, 100)
+        self._donut_chart.setMinimumSize(S.px(100), S.px(100))
+        self._donut_chart.setMaximumSize(S.px(140), S.px(140))
         dist_content.addWidget(self._donut_chart)
 
         self._protocol_legend = QVBoxLayout()
@@ -1334,24 +1319,32 @@ class NetworkView(QWidget, ScaleMixin):
         dist_widget = QWidget()
         dist_widget.setLayout(dist_content)
         dist_card.add_widget(dist_widget)
-        bottom_layout.addWidget(dist_card, stretch=1)
+        right_layout.addWidget(dist_card, stretch=1)
 
         # Top devices
         devices_card = Card(title="Top Devices by Traffic", icon="📱")
-        devices_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        devices_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._devices_list = QVBoxLayout()
         self._devices_list.setSpacing(S.px(4))
         devices_widget = QWidget()
         devices_widget.setLayout(self._devices_list)
         devices_card.add_widget(devices_widget)
-        bottom_layout.addWidget(devices_card, stretch=1)
+        right_layout.addWidget(devices_card, stretch=1)
 
-        # Network topology
+        content_layout.addWidget(right_widget, stretch=1)
+
+        main_layout.addWidget(content_container, stretch=1)
+
+        # ===== BOTTOM ROW - Network map =====
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(S.px(12))
+
         topology_card = Card(title="Network Map", icon="🗺️")
         topology_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._topology_widget = NetworkTopologyWidget()
         self._topology_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._topology_widget.setMinimumHeight(100)
+        self._topology_widget.setMinimumHeight(S.px(120))
+        self._topology_widget.setMaximumHeight(S.px(200))
         topology_card.add_widget(self._topology_widget)
         bottom_layout.addWidget(topology_card, stretch=1)
 
@@ -1365,7 +1358,9 @@ class NetworkView(QWidget, ScaleMixin):
         c = theme_manager.colors
 
         top_bar = QFrame()
-        top_bar.setFixedHeight(S.px(48))
+        top_bar.setMinimumHeight(S.px(48))
+        top_bar.setMaximumHeight(S.px(56))
+        top_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         top_bar.setStyleSheet(f"""
             QFrame {{
                 background-color: {c.BG_CARD};
@@ -1384,15 +1379,15 @@ class NetworkView(QWidget, ScaleMixin):
         live_layout.setSpacing(S.px(8))
 
         live_dot = QFrame()
-        live_dot.setFixedSize(10, 10)
+        live_dot.setFixedSize(S.px(10), S.px(10))
         live_dot.setStyleSheet(f"""
             background-color: {c.ACCENT_GREEN};
-            border-radius: 5px;
+            border-radius: {S.px(5)}px;
         """)
         live_layout.addWidget(live_dot)
 
         live_label = QLabel("LIVE")
-        live_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        live_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
         live_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; background: transparent;")
         live_layout.addWidget(live_label)
 
@@ -1401,13 +1396,13 @@ class NetworkView(QWidget, ScaleMixin):
         # Time range dropdown
         self._time_dropdown = QComboBox()
         self._time_dropdown.addItems(["Last 1 hour", "Last 24 hours", "Last 7 days", "Last 30 days"])
-        self._time_dropdown.setFixedWidth(120)
+        self._time_dropdown.setMinimumWidth(S.px(120))
         layout.addWidget(self._time_dropdown)
 
         # Refresh dropdown
         self._refresh_dropdown = QComboBox()
         self._refresh_dropdown.addItems(["5s", "10s", "30s", "60s"])
-        self._refresh_dropdown.setFixedWidth(70)
+        self._refresh_dropdown.setMinimumWidth(S.px(70))
         self._refresh_dropdown.setCurrentText("5s")
         layout.addWidget(self._refresh_dropdown)
 
@@ -1422,7 +1417,7 @@ class NetworkView(QWidget, ScaleMixin):
                 icon = qta.icon(icon_name, color=c.TEXT_MUTED)
                 icon_btn = QPushButton()
                 icon_btn.setIcon(icon)
-                icon_btn.setFixedSize(36, 36)
+                icon_btn.setFixedSize(S.px(36), S.px(36))
                 icon_btn.setStyleSheet(f"""
                     QPushButton {{
                         background-color: transparent;
@@ -1459,14 +1454,14 @@ class NetworkView(QWidget, ScaleMixin):
         health_icon = QLabel()
         try:
             icon = qta.icon("mdi.shield-check", color=c.ACCENT_GREEN, scale=1.5)
-            health_icon.setPixmap(icon.pixmap(32, 32))
+            health_icon.setPixmap(icon.pixmap(S.px(32), S.px(32)))
         except Exception:
             health_icon.setText("✓")
         health_icon.setStyleSheet("background: transparent;")
         health_layout.addWidget(health_icon)
 
         health_label = QLabel("Healthy")
-        health_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        health_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         health_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; background: transparent;")
         health_layout.addWidget(health_label)
 
@@ -1480,12 +1475,12 @@ class NetworkView(QWidget, ScaleMixin):
         uptime_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         uptime_title = QLabel("Uptime")
-        uptime_title.setFont(QFont("Segoe UI", 9))
+        uptime_title.setFont(QFont("Segoe UI", S.font_pt(9)))
         uptime_title.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         uptime_layout.addWidget(uptime_title)
 
         self._uptime_label = QLabel("0d 0h 0m")
-        self._uptime_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self._uptime_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         self._uptime_label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         uptime_layout.addWidget(self._uptime_label)
 
@@ -1499,12 +1494,12 @@ class NetworkView(QWidget, ScaleMixin):
         start_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         start_title = QLabel("Started")
-        start_title.setFont(QFont("Segoe UI", 9))
+        start_title.setFont(QFont("Segoe UI", S.font_pt(9)))
         start_title.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         start_layout.addWidget(start_title)
 
         self._start_label = QLabel("--:--")
-        self._start_label.setFont(QFont("Segoe UI", 12))
+        self._start_label.setFont(QFont("Segoe UI", S.font_pt(12)))
         self._start_label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         start_layout.addWidget(self._start_label)
 
@@ -1518,12 +1513,12 @@ class NetworkView(QWidget, ScaleMixin):
         monitors_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         monitors_title = QLabel("Monitoring")
-        monitors_title.setFont(QFont("Segoe UI", 9))
+        monitors_title.setFont(QFont("Segoe UI", S.font_pt(9)))
         monitors_title.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         monitors_layout.addWidget(monitors_title)
 
         monitors_value = QLabel("7 services")
-        monitors_value.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        monitors_value.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         monitors_value.setStyleSheet(f"color: {c.ACCENT_BLUE}; background: transparent;")
         monitors_layout.addWidget(monitors_value)
 
@@ -1638,11 +1633,7 @@ class NetworkView(QWidget, ScaleMixin):
             # Update top devices
             self._update_top_devices()
 
-            # Update alerts
-            self._update_alerts()
-
-            # Update interfaces
-            self._update_interfaces()
+            # Protocol distribution and top devices are updated above
 
         except Exception as e:
             pass
@@ -1677,12 +1668,12 @@ class NetworkView(QWidget, ScaleMixin):
             row.setSpacing(8)
 
             color_dot = QFrame()
-            color_dot.setFixedSize(10, 10)
-            color_dot.setStyleSheet(f"background-color: {color}; border-radius: 5px;")
+            color_dot.setFixedSize(S.px(10), S.px(10))
+            color_dot.setStyleSheet(f"background-color: {color}; border-radius: {S.px(5)}px;")
             row.addWidget(color_dot)
 
             label_widget = QLabel(f"{label}: {count}")
-            label_widget.setFont(QFont("Segoe UI", 10))
+            label_widget.setFont(QFont("Segoe UI", S.font_pt(10)))
             label_widget.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
             row.addWidget(label_widget)
 
@@ -1729,7 +1720,7 @@ class NetworkView(QWidget, ScaleMixin):
 
         if not alerts:
             no_alerts = QLabel("No active alerts")
-            no_alerts.setFont(QFont("Segoe UI", 11))
+            no_alerts.setFont(QFont("Segoe UI", S.font_pt(11)))
             no_alerts.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
             self._alerts_container.addWidget(no_alerts)
         else:

@@ -100,7 +100,8 @@ class GPUGauge(QFrame, ScaleMixin):
         self._glow_intensity = 0.0
         self._last_color = COLORS.get('accent_green', '#0c997f')
 
-        self.setFixedSize(size, size)
+        self.setMinimumSize(S.px(size), S.px(size))
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background-color: transparent; border: none;")
 
         # Throttle updates to ~30fps max
@@ -165,7 +166,7 @@ class GPUGauge(QFrame, ScaleMixin):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        size = self._size
+        size = min(self.width(), self.height())
         center = size / 2
 
         # Smooth animation towards target
@@ -181,8 +182,8 @@ class GPUGauge(QFrame, ScaleMixin):
         progress = max(0.0, min(1.0, progress))
         current_color = self._get_color_for_value(progress * 100)
 
-        pen_width = 8
-        arc_rect = 14
+        pen_width = S.px(8)
+        arc_rect = S.px(14)
 
         # Background track
         painter.setPen(QPen(QColor(COLORS['border']), pen_width, Qt.PenStyle.SolidLine))
@@ -218,7 +219,7 @@ class GPUGauge(QFrame, ScaleMixin):
                            135 * 16, -270 * 16)
 
         # Center value - for VRAM gauge show total memory (16) at center with GB below
-        painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Light))
+        painter.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Light))
         painter.setPen(QColor(COLORS['text_primary']))
         if self._title == "VRAM":
             max_val = self._max_val if self._max_val > 0 else 16
@@ -226,10 +227,10 @@ class GPUGauge(QFrame, ScaleMixin):
             fm = painter.fontMetrics()
             text_width = fm.width(value_text)
             painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
-            painter.setFont(QFont("Segoe UI", 9))
+            painter.setFont(QFont("Segoe UI", S.font_pt(9)))
             painter.setPen(QColor(COLORS['text_secondary']))
             gb_width = fm.width("GB")
-            painter.drawText(int(center - gb_width / 2), int(center + 20), "GB")
+            painter.drawText(int(center - gb_width / 2), int(center + S.px(20)), "GB")
         else:
             value_text = f"{self._display_value:.0f}{self._unit}"
             fm = painter.fontMetrics()
@@ -238,10 +239,10 @@ class GPUGauge(QFrame, ScaleMixin):
 
         # Title
         if self._title:
-            painter.setFont(QFont("Segoe UI", 8))
+            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
             painter.setPen(QColor(COLORS['text_muted']))
             title_width = fm.width(self._title)
-            painter.drawText(int(center - title_width / 2), int(center + 35), self._title)
+            painter.drawText(int(center - title_width / 2), int(center + S.px(35)), self._title)
 
         painter.end()
 
@@ -263,17 +264,17 @@ class StatTile(QFrame, ScaleMixin):
             }}
         """)
         layout = QVBoxLayout()
-        layout.setSpacing(2)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(S.px(2))
+        layout.setContentsMargins(S.px(10), S.px(10), S.px(10), S.px(10))
         self.setLayout(layout)
 
         self._value_lbl = QLabel(value)
-        self._value_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self._value_lbl.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         self._value_lbl.setStyleSheet(f"color: {self._color}; background: transparent;")
         layout.addWidget(self._value_lbl)
 
         self._label_lbl = QLabel(label)
-        self._label_lbl.setFont(QFont("Segoe UI", 9))
+        self._label_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
         self._label_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
         layout.addWidget(self._label_lbl)
 
@@ -294,7 +295,7 @@ class RealtimeGraph(QWidget, ScaleMixin):
         self._max_points = 60
         self._pending_update = False
         self.scale_connect()
-        self.setMinimumHeight(160)
+        self.setMinimumHeight(S.px(160))
 
         # Throttle updates to ~30fps max
         self._update_timer = QTimer(self)
@@ -373,11 +374,11 @@ class RealtimeGraph(QWidget, ScaleMixin):
                                    int(temp_points[i + 1][0]), int(temp_points[i + 1][1]))
 
         # Legend
-        painter.setFont(QFont("Segoe UI", 9))
+        painter.setFont(QFont("Segoe UI", S.font_pt(9)))
         painter.setPen(QColor(COLORS['accent_green']))
-        painter.drawText(12, 16, "● Load")
+        painter.drawText(S.px(12), S.px(16), "● Load")
         painter.setPen(QColor(COLORS['accent_blue']))
-        painter.drawText(80, 16, "● Temp")
+        painter.drawText(S.px(80), S.px(16), "● Temp")
 
         painter.end()
 
@@ -413,7 +414,7 @@ class GPUView(QWidget, ScaleMixin):
     def _reapply_widget_styles(self):
         """Re-apply styles to widgets that use COLORS"""
         try:
-            self._status_dot.setStyleSheet(f"color: {COLORS.get('accent_green', '#0c997f')}; font-size: 14px; background: transparent;")
+            self._status_dot.setStyleSheet(f"color: {COLORS.get('accent_green', '#0c997f')}; font-size: {S.font_pt(14)}px; background: transparent;")
             self._gpu_name_label.setStyleSheet(f"color: {COLORS.get('accent_cyan', '#22d3ee')}; background: transparent;")
         except Exception as e:
             print(f"GPU style reapply error: {e}")
@@ -436,8 +437,8 @@ class GPUView(QWidget, ScaleMixin):
         """Setup GPU view UI"""
         # Main layout - no scroll area, fits in content area
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 16, 20, 16)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
+        main_layout.setSpacing(S.px(16))
         self.setLayout(main_layout)
 
         # Header bar
@@ -469,32 +470,34 @@ class GPUView(QWidget, ScaleMixin):
     def _create_header(self):
         """Header with title and GPU status"""
         header = QFrame()
-        header.setFixedHeight(60)
+        header.setMinimumHeight(S.px(60))
+        header.setMaximumHeight(S.px(72))
+        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         header.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_card']};
-                border-radius: 10px;
+                border-radius: {S.px(10)}px;
                 border: none;
             }}
         """)
         layout = QHBoxLayout()
-        layout.setContentsMargins(16, 0, 16, 0)
+        layout.setContentsMargins(S.px(16), 0, S.px(16), 0)
         header.setLayout(layout)
 
         # Status indicator
         self._status_dot = QLabel("●")
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: {S.font_pt(14)}px; background: transparent;")
         layout.addWidget(self._status_dot)
 
         # Title
         title = QLabel("GPU Monitor")
-        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         layout.addWidget(title)
 
         # GPU name
         self._gpu_name_label = QLabel("—")
-        self._gpu_name_label.setFont(QFont("Segoe UI", 11))
+        self._gpu_name_label.setFont(QFont("Segoe UI", S.font_pt(11)))
         self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
         layout.addWidget(self._gpu_name_label)
 
@@ -507,7 +510,7 @@ class GPUView(QWidget, ScaleMixin):
         container = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(S.px(12))
         container.setLayout(layout)
 
         # Make gauges stretch to fill available space
@@ -533,7 +536,7 @@ class GPUView(QWidget, ScaleMixin):
         container = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(S.px(12))
         container.setLayout(layout)
 
         self._card_model = StatTile("GPU Model", "—", COLORS['accent_cyan'])
@@ -559,12 +562,12 @@ class GPUView(QWidget, ScaleMixin):
             }}
         """)
         layout = QVBoxLayout()
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(S.px(12), S.px(10), S.px(12), S.px(10))
+        layout.setSpacing(S.px(8))
         chart_card.setLayout(layout)
 
         chart_title = QLabel("Performance")
-        chart_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        chart_title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         chart_title.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
         layout.addWidget(chart_title)
 
@@ -592,10 +595,10 @@ class GPUView(QWidget, ScaleMixin):
         gpu = data['gpu']
 
         if not gpu.get('available', False):
-            self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: 14px; background: transparent;")
+            self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: {S.font_pt(14)}px; background: transparent;")
             return
 
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: 14px; background: transparent;")
+        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: {S.font_pt(14)}px; background: transparent;")
 
         # GPU info is embedded in the gpu dict itself (name, vendor, vram_mb, driver_version)
         gpu_name = gpu.get('name', '—')

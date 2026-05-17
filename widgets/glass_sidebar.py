@@ -1,6 +1,6 @@
 """
-Nexus Monitor - Premium Glass Sidebar Navigation Widget
-Modern enterprise-grade design with glassmorphism and green glow
+Premium Glass Sidebar Navigation Widget
+Responsive design with adaptive collapse, smooth animations, and glassmorphism
 """
 import sys
 import os
@@ -16,7 +16,7 @@ import qtawesome as qta
 from typing import Optional, Dict
 
 from styles.theme import theme_manager
-from scaler import S, ScaleMixin
+from scaler import S, ScaleMixin, LayoutMode
 
 
 NAV_STRUCTURE = {
@@ -58,11 +58,10 @@ class GlassNavItem(QPushButton, ScaleMixin):
 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setCheckable(True)
-        self.setMinimumHeight(S.px(44))
-        self.setMinimumWidth(S.px(280))
+        self.setMinimumHeight(S.px(40))
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        font = S.font("Segoe UI", 13)
+        font = S.font("Segoe UI", 12)
         self.setFont(font)
 
         self._setup_icon()
@@ -81,19 +80,19 @@ class GlassNavItem(QPushButton, ScaleMixin):
         self._setup_icon()
 
     def set_collapsed(self, collapsed: bool):
-        """Set collapsed mode - show only icon"""
         self._collapsed = collapsed
         if collapsed:
             self.setText("")
-            self.setIconSize(QSize(S.px(24), S.px(24)))
-            self.setMinimumWidth(S.px(50))
+            self.setIconSize(QSize(S.px(22), S.px(22)))
+            self.setMinimumWidth(S.px(44))
+            self.setMaximumWidth(S.px(64))
         else:
             self.setText(f"  {self._label}")
-            self.setIconSize(QSize(S.px(22), S.px(22)))
-            self.setMinimumWidth(S.px(280))
+            self.setIconSize(QSize(S.px(20), S.px(20)))
+            self.setMinimumWidth(S.px(100))
+            self.setMaximumWidth(16777215)
 
     def _setup_icon(self):
-        """Setup premium icon from qtawesome"""
         try:
             c = theme_manager.colors
             normal_color = QColor(c.TEXT_MUTED)
@@ -104,18 +103,16 @@ class GlassNavItem(QPushButton, ScaleMixin):
                 color_active=active_color
             )
             self.setIcon(icon)
-            self.setIconSize(QSize(S.px(22), S.px(22)))
+            self.setIconSize(QSize(S.px(20), S.px(20)))
             self.setText(f"  {self._label}")
         except Exception:
             self.setText(f"  {self._label}")
 
     def _apply_style(self):
-        """Apply premium glass navigation item style"""
         c = theme_manager.colors
         accent = self._accent
 
         if theme_manager.current_theme == "heimdal":
-            # Heimdal theme styling
             active_border = "border-left: 4px solid #4A6CF7;"
             normal_border = "border-left: 4px solid transparent;"
             active_bg = "background-color: rgba(74, 108, 247, 0.15);"
@@ -127,11 +124,11 @@ class GlassNavItem(QPushButton, ScaleMixin):
                     color: #8A92B2;
                     border: none;
                     {normal_border}
-                    padding: {S.px(12)}px {S.px(16)}px;
+                    padding: {S.px(10)}px {S.px(14)}px;
                     text-align: left;
                     border-radius: {S.px(8)}px;
                     font-family: "Segoe UI", sans-serif;
-                    font-size: {S.px(13)}px;
+                    font-size: {S.font_pt(12)}px;
                     font-weight: 500;
                 }}
 
@@ -153,7 +150,6 @@ class GlassNavItem(QPushButton, ScaleMixin):
                 }}
             """)
         else:
-            # Active glow border style
             active_border = f"""
                 border-left: 3px solid {accent};
                 background-color: {c.ACCENT_GREEN_DIM};
@@ -166,11 +162,11 @@ class GlassNavItem(QPushButton, ScaleMixin):
                     color: {c.TEXT_SECONDARY};
                     border: none;
                     {normal_border}
-                    padding: {S.px(14)}px {S.px(20)}px;
+                    padding: {S.px(10)}px {S.px(16)}px;
                     text-align: left;
-                    border-radius: {S.px(10)}px;
+                    border-radius: {S.px(8)}px;
                     font-family: "Segoe UI", sans-serif;
-                    font-size: {S.px(13)}px;
+                    font-size: {S.font_pt(12)}px;
                     font-weight: 500;
                 }}
 
@@ -193,14 +189,12 @@ class GlassNavItem(QPushButton, ScaleMixin):
             """)
 
     def set_active(self, active: bool):
-        """Set active state with premium glow effect"""
         self._is_active = active
         self.setChecked(active)
         self._update_icon()
         self._apply_style()
 
     def _update_icon(self):
-        """Update icon color based on state"""
         try:
             c = theme_manager.colors
             color = self._accent if self._is_active else c.TEXT_MUTED
@@ -211,7 +205,7 @@ class GlassNavItem(QPushButton, ScaleMixin):
 
 
 class GlassSidebar(QFrame, ScaleMixin):
-    """Premium glassmorphism sidebar navigation with collapsible support"""
+    """Premium glassmorphism sidebar navigation - fully responsive"""
 
     view_selected = pyqtSignal(str)
 
@@ -219,20 +213,34 @@ class GlassSidebar(QFrame, ScaleMixin):
         super().__init__(parent)
         self._items: Dict[str, GlassNavItem] = {}
         self._current_view: str = ""
-        self._collapsed = False
-        self._expanded_width = S.px(260)
-        self._collapsed_width = S.px(64)
+        self._collapsed = S.is_compact()
+        self._expanded_width = S.px(220)
+        self._collapsed_width = S.px(58)
         self._setup_ui()
         self._apply_theme()
         theme_manager.theme_changed.connect(self._on_theme_changed)
         self.scale_connect()
 
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        shadow.setBlurRadius(20)
+        shadow.setOffset(2, 0)
+        self.setGraphicsEffect(shadow)
+
     def on_scale_changed(self, factor: float):
-        self._expanded_width = S.px(260)
-        self._collapsed_width = S.px(64)
+        self._expanded_width = S.px(220)
+        self._collapsed_width = S.px(58)
         self._setup_ui()
         self._apply_theme()
         self.update()
+
+    def on_layout_mode_changed(self, mode):
+        if mode == LayoutMode.COMPACT:
+            if not self._collapsed:
+                self._toggle_collapse()
+        else:
+            if self._collapsed:
+                self._toggle_collapse()
 
     def _on_theme_changed(self, theme_name: str):
         self._apply_theme()
@@ -240,48 +248,32 @@ class GlassSidebar(QFrame, ScaleMixin):
             item._apply_style()
 
     def _toggle_collapse(self):
-        """Toggle between collapsed and expanded state"""
         self._collapsed = not self._collapsed
         target_width = self._collapsed_width if self._collapsed else self._expanded_width
 
-        # Animate width transition
         self._width_animation = QPropertyAnimation(self, b"sidebar_width")
         self._width_animation.setDuration(200)
         self._width_animation.setStartValue(self.width())
         self._width_animation.setEndValue(target_width)
         self._width_animation.setEasingCurve(QEasingCurve.OutCubic)
         self._width_animation.start()
-
-        # Update UI after animation
         self._width_animation.finished.connect(self._on_collapse_animation_finished)
 
     def _on_collapse_animation_finished(self):
-        """Handle collapse animation completion"""
         self._update_collapse_state()
 
     def _update_collapse_state(self):
-        """Update UI elements based on collapse state"""
         self.setFixedWidth(self._collapsed_width if self._collapsed else self._expanded_width)
 
-        # Show/hide header elements
         if hasattr(self, '_header'):
             self._header.setVisible(not self._collapsed)
 
-        # Show/hide footer
         if hasattr(self, '_footer'):
             self._footer.setVisible(not self._collapsed)
 
-        # Update nav items
         for item in self._items.values():
-            item.setMinimumWidth(S.px(280) if not self._collapsed else S.px(50))
-            if self._collapsed:
-                item.setText("")
-                item.setIconSize(QSize(S.px(24), S.px(24)))
-            else:
-                item.setText(f"  {item._label}")
-                item.setIconSize(QSize(S.px(22), S.px(22)))
+            item.set_collapsed(self._collapsed)
 
-        # Update collapse button icon
         if hasattr(self, '_collapse_btn'):
             if self._collapsed:
                 self._collapse_btn.setText("▶")
@@ -289,46 +281,44 @@ class GlassSidebar(QFrame, ScaleMixin):
                 self._collapse_btn.setText("◀")
 
     def _setup_ui(self):
-        """Setup premium glass sidebar UI"""
-        self.setFixedWidth(self._expanded_width)
+        self.setMinimumWidth(self._collapsed_width)
+        self.setMaximumWidth(self._expanded_width + S.px(40))
+        current_width = self._collapsed_width if self._collapsed else self._expanded_width
+        self.setFixedWidth(current_width)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
-        # Main layout
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
 
-        # Premium glass header (hidden when collapsed)
         self._setup_header()
         self._header.setVisible(not self._collapsed)
 
-        # Navigation area with glass background
         nav_container = QFrame()
         nav_container.setObjectName("nav_container")
-        nav_container.setStyleSheet(f"""
-            #nav_container {{
+        nav_container.setStyleSheet("""
+            #nav_container {
                 background-color: rgba(26, 30, 53, 0.7);
                 border-top: 1px solid rgba(74, 108, 247, 0.15);
                 border-bottom: 1px solid rgba(74, 108, 247, 0.15);
-            }}
+            }
         """)
         nav_layout = QVBoxLayout()
-        nav_layout.setContentsMargins(S.px(8), S.px(12), S.px(8), S.px(8))
-        nav_layout.setSpacing(S.px(4))
+        nav_layout.setContentsMargins(S.px(6), S.px(8), S.px(6), S.px(8))
+        nav_layout.setSpacing(S.px(2))
         nav_container.setLayout(nav_layout)
 
-        # Build navigation sections
         for section_key, section_data in NAV_STRUCTURE.items():
             title = section_data.get("title")
             if title:
                 section_label = QLabel(title.upper())
                 section_label.setObjectName("section_label")
-                section_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.DemiBold))
+                section_label.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.DemiBold))
                 section_label.setStyleSheet("""
                     color: #525A7A;
                     letter-spacing: 1.5px;
-                    padding: 16px 12px 8px 12px;
+                    padding: 12px 10px 6px 10px;
                     background: transparent;
                 """)
                 nav_layout.addWidget(section_label)
@@ -345,12 +335,12 @@ class GlassSidebar(QFrame, ScaleMixin):
 
         layout.addWidget(nav_container, stretch=1)
 
-        # Collapse toggle button
         collapse_btn = QPushButton()
-        collapse_btn.setFixedHeight(S.px(36))
+        collapse_btn.setMinimumHeight(S.px(36))
+        collapse_btn.setMaximumHeight(S.px(44))
         collapse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        collapse_btn.setText("◀")
-        collapse_btn.setFont(QFont("Segoe UI", S.font_pt(12)))
+        collapse_btn.setText("▶" if self._collapsed else "◀")
+        collapse_btn.setFont(QFont("Segoe UI", S.font_pt(11)))
         collapse_btn.setStyleSheet("""
             QPushButton {
                 background-color: rgba(30, 35, 64, 0.6);
@@ -367,17 +357,16 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._collapse_btn = collapse_btn
         layout.addWidget(collapse_btn)
 
-        # Premium glass footer (hidden when collapsed)
         self._setup_footer()
         self._footer.setVisible(not self._collapsed)
 
     def _setup_header(self):
-        """Setup premium glass branding header"""
         c = theme_manager.colors
 
         header = QFrame()
         header.setObjectName("sidebar_header")
-        header.setFixedHeight(S.px(60))
+        header.setMinimumHeight(S.px(48))
+        header.setMaximumHeight(S.px(64))
         header.setStyleSheet(f"""
             #sidebar_header {{
                 background-color: rgba(26, 30, 53, 0.5);
@@ -387,17 +376,17 @@ class GlassSidebar(QFrame, ScaleMixin):
         """)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(12), S.px(12), S.px(12), S.px(12))
-        layout.setSpacing(S.px(10))
+        layout.setContentsMargins(S.px(10), S.px(10), S.px(10), S.px(10))
+        layout.setSpacing(S.px(8))
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setLayout(layout)
 
-        # App icon container
         icon_container = QFrame()
-        icon_container.setFixedSize(S.px(36), S.px(36))
+        icon_container.setMinimumSize(S.px(32), S.px(32))
+        icon_container.setMaximumSize(S.px(40), S.px(40))
         icon_container.setStyleSheet(f"""
             background-color: #4A6CF7;
-            border-radius: {S.px(8)}px;
+            border-radius: {S.px(7)}px;
         """)
 
         icon_layout = QVBoxLayout()
@@ -406,24 +395,23 @@ class GlassSidebar(QFrame, ScaleMixin):
         icon_container.setLayout(icon_layout)
 
         icon_label = QLabel("SM")
-        icon_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        icon_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         icon_label.setStyleSheet("color: white;")
         icon_layout.addWidget(icon_label)
 
         layout.addWidget(icon_container)
 
-        # App title (hidden when collapsed)
         title_container = QVBoxLayout()
         title_container.setSpacing(1)
         title_container.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         title = QLabel("System Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.DemiBold))
+        title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
         title.setStyleSheet("color: #E8ECFF; background: transparent;")
         title_container.addWidget(title)
 
         version = QLabel("v2.0")
-        version.setFont(QFont("Segoe UI", S.font_pt(9)))
+        version.setFont(QFont("Segoe UI", S.font_pt(8)))
         version.setStyleSheet("color: #525A7A; background: transparent;")
         title_container.addWidget(version)
 
@@ -434,13 +422,11 @@ class GlassSidebar(QFrame, ScaleMixin):
         self.layout().insertWidget(0, header)
 
     def _setup_footer(self):
-        """Setup premium glass footer with status"""
-        c = theme_manager.colors
-
         footer = QFrame()
         footer.setObjectName("sidebar_footer")
         footer.setFrameShape(QFrame.Shape.NoFrame)
-        footer.setFixedHeight(S.px(48))
+        footer.setMinimumHeight(S.px(36))
+        footer.setMaximumHeight(S.px(48))
         footer.setStyleSheet(f"""
             #sidebar_footer {{
                 background-color: rgba(26, 30, 53, 0.5);
@@ -450,15 +436,13 @@ class GlassSidebar(QFrame, ScaleMixin):
         """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(12), S.px(10), S.px(12), S.px(10))
+        layout.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
         layout.setSpacing(2)
         footer.setLayout(layout)
 
-        # Status row
         status_layout = QHBoxLayout()
-        status_layout.setSpacing(S.px(8))
+        status_layout.setSpacing(S.px(6))
 
-        # Status indicator
         status_indicator = QFrame()
         status_indicator.setFixedSize(S.px(6), S.px(6))
         status_indicator.setStyleSheet(f"""
@@ -468,7 +452,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         status_layout.addWidget(status_indicator)
 
         status_text = QLabel("Operational")
-        status_text.setFont(QFont("Segoe UI", S.font_pt(9)))
+        status_text.setFont(QFont("Segoe UI", S.font_pt(8)))
         status_text.setStyleSheet("color: #525A7A; background: transparent;")
         status_layout.addWidget(status_text)
         status_layout.addStretch()
@@ -479,7 +463,6 @@ class GlassSidebar(QFrame, ScaleMixin):
         self.layout().insertWidget(self.layout().count(), footer)
 
     def _apply_theme(self):
-        """Apply glass theme styles"""
         if theme_manager.current_theme == "heimdal":
             self.setStyleSheet("""
                 QFrame {
@@ -500,17 +483,14 @@ class GlassSidebar(QFrame, ScaleMixin):
             """)
 
     def _on_item_clicked(self, key: str):
-        """Handle navigation item click"""
         self.set_active_view(key)
         self.view_selected.emit(key)
 
     def set_active_view(self, view_name: str):
-        """Set active view"""
         self._current_view = view_name
         for key, item in self._items.items():
             item.set_active(key == view_name)
 
-    # Property for animation
     def get_sidebar_width(self):
         return self.width()
 

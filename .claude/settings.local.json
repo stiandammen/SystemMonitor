@@ -54,7 +54,17 @@
       "Bash(ls *)",
       "Bash(E: *)",
       "Bash(grep *)",
-      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\SystemMonitor\")"
+      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\SystemMonitor\")",
+      "Bash(where py *)",
+      "Bash(where python3 *)",
+      "Bash(python3 -c ' *)",
+      "Bash(ls \"/e/[python - prosjekter]/SystemMonitor/\"*.py)",
+      "Bash(ls -la \"/e/[python - prosjekter]/SystemMonitor/\")",
+      "Bash(cd \"/e/[python - prosjekter]/SystemMonitor\")",
+      "Bash(grep -l \"ScaleMixin\" views/cpu.py views/gpu.py views/memory.py views/network.py views/storage.py widgets/sparkline.py widgets/donut_gauge.py)",
+      "Bash(grep -c \"setMinimumHeight\\\\|setMinimumWidth\\\\|setMinimumSize\\\\|S\\\\.px\\\\|S\\\\.font_pt\\\\|setSizePolicy\\\\|QSizePolicy\\\\.Expanding\" views/cpu.py views/gpu.py views/memory.py views/network.py views/storage.py widgets/sparkline.py widgets/donut_gauge.py)",
+      "Bash(python3 -m py_compile scaler.py)",
+      "Bash(\"/e/[python - prosjekter]/SystemMonitor/.venv/Scripts/python.exe\" -c \"import sys; sys.path.insert\\(0, r'E:\\\\[python - prosjekter]\\\\SystemMonitor'\\); from scaler import S, ScaleMixin, LayoutMode; print\\('scaler OK'\\)\")"
     ]
   }
 }

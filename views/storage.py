@@ -22,19 +22,21 @@ from widgets.storage_widgets import (
 )
 
 
-class StorageHeader(QWidget):
+class StorageHeader(QWidget, ScaleMixin):
     """Header widget for storage view with live indicator and stats summary"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._live_state = True
+        self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_ui(self):
         """Build header layout"""
         colors = theme_manager.colors
-        self.setFixedHeight(S.px(56))
+        self.setMinimumHeight(S.px(56))
+        self.setMaximumHeight(S.px(68))
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setStyleSheet(f"background-color: {colors.BG_CARD}; border: none; border-radius: {S.px(10)}px;")
 
@@ -114,7 +116,7 @@ class StorageHeader(QWidget):
         self.set_live(self._live_state)
 
 
-class StorageKpiCard(QFrame):
+class StorageKpiCard(QFrame, ScaleMixin):
     """Premium KPI stat card for storage metrics"""
     def __init__(self, title: str, icon: str, accent: str, unit: str = "", parent=None):
         super().__init__(parent)
@@ -122,6 +124,7 @@ class StorageKpiCard(QFrame):
         self._icon = icon
         self._accent = accent
         self._unit = unit
+        self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -514,7 +517,7 @@ class StorageView(QWidget, ScaleMixin):
             letter.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
             letter.setStyleSheet(f"color: white; background: {pct_color}; padding: {S.px(2)}px {S.px(8)}px; border-radius: {S.px(4)}px;")
             letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            letter.setFixedWidth(S.px(32))
+            letter.setMinimumWidth(S.px(32))
             row_layout.addWidget(letter)
 
             # Info

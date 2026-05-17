@@ -1,6 +1,6 @@
 """
 System Monitor - Configuration
-Application settings, colors, fonts, and constants
+Application settings, colors, fonts, and constants with responsive defaults
 """
 import json
 import os
@@ -10,75 +10,70 @@ from PyQt6.QtGui import QFont
 
 
 class AppConfig:
-    """Application configuration constants"""
-    
-    # Window settings
-    WINDOW_WIDTH = 1200
-    WINDOW_HEIGHT = 800
-    WINDOW_MIN_WIDTH = 1000
-    WINDOW_MIN_HEIGHT = 700
-    
+    """Application configuration constants - responsive defaults"""
+
+    # Window settings (these are minimums, window adapts to screen)
+    WINDOW_MIN_WIDTH = 700
+    WINDOW_MIN_HEIGHT = 500
+
     # Sidebar
-    SIDEBAR_WIDTH = 200
-    SIDEBAR_COLLAPSED_WIDTH = 60
-    
+    SIDEBAR_EXPANDED_WIDTH = 220
+    SIDEBAR_COLLAPSED_WIDTH = 58
+
     # Title bar
-    TITLE_BAR_HEIGHT = 44
-    
+    TITLE_BAR_HEIGHT = 40
+
     # Update intervals (milliseconds)
-    UPDATE_INTERVAL_MS = 500  # Main update loop
-    FAST_UPDATE_MS = 250      # CPU, GPU, RAM, Network
-    MEDIUM_UPDATE_MS = 1000   # Processes
-    SLOW_UPDATE_MS = 5000     # Metadata, system info
-    
+    UPDATE_INTERVAL_MS = 500
+    FAST_UPDATE_MS = 250
+    MEDIUM_UPDATE_MS = 1000
+    SLOW_UPDATE_MS = 5000
+
     # History settings
-    HISTORY_DURATION_SECONDS = 300  # 5 minutes
-    HISTORY_POINTS = 600  # 1 point per 500ms
-    
-    # Gauge sizes
+    HISTORY_DURATION_SECONDS = 300
+    HISTORY_POINTS = 600
+
+    # Gauge sizes (base, will be scaled)
     GAUGE_LARGE = 160
     GAUGE_MEDIUM = 140
     GAUGE_SMALL = 120
-    
-    # Graph sizes
+
+    # Graph heights (base, will be scaled)
     GRAPH_HEIGHT_SMALL = 80
     GRAPH_HEIGHT_MEDIUM = 160
     GRAPH_HEIGHT_LARGE = 240
-    
-    # Card styling
-    CARD_RADIUS = 10
+
+    # Card styling (base, will be scaled)
+    CARD_RADIUS = 12
     CARD_PADDING = 16
     CARD_SPACING = 12
-    
+
     # Font settings
     FONT_FAMILY = "Segoe UI"
-    FONT_FALLBACK = ["SF Pro Display", "Helvetica Neue", "Arial", "sans-serif"]
+    FONT_FALLBACK = ["Inter", "SF Pro Display", "Helvetica Neue", "Arial", "sans-serif"]
+
+    # Responsive breakpoints (pixels)
+    COMPACT_THRESHOLD = 1600
+    MEDIUM_THRESHOLD = 2200
+
+    # Overlay mode
+    OVERLAY_MIN_WIDTH = 280
+    OVERLAY_MIN_HEIGHT = 60
 
 
 class FontConfig:
-    """Font configuration"""
+    """Font configuration - responsive font sizes"""
 
-    # Predefined fonts
-    TITLE = QFont(AppConfig.FONT_FAMILY, 20, QFont.Weight.Bold)
-    SUBTITLE = QFont(AppConfig.FONT_FAMILY, 16, QFont.Weight.Bold)
-    HEADING = QFont(AppConfig.FONT_FAMILY, 14, QFont.Weight.Bold)
-    BODY = QFont(AppConfig.FONT_FAMILY, 13)
-    BODY_BOLD = QFont(AppConfig.FONT_FAMILY, 13, QFont.Weight.Bold)
-    SMALL = QFont(AppConfig.FONT_FAMILY, 11)
-    SMALL_BOLD = QFont(AppConfig.FONT_FAMILY, 11, QFont.Weight.Bold)
-    CAPTION = QFont(AppConfig.FONT_FAMILY, 10)
-    VALUE_LARGE = QFont(AppConfig.FONT_FAMILY, 24, QFont.Weight.Bold)
-    VALUE_MEDIUM = QFont(AppConfig.FONT_FAMILY, 18, QFont.Weight.Bold)
+    FONT_FAMILY = AppConfig.FONT_FAMILY
 
     @staticmethod
     def get_font(size: int, bold: bool = False) -> QFont:
-        """Get font with specified size and weight"""
         return QFont(AppConfig.FONT_FAMILY, size, QFont.Weight.Bold if bold else QFont.Weight.Normal)
 
 
 class SettingsManager:
     """Manages application settings with JSON persistence"""
-    
+
     DEFAULT_SETTINGS = {
         # Appearance
         'theme': 'midnight',
@@ -108,6 +103,7 @@ class SettingsManager:
         'autostart': False,
         'minimize_to_tray': False,
         'start_minimized': False,
+        'overlay_mode': False,
 
         # Export
         'export_format': 'csv',
@@ -147,24 +143,22 @@ class SettingsManager:
             "CHART_LINE": "#0c997f",
         },
     }
-    
+
     def __init__(self):
         self._settings: Dict[str, Any] = {}
         self._config_path = self._get_config_path()
         self._load()
-    
+
     def _get_config_path(self) -> Path:
-        """Get configuration file path"""
-        if os.name == 'nt':  # Windows
+        if os.name == 'nt':
             config_dir = Path(os.environ.get('APPDATA', Path.home())) / 'SystemMonitor'
-        else:  # Linux/Mac
+        else:
             config_dir = Path.home() / '.config' / 'systemmonitor'
-        
+
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir / 'settings.json'
-    
+
     def _load(self):
-        """Load settings from file"""
         try:
             if self._config_path.exists():
                 with open(self._config_path, 'r', encoding='utf-8') as f:
@@ -176,35 +170,29 @@ class SettingsManager:
         except Exception as e:
             print(f"Error loading settings: {e}")
             self._settings = self.DEFAULT_SETTINGS.copy()
-    
+
     def _save(self):
-        """Save settings to file"""
         try:
             with open(self._config_path, 'w', encoding='utf-8') as f:
                 json.dump(self._settings, f, indent=2)
         except Exception as e:
             print(f"Error saving settings: {e}")
-    
+
     def get(self, key: str, default: Any = None) -> Any:
-        """Get setting value"""
         return self._settings.get(key, default)
-    
+
     def set(self, key: str, value: Any):
-        """Set setting value and save"""
         self._settings[key] = value
         self._save()
-    
+
     def get_all(self) -> Dict[str, Any]:
-        """Get all settings"""
         return self._settings.copy()
-    
+
     def reset_to_defaults(self):
-        """Reset all settings to defaults"""
         self._settings = self.DEFAULT_SETTINGS.copy()
         self._save()
-    
+
     def update(self, settings: Dict[str, Any]):
-        """Update multiple settings at once"""
         self._settings.update(settings)
         self._save()
 

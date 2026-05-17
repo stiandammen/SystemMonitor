@@ -1,6 +1,6 @@
 """
 Overview Page - Premium Glass Dashboard
-Modern enterprise-grade design with glassmorphism, green glow, and real-time data.
+Responsive design with adaptive grid layout, collapsible panels, and real-time data
 """
 import platform
 import time
@@ -9,19 +9,20 @@ import subprocess
 from collections import deque
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QProgressBar, QPushButton, QGridLayout, QSizePolicy
+    QScrollArea, QProgressBar, QPushButton, QGridLayout, QSizePolicy, QSplitter
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QLinearGradient, QGradient
 
 from widgets.donut_gauge import DonutGauge
 from widgets.sparkline import SparklineWidget
+from widgets.responsive import CollapsiblePanel, ResponsiveGridLayout
 from styles.theme import theme_manager
-from scaler import S, ScaleMixin
+from scaler import S, ScaleMixin, LayoutMode
 
 
 class GlassMetricCard(QFrame):
-    """Premium glass metric card with icon, value, trend, and subtle glow"""
+    """Premium glass metric card - responsive with minimum sizes"""
 
     def __init__(self, title: str, icon: str, color: str = None, parent=None):
         super().__init__(parent)
@@ -37,7 +38,8 @@ class GlassMetricCard(QFrame):
     def _setup_ui(self):
         colors = theme_manager.colors
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(S.px(140))
+        self.setMinimumHeight(S.px(120))
+        self.setMinimumWidth(S.px(160))
 
         if theme_manager.current_theme == "heimdal":
             self.setStyleSheet(f"""
@@ -55,7 +57,7 @@ class GlassMetricCard(QFrame):
                 QFrame {{
                     background-color: {colors.BG_CARD};
                     border: none;
-                    border-radius: {S.px(16)}px;
+                    border-radius: {S.px(14)}px;
                 }}
                 QFrame:hover {{
                     background-color: rgba(35, 40, 70, 0.9);
@@ -63,43 +65,40 @@ class GlassMetricCard(QFrame):
             """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
-        layout.setSpacing(S.px(10))
+        layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
+        layout.setSpacing(S.px(6))
         self.setLayout(layout)
 
-        # Header with icon and title
         header = QHBoxLayout()
-        header.setSpacing(S.px(10))
+        header.setSpacing(S.px(8))
 
         if self._icon:
             icon_label = QLabel(self._icon)
-            icon_label.setFont(QFont("Segoe UI", S.font_pt(16)))
+            icon_label.setFont(QFont("Segoe UI", S.font_pt(14)))
             icon_label.setStyleSheet(f"color: {self._color}; background: transparent;")
             header.addWidget(icon_label)
 
         title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        title_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
         title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         header.addWidget(title_label)
         header.addStretch()
 
         layout.addLayout(header)
 
-        # Value display
         self._value_label = QLabel("--")
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(28), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Segoe UI", S.font_pt(24), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self._value_label)
 
-        # Subtitle
         self._subtitle_label = QLabel("")
-        self._subtitle_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._subtitle_label.setFont(QFont("Segoe UI", S.font_pt(9)))
         self._subtitle_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self._subtitle_label)
 
-        # Sparkline
         self._sparkline = SparklineWidget(colors=[self._color])
-        self._sparkline.setFixedHeight(40)
+        self._sparkline.setMinimumHeight(S.px(30))
+        self._sparkline.setMaximumHeight(S.px(50))
         layout.addWidget(self._sparkline)
 
     def set_value(self, value: str, subtitle: str = ""):
@@ -114,7 +113,7 @@ class GlassMetricCard(QFrame):
 
 
 class GlassChartPanel(QFrame):
-    """Premium glass chart panel with title and sparkline"""
+    """Premium glass chart panel with title and sparkline - responsive"""
 
     def __init__(self, title: str, color: str = None, parent=None):
         super().__init__(parent)
@@ -128,6 +127,9 @@ class GlassChartPanel(QFrame):
 
     def _setup_ui(self):
         colors = theme_manager.colors
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumHeight(S.px(80))
+        self.setMinimumWidth(S.px(140))
 
         if theme_manager.current_theme == "heimdal":
             self.setStyleSheet(f"""
@@ -145,25 +147,24 @@ class GlassChartPanel(QFrame):
                 QFrame {{
                     background-color: {colors.BG_CARD};
                     border: none;
-                    border-radius: {S.px(16)}px;
+                    border-radius: {S.px(14)}px;
                 }}
             """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
-        layout.setSpacing(S.px(10))
+        layout.setContentsMargins(S.px(14), S.px(10), S.px(14), S.px(10))
+        layout.setSpacing(S.px(8))
         self.setLayout(layout)
 
-        # Title
         title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        title_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
         title_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(title_label)
 
-        # Sparkline
         self._sparkline = SparklineWidget(colors=[self._color])
-        self._sparkline.setFixedHeight(80)
-        layout.addWidget(self._sparkline)
+        self._sparkline.setMinimumHeight(S.px(50))
+        self._sparkline.setMaximumHeight(S.px(90))
+        layout.addWidget(self._sparkline, stretch=1)
 
     def push(self, value: float):
         self._sparkline.push(value)
@@ -173,7 +174,7 @@ class GlassChartPanel(QFrame):
 
 
 class GlassInfoPanel(QFrame):
-    """Premium glass info panel with system/storage information"""
+    """Premium glass info panel - responsive"""
 
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
@@ -186,6 +187,7 @@ class GlassInfoPanel(QFrame):
 
     def _setup_ui(self):
         colors = theme_manager.colors
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         if theme_manager.current_theme == "heimdal":
             self.setStyleSheet(f"""
@@ -203,59 +205,52 @@ class GlassInfoPanel(QFrame):
                 QFrame {{
                     background-color: {colors.BG_CARD};
                     border: none;
-                    border-radius: {S.px(16)}px;
+                    border-radius: {S.px(14)}px;
                 }}
             """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
-        layout.setSpacing(S.px(12))
+        layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
+        layout.setSpacing(S.px(8))
         self.setLayout(layout)
 
-        # Title
         title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold))
+        title_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title_label)
 
-        # Separator
         sep = QFrame()
         sep.setFixedHeight(1)
-        sep.setStyleSheet(f"background-color: transparent;")
+        sep.setStyleSheet("background-color: transparent;")
         layout.addWidget(sep)
 
-        # Content container
         self._content = QVBoxLayout()
         self._content.setSpacing(0)
         layout.addLayout(self._content)
 
     def add_info_row(self, label: str, value: str, color: str = None):
-        """Add an info row to the panel"""
         row = QFrame()
         row.setStyleSheet("background: transparent;")
 
         row_layout = QHBoxLayout()
-        row_layout.setContentsMargins(0, S.px(6), 0, S.px(6))
-        row_layout.setSpacing(S.px(12))
+        row_layout.setContentsMargins(0, S.px(4), 0, S.px(4))
+        row_layout.setSpacing(S.px(10))
         row.setLayout(row_layout)
 
-        # Indicator
         indicator = QFrame()
-        indicator.setFixedSize(3, 18)
+        indicator.setFixedSize(3, 16)
         accent_color = color or theme_manager.colors.ACCENT_GREEN
         indicator.setStyleSheet(f"background-color: {accent_color}; border-radius: 1px;")
         row_layout.addWidget(indicator)
 
-        # Label
         label_widget = QLabel(label)
-        label_widget.setFont(QFont("Segoe UI", S.font_pt(11)))
-        label_widget.setMinimumWidth(90)
+        label_widget.setFont(QFont("Segoe UI", S.font_pt(10)))
+        label_widget.setMinimumWidth(80)
         label_widget.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; background: transparent;")
         row_layout.addWidget(label_widget)
 
-        # Value
         value_widget = QLabel(value)
-        value_widget.setFont(QFont("Segoe UI", S.font_pt(11)))
+        value_widget.setFont(QFont("Segoe UI", S.font_pt(10)))
         value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
         value_widget.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; background: transparent;")
         row_layout.addWidget(value_widget, stretch=1)
@@ -264,7 +259,7 @@ class GlassInfoPanel(QFrame):
 
 
 class GlassStoragePanel(QFrame):
-    """Premium glass storage panel with drive information"""
+    """Premium glass storage panel - responsive"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -276,6 +271,7 @@ class GlassStoragePanel(QFrame):
 
     def _setup_ui(self):
         colors = theme_manager.colors
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         if theme_manager.current_theme == "heimdal":
             self.setStyleSheet(f"""
@@ -293,29 +289,27 @@ class GlassStoragePanel(QFrame):
                 QFrame {{
                     background-color: {colors.BG_CARD};
                     border: none;
-                    border-radius: {S.px(16)}px;
+                    border-radius: {S.px(14)}px;
                 }}
             """)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
-        layout.setSpacing(S.px(12))
+        layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
+        layout.setSpacing(S.px(8))
         self.setLayout(layout)
 
-        # Header
         header = QHBoxLayout()
         header.setSpacing(S.px(8))
 
         title = QLabel("Storage Drives")
-        title.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         header.addWidget(title)
-
         header.addStretch()
 
         view_all_btn = QPushButton("View all →")
-        view_all_btn.setFont(QFont("Segoe UI", S.font_pt(10)))
-        view_all_btn.setFixedHeight(26)
+        view_all_btn.setFont(QFont("Segoe UI", S.font_pt(9)))
+        view_all_btn.setMinimumHeight(S.px(24))
         view_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         view_all_btn.clicked.connect(self._show_all_drives)
         view_all_btn.setStyleSheet(f"""
@@ -334,19 +328,16 @@ class GlassStoragePanel(QFrame):
         header.addWidget(view_all_btn)
         layout.addLayout(header)
 
-        # Separator
         sep = QFrame()
         sep.setFixedHeight(1)
-        sep.setStyleSheet(f"background-color: transparent;")
+        sep.setStyleSheet("background-color: transparent;")
         layout.addWidget(sep)
 
-        # Storage container
         self._storage_container = QVBoxLayout()
-        self._storage_container.setSpacing(S.px(8))
+        self._storage_container.setSpacing(S.px(6))
         layout.addLayout(self._storage_container)
 
     def update_drives(self, partitions):
-        """Update storage drive display"""
         while self._storage_container.count():
             item = self._storage_container.takeAt(0)
             if item and item.widget():
@@ -356,7 +347,7 @@ class GlassStoragePanel(QFrame):
 
         if not partitions:
             placeholder = QLabel("No drives detected")
-            placeholder.setFont(QFont("Segoe UI", S.font_pt(12)))
+            placeholder.setFont(QFont("Segoe UI", S.font_pt(11)))
             placeholder.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._storage_container.addWidget(placeholder)
@@ -382,30 +373,29 @@ class GlassStoragePanel(QFrame):
             """)
 
             drive_layout = QHBoxLayout()
-            drive_layout.setContentsMargins(S.px(12), S.px(8), S.px(12), S.px(8))
-            drive_layout.setSpacing(S.px(12))
+            drive_layout.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
+            drive_layout.setSpacing(S.px(10))
             drive_card.setLayout(drive_layout)
 
-            # Drive letter badge
             letter = QLabel(drive_letter.replace("\\", "") if drive_letter else "?")
-            letter.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-            letter.setStyleSheet(f"color: white; background: {pct_color}; padding: 4px 10px; border-radius: {S.px(6)}px;")
+            letter.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+            letter.setStyleSheet(f"color: white; background: {pct_color}; padding: 3px 8px; border-radius: {S.px(5)}px;")
             letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            letter.setFixedWidth(36)
+            letter.setMinimumWidth(S.px(30))
             drive_layout.addWidget(letter)
 
-            # Info
             info = QVBoxLayout()
-            info.setSpacing(4)
+            info.setSpacing(2)
 
             name_lbl = QLabel(mountpoint if mountpoint else "Local Disk")
-            name_lbl.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+            name_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
             name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
             info.addWidget(name_lbl)
 
             bar = QProgressBar()
             bar.setValue(int(pct))
-            bar.setFixedHeight(6)
+            bar.setMinimumHeight(5)
+            bar.setMaximumHeight(7)
             bar.setTextVisible(False)
             bar.setStyleSheet(f"""
                 QProgressBar {{
@@ -421,32 +411,29 @@ class GlassStoragePanel(QFrame):
             info.addWidget(bar)
             drive_layout.addLayout(info, stretch=1)
 
-            # Usage text
             usage_lbl = QLabel(f"{used_gb:.0f}/{total_gb:.0f} GB")
-            usage_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
+            usage_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
             usage_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
             usage_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            usage_lbl.setMinimumWidth(70)
+            usage_lbl.setMinimumWidth(S.px(60))
             drive_layout.addWidget(usage_lbl)
 
-            # Percentage
             pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+            pct_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
             pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
             pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-            pct_lbl.setMinimumWidth(40)
+            pct_lbl.setMinimumWidth(S.px(35))
             drive_layout.addWidget(pct_lbl)
 
             self._storage_container.addWidget(drive_card)
 
     def _show_all_drives(self):
-        """Show all drives dialog"""
         from PyQt6.QtWidgets import QDialog
 
         colors = theme_manager.colors
         dialog = QDialog(self)
         dialog.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
-        dialog.setMinimumSize(650, 450)
+        dialog.setMinimumSize(S.px(550), S.px(400))
         dialog.setStyleSheet(f"""
             QDialog {{
                 background-color: {colors.BG_PRIMARY};
@@ -472,15 +459,14 @@ class GlassStoragePanel(QFrame):
                 event.accept()
 
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(S.px(16))
+        main_layout.setContentsMargins(S.px(20), S.px(20), S.px(20), S.px(20))
         dialog.setLayout(main_layout)
 
-        # Header
         header = QFrame()
         header.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: {S.px(8)}px;")
         header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(20, 12, 12, 12)
+        header_layout.setContentsMargins(S.px(16), S.px(10), S.px(10), S.px(10))
         header.setLayout(header_layout)
         header.setCursor(Qt.CursorShape.SizeAllCursor)
         header.mousePressEvent = mousePressEvent
@@ -488,14 +474,14 @@ class GlassStoragePanel(QFrame):
         header.mouseReleaseEvent = mouseReleaseEvent
 
         title = QLabel("Storage Drives")
-        title.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         header_layout.addWidget(title)
         header_layout.addStretch()
 
         close_btn = QPushButton("×")
-        close_btn.setFont(QFont("Segoe UI", 16))
-        close_btn.setFixedSize(32, 32)
+        close_btn.setFont(QFont("Segoe UI", 14))
+        close_btn.setFixedSize(S.px(28), S.px(28))
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(f"""
             QPushButton {{
@@ -513,9 +499,8 @@ class GlassStoragePanel(QFrame):
         header_layout.addWidget(close_btn)
         main_layout.addWidget(header)
 
-        # Drives
         drives_layout = QVBoxLayout()
-        drives_layout.setSpacing(14)
+        drives_layout.setSpacing(S.px(12))
 
         for partition in psutil.disk_partitions():
             if not partition.fstype:
@@ -539,79 +524,77 @@ class GlassStoragePanel(QFrame):
                 QFrame {{
                     background-color: {colors.BG_CARD};
                     border: none;
-                    border-radius: {S.px(12)}px;
+                    border-radius: {S.px(10)}px;
                 }}
             """)
             drive_layout = QHBoxLayout()
-            drive_layout.setSpacing(20)
-            drive_layout.setContentsMargins(16, 16, 16, 16)
+            drive_layout.setSpacing(S.px(16))
+            drive_layout.setContentsMargins(S.px(14), S.px(14), S.px(14), S.px(14))
             drive_card.setLayout(drive_layout)
 
-            # Drive letter
             letter = QLabel(drive_letter.replace("\\", ""))
-            letter.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+            letter.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
             letter.setStyleSheet(f"color: {pct_color}; background: transparent;")
             letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            letter.setFixedSize(50, 50)
+            letter.setMinimumSize(S.px(40), S.px(40))
             drive_layout.addWidget(letter)
 
-            # Info
             info = QVBoxLayout()
-            info.setSpacing(8)
+            info.setSpacing(S.px(6))
 
             name = QLabel(mountpoint if mountpoint else drive_letter)
-            name.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+            name.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
             name.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
             info.addWidget(name)
 
             bar = QProgressBar()
             bar.setValue(int(pct))
-            bar.setFixedHeight(10)
+            bar.setMinimumHeight(8)
+            bar.setMaximumHeight(10)
             bar.setTextVisible(False)
             bar.setStyleSheet(f"""
                 QProgressBar {{
                     background-color: {colors.BG_PRIMARY};
                     border: none;
-                    border-radius: {S.px(5)}px;
+                    border-radius: {S.px(4)}px;
                 }}
                 QProgressBar::chunk {{
                     background-color: {pct_color};
-                    border-radius: {S.px(5)}px;
+                    border-radius: {S.px(4)}px;
                 }}
             """)
             info.addWidget(bar)
 
             stats = QHBoxLayout()
             used_lbl = QLabel(f"{used_gb:.1f} GB used")
-            used_lbl.setFont(QFont("Segoe UI", 10))
+            used_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
             used_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
             stats.addWidget(used_lbl)
             stats.addStretch()
             free_lbl = QLabel(f"{free_gb:.1f} GB free")
-            free_lbl.setFont(QFont("Segoe UI", 10))
+            free_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
             free_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
             stats.addWidget(free_lbl)
             info.addLayout(stats)
 
             drive_layout.addLayout(info, stretch=1)
 
-            # Percentage box
             pct_box = QFrame()
-            pct_box.setStyleSheet(f"background-color: {colors.BG_SECONDARY}; border-radius: {S.px(10)}px;")
+            pct_box.setStyleSheet(f"background-color: {colors.BG_SECONDARY}; border-radius: {S.px(8)}px;")
             pct_layout = QVBoxLayout()
-            pct_layout.setSpacing(2)
-            pct_layout.setContentsMargins(16, 8, 16, 8)
+            pct_layout.setSpacing(1)
+            pct_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
             pct_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_box.setLayout(pct_layout)
 
             pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+            pct_lbl.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
             pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
             pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_layout.addWidget(pct_lbl)
 
             used_lbl2 = QLabel("used")
-            used_lbl2.setFont(QFont("Segoe UI", 9))
+            used_lbl2.setFont(QFont("Segoe UI", S.font_pt(8)))
             used_lbl2.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
             used_lbl2.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_layout.addWidget(used_lbl2)
@@ -621,18 +604,17 @@ class GlassStoragePanel(QFrame):
 
         main_layout.addLayout(drives_layout)
 
-        # Close button
         close_btn = QPushButton("Close")
-        close_btn.setFont(QFont("Segoe UI", 11))
-        close_btn.setFixedHeight(38)
+        close_btn.setFont(QFont("Segoe UI", S.font_pt(10)))
+        close_btn.setMinimumHeight(S.px(32))
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {colors.ACCENT_BLUE};
                 color: white;
                 border: none;
-                border-radius: {S.px(8)}px;
-                padding: 6px 28px;
+                border-radius: {S.px(6)}px;
+                padding: 6px 24px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
@@ -646,7 +628,7 @@ class GlassStoragePanel(QFrame):
 
 
 class OverviewPage(QWidget, ScaleMixin):
-    """Premium glass overview dashboard with enterprise design"""
+    """Premium glass overview dashboard - responsive with adaptive grid"""
 
     def __init__(self, data_collector=None, parent=None):
         super().__init__(parent)
@@ -675,6 +657,9 @@ class OverviewPage(QWidget, ScaleMixin):
     def on_scale_changed(self, factor: float):
         self._rebuild_styles()
 
+    def on_layout_mode_changed(self, mode):
+        self._rebuild_styles()
+
     def _rebuild_styles(self):
         colors = theme_manager.colors
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
@@ -689,40 +674,59 @@ class OverviewPage(QWidget, ScaleMixin):
         main_layout.setSpacing(0)
         self.setLayout(main_layout)
 
-        # Header
         self._header = self._create_header()
         main_layout.addWidget(self._header)
 
-        # Content widget that expands to fill available space
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {colors.BG_PRIMARY};
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                background-color: {colors.BG_SECONDARY};
+                width: 6px;
+                border-radius: 3px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: rgba(74, 108, 247, 0.3);
+                border-radius: 3px;
+                min-height: 30px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+        """)
+
         content = QWidget()
         content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         content.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(S.px(28), S.px(20), S.px(28), S.px(28))
-        content_layout.setSpacing(S.px(20))
-        content_layout.addStretch(1)
+        content_layout.setContentsMargins(S.px(24), S.px(16), S.px(24), S.px(24))
+        content_layout.setSpacing(S.px(16))
         content.setLayout(content_layout)
 
-        # Metric cards row
-        metrics_row = self._create_metrics_row()
-        content_layout.insertWidget(0, metrics_row)
+        self._metrics_row = self._create_metrics_row()
+        content_layout.addWidget(self._metrics_row)
 
-        # Charts section
-        charts_section = self._create_charts_section()
-        content_layout.insertWidget(1, charts_section)
+        self._charts_section = self._create_charts_section()
+        content_layout.addWidget(self._charts_section, stretch=1)
 
-        # Info panels
-        info_row = self._create_info_row()
-        content_layout.insertWidget(2, info_row)
+        self._info_row = self._create_info_row()
+        content_layout.addWidget(self._info_row)
 
-        main_layout.addWidget(content, stretch=1)
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll, stretch=1)
 
     def _create_header(self):
         colors = theme_manager.colors
         header = QFrame()
-        header.setFixedHeight(S.px(90))
+        header.setMinimumHeight(S.px(60))
+        header.setMaximumHeight(S.px(90))
         if theme_manager.current_theme == "heimdal":
-            header.setStyleSheet(f"""
+            header.setStyleSheet("""
                 background-color: #12152A;
                 border: none;
             """)
@@ -732,34 +736,31 @@ class OverviewPage(QWidget, ScaleMixin):
                 border: none;
             """)
         layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(28), 0, S.px(28), 0)
-        layout.setSpacing(S.px(24))
+        layout.setContentsMargins(S.px(24), S.px(8), S.px(24), S.px(8))
+        layout.setSpacing(S.px(16))
         header.setLayout(layout)
 
-        # Title section
         title_section = QVBoxLayout()
-        title_section.setSpacing(4)
+        title_section.setSpacing(2)
         title_section.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         title = QLabel("Dashboard")
-        title.setFont(QFont("Segoe UI", S.font_pt(26), QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         title_section.addWidget(title)
 
         subtitle = QLabel("System performance overview")
-        subtitle.setFont(QFont("Segoe UI", S.font_pt(12)))
+        subtitle.setFont(QFont("Segoe UI", S.font_pt(10)))
         subtitle.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         title_section.addWidget(subtitle)
         layout.addLayout(title_section)
 
         layout.addStretch()
 
-        # Status indicators
         status_layout = QHBoxLayout()
-        status_layout.setSpacing(16)
+        status_layout.setSpacing(S.px(12))
         status_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Uptime
         uptime_block = QFrame()
         uptime_block.setStyleSheet(f"""
             background-color: {colors.BG_CARD};
@@ -768,29 +769,28 @@ class OverviewPage(QWidget, ScaleMixin):
         """)
         uptime_layout = QVBoxLayout()
         uptime_layout.setSpacing(0)
-        uptime_layout.setContentsMargins(S.px(16), S.px(8), S.px(16), S.px(8))
+        uptime_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
         uptime_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         uptime_block.setLayout(uptime_layout)
 
         self._uptime_val = QLabel("0m")
-        self._uptime_val.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold))
+        self._uptime_val.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         self._uptime_val.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         uptime_layout.addWidget(self._uptime_val)
 
         uptime_lbl = QLabel("Uptime")
-        uptime_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
+        uptime_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
         uptime_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         uptime_layout.addWidget(uptime_lbl)
         status_layout.addWidget(uptime_block)
 
-        # Separator
         sep = QFrame()
         sep.setFixedWidth(1)
-        sep.setFixedHeight(40)
-        sep.setStyleSheet(f"background-color: transparent;")
+        sep.setMinimumHeight(S.px(28))
+        sep.setMaximumHeight(S.px(36))
+        sep.setStyleSheet("background-color: transparent;")
         status_layout.addWidget(sep)
 
-        # OS
         os_block = QFrame()
         os_block.setStyleSheet(f"""
             background-color: {colors.BG_CARD};
@@ -799,51 +799,20 @@ class OverviewPage(QWidget, ScaleMixin):
         """)
         os_layout = QVBoxLayout()
         os_layout.setSpacing(0)
-        os_layout.setContentsMargins(S.px(16), S.px(8), S.px(16), S.px(8))
+        os_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
         os_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         os_block.setLayout(os_layout)
 
         os_val = QLabel(self._short_os())
-        os_val.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold))
+        os_val.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         os_val.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         os_layout.addWidget(os_val)
 
-        os_lbl = QLabel("Operating System")
-        os_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
+        os_lbl = QLabel("OS")
+        os_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
         os_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         os_layout.addWidget(os_lbl)
         status_layout.addWidget(os_block)
-
-        # Separator
-        sep2 = QFrame()
-        sep2.setFixedWidth(1)
-        sep2.setFixedHeight(40)
-        sep2.setStyleSheet(f"background-color: transparent;")
-        status_layout.addWidget(sep2)
-
-        # CPU
-        cpu_block = QFrame()
-        cpu_block.setStyleSheet(f"""
-            background-color: {colors.BG_CARD};
-            border: none;
-            border-radius: {S.px(8)}px;
-        """)
-        cpu_layout = QVBoxLayout()
-        cpu_layout.setSpacing(0)
-        cpu_layout.setContentsMargins(S.px(16), S.px(8), S.px(16), S.px(8))
-        cpu_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cpu_block.setLayout(cpu_layout)
-
-        self._cpu_name_val = QLabel(self._short_cpu()[:20])
-        self._cpu_name_val.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        self._cpu_name_val.setStyleSheet(f"color: {colors.ACCENT_BLUE}; background: transparent;")
-        cpu_layout.addWidget(self._cpu_name_val)
-
-        cpu_lbl = QLabel("Processor")
-        cpu_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-        cpu_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        cpu_layout.addWidget(cpu_lbl)
-        status_layout.addWidget(cpu_block)
 
         layout.addLayout(status_layout)
         return header
@@ -851,15 +820,12 @@ class OverviewPage(QWidget, ScaleMixin):
     def _create_metrics_row(self):
         colors = theme_manager.colors
         row = QFrame()
-        row.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        row.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         layout = QGridLayout()
-        layout.setSpacing(S.px(16))
-        layout.setHorizontalSpacing(S.px(16))
-        layout.setVerticalSpacing(S.px(16))
+        layout.setSpacing(S.px(12))
         layout.setContentsMargins(0, 0, 0, 0)
         row.setLayout(layout)
 
-        # Row 1: CPU, GPU, Memory
         cpu_card = GlassMetricCard("CPU Load", "🖥", colors.ACCENT_GREEN)
         cpu_card.set_value("--", "Loading...")
         self._cpu_card = cpu_card
@@ -875,7 +841,6 @@ class OverviewPage(QWidget, ScaleMixin):
         self._ram_card = ram_card
         layout.addWidget(ram_card, 0, 2)
 
-        # Row 2: Network, Disk, Temperature
         net_card = GlassMetricCard("Network", "📶", colors.ACCENT_CYAN)
         net_card.set_value("0.0 / 0.0", "Down / Up Mbps")
         self._net_card = net_card
@@ -886,7 +851,6 @@ class OverviewPage(QWidget, ScaleMixin):
         self._disk_card = disk_card
         layout.addWidget(disk_card, 1, 1)
 
-        # Temperature card
         temp_card = GlassMetricCard("Temperature", "🌡", colors.ACCENT_RED)
         temp_card.set_value("--°C", "CPU temp")
         self._temp_card = temp_card
@@ -897,6 +861,7 @@ class OverviewPage(QWidget, ScaleMixin):
     def _create_charts_section(self):
         colors = theme_manager.colors
         section = QFrame()
+        section.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         if theme_manager.current_theme == "heimdal":
             section.setStyleSheet(f"""
                 QFrame {{
@@ -910,30 +875,26 @@ class OverviewPage(QWidget, ScaleMixin):
                 QFrame {{
                     background-color: {colors.BG_CARD};
                     border: none;
-                    border-radius: {S.px(16)}px;
+                    border-radius: {S.px(14)}px;
                 }}
             """)
         layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
-        layout.setSpacing(S.px(20))
+        layout.setContentsMargins(S.px(14), S.px(10), S.px(14), S.px(10))
+        layout.setSpacing(S.px(12))
         section.setLayout(layout)
 
-        # CPU Chart
         cpu_chart = GlassChartPanel("CPU Usage", colors.ACCENT_GREEN)
         self._cpu_sparkline = cpu_chart._sparkline
         layout.addWidget(cpu_chart, stretch=1)
 
-        # RAM Chart
         ram_chart = GlassChartPanel("Memory Usage", colors.ACCENT_BLUE)
         self._ram_sparkline = ram_chart._sparkline
         layout.addWidget(ram_chart, stretch=1)
 
-        # Network Chart
         net_chart = GlassChartPanel("Network Traffic", colors.ACCENT_CYAN)
         self._net_sparkline = net_chart._sparkline
         layout.addWidget(net_chart, stretch=1)
 
-        # GPU Chart
         gpu_chart = GlassChartPanel("GPU Load", colors.ACCENT_PURPLE)
         self._gpu_sparkline = gpu_chart._sparkline
         layout.addWidget(gpu_chart, stretch=1)
@@ -942,15 +903,14 @@ class OverviewPage(QWidget, ScaleMixin):
 
     def _create_info_row(self):
         row = QFrame()
+        row.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         layout = QHBoxLayout()
-        layout.setSpacing(S.px(16))
+        layout.setSpacing(S.px(12))
         row.setLayout(layout)
 
-        # System Info panel
         sysinfo_panel = self._create_sysinfo_panel()
         layout.addWidget(sysinfo_panel, stretch=1)
 
-        # Storage panel
         storage_panel = GlassStoragePanel()
         self._storage_panel = storage_panel
         layout.addWidget(storage_panel, stretch=1)
@@ -961,7 +921,6 @@ class OverviewPage(QWidget, ScaleMixin):
         colors = theme_manager.colors
         panel = GlassInfoPanel("System Information")
 
-        # Info rows
         panel.add_info_row("Processor", self._get_cpu_display(), colors.ACCENT_BLUE)
         panel.add_info_row("Graphics", self._get_gpu_display(), colors.ACCENT_PURPLE)
         panel.add_info_row("Memory", self._get_ram_display(), colors.ACCENT_GREEN)
@@ -1098,7 +1057,6 @@ class OverviewPage(QWidget, ScaleMixin):
         self._last_data = data
         colors = theme_manager.colors
 
-        # CPU
         if 'cpu' in data:
             cpu = data['cpu']
             pct = cpu.get('percent', 0)
@@ -1106,7 +1064,6 @@ class OverviewPage(QWidget, ScaleMixin):
             self._cpu_card.push_sparkline(pct)
             self._cpu_sparkline.push(pct)
 
-        # GPU
         if 'gpu' in data:
             gpu = data['gpu']
             if gpu.get('available'):
@@ -1116,7 +1073,6 @@ class OverviewPage(QWidget, ScaleMixin):
                     self._gpu_card.push_sparkline(load)
                     self._gpu_sparkline.push(load)
 
-        # Memory
         if 'memory' in data:
             mem = data['memory']
             pct = mem.get('percent', 0)
@@ -1126,7 +1082,6 @@ class OverviewPage(QWidget, ScaleMixin):
             self._ram_card.push_sparkline(pct)
             self._ram_sparkline.push(pct)
 
-        # Network
         if 'network' in data:
             net = data['network']
             bytes_sent = net.get('bytes_sent', 0)
@@ -1148,7 +1103,6 @@ class OverviewPage(QWidget, ScaleMixin):
 
             self._last_net = (bytes_sent, bytes_recv)
 
-        # Disk
         if 'disk' in data:
             disk = data['disk']
             read_speed = disk.get('read_speed', 0)
@@ -1158,7 +1112,6 @@ class OverviewPage(QWidget, ScaleMixin):
                 "R/W MB/s"
             )
 
-        # Temperature
         if 'gpu' in data:
             gpu = data['gpu']
             temp = gpu.get('temperature')
@@ -1166,6 +1119,5 @@ class OverviewPage(QWidget, ScaleMixin):
                 self._temp_card.set_value(f"{temp:.0f}°C", "GPU temp")
                 self._temp_card.push_sparkline(temp)
 
-        # Update storage display
         if 'partitions' in data:
             self._storage_panel.update_drives(data['partitions'])
