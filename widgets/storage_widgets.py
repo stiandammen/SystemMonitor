@@ -414,7 +414,7 @@ class StorageDiskCard(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_CARD};
-                border: 1px solid {colors.BORDER};
+                border: none;
                 border-radius: 12px;
             }}
         """)
@@ -482,7 +482,7 @@ class StorageDiskCard(QFrame):
 
         # Usage percentage (large)
         self._pct_label = QLabel(f"{self._get_usage_percent():.0f}%")
-        self._pct_label.setFont(QFont("Segoe UI", S.font_pt(26), QFont.Weight.Bold))
+        self._pct_label.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
         self._pct_label.setStyleSheet(f"color: {self._get_usage_color()}; background: transparent;")
         self._pct_label.setObjectName("pct_label")
         self._pct_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -703,7 +703,7 @@ class StorageOverviewCard(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_CARD};
-                border: 1px solid {colors.BORDER};
+                border: none;
                 border-radius: 12px;
             }}
         """)

@@ -1,6 +1,6 @@
 """
-Memory View - Memory monitoring dashboard
-Modern design with real-time graphs, donut charts, and process list
+Memory View - Professional memory monitoring dashboard
+Enterprise-grade design with real-time graphs, donut charts, and process list
 """
 import time
 import psutil
@@ -8,16 +8,90 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient, QPaintEvent, QShowEvent
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QFrame, QProgressBar, QScrollArea, QSizePolicy, QMenu, QPushButton
+    QLabel, QFrame, QProgressBar, QSizePolicy, QMenu, QPushButton
 )
 
 from styles.theme import theme_manager
 from scaler import S, ScaleMixin
+from widgets.card import Card
+import qtawesome as qta
 
 
 def c():
     """Access theme colors"""
     return theme_manager.colors
+
+
+class MemoryKpiCard(QFrame):
+    """Premium KPI stat card for memory metrics"""
+    def __init__(self, title: str, icon: str, accent: str, parent=None):
+        super().__init__(parent)
+        self._title = title
+        self._icon = icon
+        self._accent = accent
+        self._value = "--"
+        self._unit = ""
+        self._setup_ui()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self, theme_name: str):
+        self._setup_ui()
+
+    def _setup_ui(self):
+        colors = theme_manager.colors
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumHeight(S.px(90))
+
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {colors.BG_CARD};
+                border: none;
+                border-radius: {S.px(12)}px;
+            }}
+        """)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
+        layout.setSpacing(S.px(8))
+        self.setLayout(layout)
+
+        # Top row: icon + title
+        top_row = QHBoxLayout()
+        top_row.setSpacing(S.px(8))
+
+        icon_label = QLabel()
+        try:
+            icon = qta.icon(self._icon, color=self._accent, scale=1.0)
+            icon_label.setPixmap(icon.pixmap(S.px(16), S.px(16)))
+        except Exception:
+            icon_label.setText("")
+        icon_label.setStyleSheet("background: transparent;")
+        top_row.addWidget(icon_label)
+
+        title_label = QLabel(self._title)
+        title_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        top_row.addWidget(title_label)
+        top_row.addStretch()
+
+        layout.addLayout(top_row)
+
+        # Value
+        self._value_label = QLabel(self._value)
+        self._value_label.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
+        self._value_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
+        layout.addWidget(self._value_label)
+
+        # Unit
+        self._unit_label = QLabel("")
+        self._unit_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._unit_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        layout.addWidget(self._unit_label)
+
+    def set_value(self, value: str, unit: str = ""):
+        self._value = value
+        self._value_label.setText(value)
+        self._unit_label.setText(unit)
 
 
 class MemoryDonutChart(QWidget):
@@ -115,7 +189,7 @@ class MemoryPressureGraph(QWidget):
             return
 
         # Background
-        painter.setBrush(QColor(colors.BG_CARD))
+        painter.setBrush(QColor(colors.BG_HOVER))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, 0, w, h)
 
@@ -357,49 +431,50 @@ class ProcessRow(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_SECONDARY};
-                border-radius: 6px;
+                border: none;
+                border-radius: {S.px(6)}px;
             }}
             QFrame:hover {{
-                background-color: {colors.BG_CARD};
+                background-color: {colors.BG_HOVER};
             }}
         """)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(10, 6, 10, 6)
-        layout.setSpacing(10)
+        layout.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
+        layout.setSpacing(S.px(10))
         self.setLayout(layout)
 
         self._rank_lbl = QLabel()
-        self._rank_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        self._rank_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
         self._rank_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         self._rank_lbl.setFixedWidth(22)
         layout.addWidget(self._rank_lbl)
 
         self._name_lbl = QLabel()
-        self._name_lbl.setFont(QFont("Segoe UI", 9))
+        self._name_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
         self._name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         self._name_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self._name_lbl, stretch=1)
 
         self._mem_lbl = QLabel()
-        self._mem_lbl.setFont(QFont("Segoe UI", 9))
+        self._mem_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
         self._mem_lbl.setStyleSheet(f"color: {colors.ACCENT_CYAN}; background: transparent;")
-        self._mem_lbl.setFixedWidth(70)
+        self._mem_lbl.setFixedWidth(S.px(70))
         self._mem_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self._mem_lbl)
 
         self._pct_lbl = QLabel()
-        self._pct_lbl.setFont(QFont("Segoe UI", 9))
+        self._pct_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
         self._pct_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-        self._pct_lbl.setFixedWidth(40)
+        self._pct_lbl.setFixedWidth(S.px(40))
         self._pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self._pct_lbl)
 
         self._bar = QProgressBar()
-        self._bar.setFixedWidth(80)
-        self._bar.setFixedHeight(6)
+        self._bar.setFixedWidth(S.px(80))
+        self._bar.setFixedHeight(S.px(6))
         self._bar.setTextVisible(False)
         layout.addWidget(self._bar)
 
@@ -411,16 +486,16 @@ class ProcessRow(QFrame):
             QMenu {{
                 background-color: {c().BG_CARD};
                 border: 1px solid {c().BORDER};
-                border-radius: 8px;
-                padding: 4px;
+                border-radius: {S.px(8)}px;
+                padding: {S.px(4)}px;
             }}
             QMenu::item {{
                 color: {c().TEXT_PRIMARY};
-                padding: 6px 24px 6px 12px;
-                border-radius: 4px;
+                padding: {S.px(6)}px {S.px(24)}px {S.px(6)}px {S.px(12)}px;
+                border-radius: {S.px(4)}px;
             }}
             QMenu::item:selected {{
-                background-color: {c().BG_SECONDARY};
+                background-color: {c().BG_HOVER};
             }}
         """)
 
@@ -464,82 +539,17 @@ class ProcessRow(QFrame):
             QProgressBar {{
                 background-color: {c().BG_PRIMARY};
                 border: none;
-                border-radius: 3px;
+                border-radius: {S.px(3)}px;
             }}
             QProgressBar::chunk {{
                 background-color: {bar_color};
-                border-radius: 3px;
-            }}
-        """)
-
-
-class MemoryStatCard(QFrame):
-    """Memory stat card"""
-    def __init__(self, label: str = "", value: str = "--", color: str | None = None, parent=None):
-        super().__init__(parent)
-        colors = c()
-        self._color = color or colors.ACCENT_GREEN
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {colors.BG_CARD};
-                border: 1px solid {colors.BORDER};
-                border-radius: 10px;
-            }}
-        """)
-        layout = QVBoxLayout()
-        layout.setSpacing(4)
-        layout.setContentsMargins(20, 12, 20, 12)
-        self.setLayout(layout)
-
-        lbl = QLabel(label)
-        lbl.setFont(QFont("Segoe UI", 8))
-        lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        layout.addWidget(lbl)
-
-        self._value_lbl = QLabel(value)
-        self._value_lbl.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
-        self._value_lbl.setStyleSheet(f"color: {self._color}; background: transparent;")
-        layout.addWidget(self._value_lbl)
-
-        self._bar = QProgressBar()
-        self._bar.setFixedHeight(3)
-        self._bar.setTextVisible(False)
-        self._bar.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {colors.BG_SECONDARY};
-                border: none;
-                border-radius: 2px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {self._color};
-                border-radius: 2px;
-            }}
-        """)
-        layout.addWidget(self._bar)
-
-    def set_value(self, value: str, percent: float | None = None):
-        self._value_lbl.setText(str(value))
-        if percent is not None:
-            self._bar.setValue(int(min(100, max(0, percent))))
-
-    def set_color(self, color: str):
-        self._color = color
-        self._value_lbl.setStyleSheet(f"color: {color}; background: transparent;")
-        self._bar.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {c().BG_SECONDARY};
-                border: none;
-                border-radius: 2px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {color};
-                border-radius: 2px;
+                border-radius: {S.px(3)}px;
             }}
         """)
 
 
 class MemoryView(QWidget, ScaleMixin):
-    """Memory monitoring dashboard"""
+    """Memory monitoring dashboard with professional enterprise design"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -549,9 +559,7 @@ class MemoryView(QWidget, ScaleMixin):
         self._max_history = 60
         self._current_memory_data = None
         self._update_timer = None
-        self._prev_top_pid = None  # Track previous #1 process
-        self._highlight_timer = QTimer()  # Timer to remove highlight
-        self._highlight_timer.timeout.connect(self._clear_highlight)
+        self._prev_top_pid = None
         self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -572,135 +580,148 @@ class MemoryView(QWidget, ScaleMixin):
     def _start_update_timer(self):
         """Start the real-time update timer - called when view is shown"""
         if self._update_timer is not None:
-            return  # Already started
+            return
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self._update_display_from_signal)
         self._update_timer.start(1000)
 
     def _update_display_from_signal(self):
         """Called by timer to refresh data from collector signal"""
-        # Re-request data update from the current data we have
-        # This ensures we still get updates even when not receiving signals
-        pass  # Data comes from update_data signal
+        pass
 
     def _setup_ui(self):
         colors = c()
+        self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Main layout
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(16, 12, 16, 12)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
+        main_layout.setSpacing(S.px(12))
         self.setLayout(main_layout)
 
-        # Header
+        # ===== HEADER BAR =====
         header = QFrame()
-        header.setFixedHeight(44)
-        header.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: 10px; border: 1px solid {colors.BORDER};")
+        header.setFixedHeight(S.px(48))
+        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        header.setStyleSheet(f"""
+            QFrame {{
+                background-color: {colors.BG_CARD};
+                border: none;
+                border-radius: {S.px(10)}px;
+            }}
+        """)
         header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(14, 0, 14, 0)
+        header_layout.setContentsMargins(S.px(16), 0, S.px(16), 0)
+        header_layout.setSpacing(S.px(12))
         header.setLayout(header_layout)
 
-        self._status_dot = QLabel("●")
-        self._status_dot.setStyleSheet(f"color: {colors.ACCENT_GREEN}; font-size: 12px; background: transparent;")
-        header_layout.addWidget(self._status_dot)
+        # Live indicator
+        live_layout = QHBoxLayout()
+        live_layout.setSpacing(S.px(8))
+
+        self._status_dot = QLabel()
+        self._status_dot.setFixedSize(S.px(8), S.px(8))
+        self._status_dot.setStyleSheet(f"background-color: {colors.ACCENT_GREEN}; border-radius: {S.px(4)}px;")
+        live_layout.addWidget(self._status_dot)
+
+        live_label = QLabel("LIVE")
+        live_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        live_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        live_layout.addWidget(live_label)
+
+        header_layout.addLayout(live_layout)
 
         title = QLabel("Memory Monitor")
-        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         header_layout.addWidget(title)
 
         header_layout.addStretch()
 
         self._usage_indicator = QLabel("0%")
-        self._usage_indicator.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self._usage_indicator.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
         self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
         header_layout.addWidget(self._usage_indicator)
 
         self._pressure_label = QLabel("Normal")
-        self._pressure_label.setFont(QFont("Segoe UI", 9))
-        self._pressure_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; padding: 3px 10px; background-color: {colors.BG_SECONDARY}; border-radius: 10px;")
+        self._pressure_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._pressure_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; padding: {S.px(3)}px {S.px(10)}px; background-color: {colors.BG_SECONDARY}; border-radius: {S.px(10)}px;")
         header_layout.addWidget(self._pressure_label)
 
         main_layout.addWidget(header)
 
-        # Stats row
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(10)
+        # ===== KPI CARDS ROW =====
+        kpi_layout = QHBoxLayout()
+        kpi_layout.setSpacing(S.px(12))
 
-        self._card_used = MemoryStatCard("Used Memory", "-- GB", colors.ACCENT_GREEN)
-        self._card_available = MemoryStatCard("Available", "-- GB", colors.ACCENT_BLUE)
-        self._card_cached = MemoryStatCard("Cached", "-- GB", colors.ACCENT_PURPLE)
-        self._card_free = MemoryStatCard("Free", "-- GB", colors.TEXT_SECONDARY)
+        self._used_kpi = MemoryKpiCard("Used", "fa5s.memory", colors.ACCENT_GREEN)
+        self._available_kpi = MemoryKpiCard("Available", "fa5s.check", colors.ACCENT_BLUE)
+        self._cached_kpi = MemoryKpiCard("Cached", "fa5s.archive", colors.ACCENT_PURPLE)
+        self._free_kpi = MemoryKpiCard("Free", "fa5s.box-open", colors.ACCENT_ORANGE)
 
-        for card in [self._card_used, self._card_available, self._card_cached, self._card_free]:
-            stats_layout.addWidget(card, stretch=1)
+        for card in [self._used_kpi, self._available_kpi, self._cached_kpi, self._free_kpi]:
+            card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            kpi_layout.addWidget(card, stretch=1)
 
-        main_layout.addLayout(stats_layout)
+        main_layout.addLayout(kpi_layout)
 
-        # Charts section
-        charts_frame = QFrame()
-        charts_frame.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: 10px; border: 1px solid {colors.BORDER};")
-        charts_layout = QHBoxLayout()
-        charts_layout.setContentsMargins(10, 8, 10, 8)
-        charts_layout.setSpacing(12)
-        charts_frame.setLayout(charts_layout)
+        # ===== MAIN CONTENT (2 columns) =====
+        content_container = QWidget()
+        content_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        content_layout = QHBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(S.px(12))
+        content_container.setLayout(content_layout)
 
-        # Donut
+        # LEFT COLUMN - Charts
+        left_widget = QWidget()
+        left_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(S.px(12))
+        left_widget.setLayout(left_layout)
+
+        # Distribution card
+        dist_card = Card(title="Memory Distribution", icon="📊")
         donut_container = QWidget()
         donut_layout = QVBoxLayout()
         donut_layout.setContentsMargins(0, 0, 0, 0)
+        donut_layout.setSpacing(S.px(8))
         donut_container.setLayout(donut_layout)
-
-        donut_title = QLabel("Memory Distribution")
-        donut_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        donut_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-        donut_layout.addWidget(donut_title)
 
         self._donut_chart = MemoryDonutChart()
         donut_layout.addWidget(self._donut_chart, alignment=Qt.AlignmentFlag.AlignCenter)
+        dist_card.add_widget(donut_container)
+        left_layout.addWidget(dist_card, stretch=1)
 
-        charts_layout.addWidget(donut_container)
-
-        # Line graph
-        graph_container = QWidget()
-        graph_layout = QVBoxLayout()
-        graph_layout.setContentsMargins(0, 0, 0, 0)
-        graph_container.setLayout(graph_layout)
-
-        graph_title = QLabel("Memory Usage Over Time")
-        graph_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        graph_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-        graph_layout.addWidget(graph_title)
-
+        # Usage graph card
+        graph_card = Card(title="Memory Usage Over Time", icon="📈")
         self._usage_graph = MemoryUsageGraph()
-        graph_layout.addWidget(self._usage_graph, stretch=1)
+        self._usage_graph.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        graph_card.add_widget(self._usage_graph)
+        left_layout.addWidget(graph_card, stretch=1)
 
-        charts_layout.addWidget(graph_container, stretch=1)
+        content_layout.addWidget(left_widget, stretch=2)
 
-        main_layout.addWidget(charts_frame, stretch=1)
+        # RIGHT COLUMN - Process list + Pressure
+        right_widget = QWidget()
+        right_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(S.px(12))
+        right_widget.setLayout(right_layout)
 
-        # Process section
-        process_frame = QFrame()
-        process_frame.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: 10px; border: 1px solid {colors.BORDER};")
-        process_layout = QVBoxLayout()
-        process_layout.setContentsMargins(12, 10, 12, 10)
-        process_layout.setSpacing(0)
-        process_frame.setLayout(process_layout)
+        # Process card
+        process_card = Card(title="Top Processes", icon="🔍")
 
-        # Header with title and view all button
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(0, 0, 0, 8)
-
-        process_title = QLabel("Top Processes")
-        process_title.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        process_title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        header_layout.addWidget(process_title)
-
-        header_layout.addStretch()
+        # Header with view all button
+        proc_header = QHBoxLayout()
+        proc_header.setSpacing(S.px(12))
 
         self._view_all_btn = QPushButton("View all")
-        self._view_all_btn.setFont(QFont("Segoe UI", 9))
-        self._view_all_btn.setFixedHeight(24)
+        self._view_all_btn.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._view_all_btn.setFixedHeight(S.px(24))
         self._view_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._view_all_btn.clicked.connect(self._show_all_processes)
         self._view_all_btn.setStyleSheet(f"""
@@ -708,8 +729,8 @@ class MemoryView(QWidget, ScaleMixin):
                 background-color: {colors.BG_SECONDARY};
                 color: {colors.TEXT_SECONDARY};
                 border: 1px solid {colors.BORDER};
-                border-radius: 4px;
-                padding: 2px 12px;
+                border-radius: {S.px(4)}px;
+                padding: 2px {S.px(12)}px;
             }}
             QPushButton:hover {{
                 background-color: {colors.BG_HOVER};
@@ -717,88 +738,170 @@ class MemoryView(QWidget, ScaleMixin):
                 border-color: {colors.ACCENT_PURPLE};
             }}
         """)
-        header_layout.addWidget(self._view_all_btn)
-        process_layout.addLayout(header_layout)
+        proc_header.addStretch()
+        proc_header.addWidget(self._view_all_btn)
+        process_card.add_layout(proc_header)
 
         # Column headers
         col_header = QHBoxLayout()
-        col_header.setContentsMargins(4, 0, 4, 4)
-        col_header.setSpacing(10)
+        col_header.setContentsMargins(0, S.px(4), 0, S.px(4))
+        col_header.setSpacing(S.px(10))
 
         lbl = QLabel("#")
-        lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(24)
+        lbl.setFixedWidth(22)
         col_header.addWidget(lbl)
 
         lbl = QLabel("Process")
-        lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         col_header.addWidget(lbl, stretch=1)
 
         lbl = QLabel("Memory")
-        lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(70)
+        lbl.setFixedWidth(S.px(70))
         lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         col_header.addWidget(lbl)
 
         lbl = QLabel("%")
-        lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(45)
+        lbl.setFixedWidth(S.px(40))
         lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         col_header.addWidget(lbl)
 
         lbl = QLabel("Usage")
-        lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(80)
+        lbl.setFixedWidth(S.px(80))
         col_header.addWidget(lbl)
-        process_layout.addLayout(col_header)
+        process_card.add_layout(col_header)
 
         # Process rows
         self._process_container = QWidget()
+        self._process_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         process_vlayout = QVBoxLayout()
         process_vlayout.setContentsMargins(0, 0, 0, 0)
-        process_vlayout.setSpacing(3)
+        process_vlayout.setSpacing(S.px(3))
         self._process_container.setLayout(process_vlayout)
 
         for i in range(10):
             row = ProcessRow(name="--", memory_mb=0, percent=0, rank=i + 1)
-            row.setFixedHeight(30)
+            row.setFixedHeight(S.px(30))
             self._process_rows.append(row)
             process_vlayout.addWidget(row)
 
-        process_layout.addWidget(self._process_container)
+        process_card.add_widget(self._process_container)
+        right_layout.addWidget(process_card, stretch=2)
 
-        main_layout.addWidget(process_frame)
+        # Pressure card
+        pressure_card = Card(title="Memory Pressure", icon="⚡")
+        self._pressure_graph = MemoryPressureGraph()
+        self._pressure_graph.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        pressure_card.add_widget(self._pressure_graph)
+        right_layout.addWidget(pressure_card, stretch=1)
 
-        # Pressure section
-        pressure_frame = QFrame()
-        pressure_frame.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: 10px; border: 1px solid {colors.BORDER};")
+        content_layout.addWidget(right_widget, stretch=1)
+
+        main_layout.addWidget(content_container, stretch=1)
+
+        # ===== STATUS BAR =====
+        self._setup_status_bar(main_layout)
+
+    def _setup_status_bar(self, parent_layout):
+        """Setup bottom status bar"""
+        colors = c()
+
+        status_card = Card(title="System Status", icon="🛡️")
+        status_layout = QHBoxLayout()
+        status_layout.setSpacing(S.px(32))
+
+        # Health
+        health_widget = QWidget()
+        health_layout = QVBoxLayout()
+        health_layout.setSpacing(4)
+        health_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        health_icon = QLabel()
+        try:
+            icon = qta.icon("mdi.shield-check", color=colors.ACCENT_GREEN, scale=1.5)
+            health_icon.setPixmap(icon.pixmap(S.px(28), S.px(28)))
+        except Exception:
+            health_icon.setText("✓")
+        health_icon.setStyleSheet("background: transparent;")
+        health_layout.addWidget(health_icon)
+
+        self._health_label = QLabel("Healthy")
+        self._health_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        self._health_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        health_layout.addWidget(self._health_label)
+
+        health_widget.setLayout(health_layout)
+        status_layout.addWidget(health_widget)
+
+        # Total memory
+        total_widget = QWidget()
+        total_layout = QVBoxLayout()
+        total_layout.setSpacing(2)
+        total_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        total_title = QLabel("Total Memory")
+        total_title.setFont(QFont("Segoe UI", S.font_pt(9)))
+        total_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        total_layout.addWidget(total_title)
+
+        self._total_label = QLabel("-- GB")
+        self._total_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._total_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+        total_layout.addWidget(self._total_label)
+
+        total_widget.setLayout(total_layout)
+        status_layout.addWidget(total_widget)
+
+        # Used memory
+        used_widget = QWidget()
+        used_layout = QVBoxLayout()
+        used_layout.setSpacing(2)
+        used_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        used_title = QLabel("Used")
+        used_title.setFont(QFont("Segoe UI", S.font_pt(9)))
+        used_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        used_layout.addWidget(used_title)
+
+        self._used_label = QLabel("-- GB")
+        self._used_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._used_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        used_layout.addWidget(self._used_label)
+
+        used_widget.setLayout(used_layout)
+        status_layout.addWidget(used_widget)
+
+        # Pressure status
+        pressure_widget = QWidget()
         pressure_layout = QVBoxLayout()
-        pressure_layout.setContentsMargins(10, 8, 10, 8)
-        pressure_layout.setSpacing(8)
-        pressure_frame.setLayout(pressure_layout)
+        pressure_layout.setSpacing(2)
+        pressure_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        pressure_title_row = QHBoxLayout()
-        pressure_title = QLabel("Memory Pressure Over Time")
-        pressure_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        pressure_title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-        pressure_title_row.addWidget(pressure_title)
-        pressure_title_row.addStretch()
+        pressure_title = QLabel("Pressure")
+        pressure_title.setFont(QFont("Segoe UI", S.font_pt(9)))
+        pressure_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        pressure_layout.addWidget(pressure_title)
 
         self._pressure_status = QLabel("Normal")
-        self._pressure_status.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        self._pressure_status.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent; padding: 3px 10px; background-color: {colors.BG_SECONDARY}; border-radius: 8px;")
-        pressure_title_row.addWidget(self._pressure_status)
-        pressure_layout.addLayout(pressure_title_row)
+        self._pressure_status.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._pressure_status.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        pressure_layout.addWidget(self._pressure_status)
 
-        self._pressure_graph = MemoryPressureGraph()
-        pressure_layout.addWidget(self._pressure_graph)
+        pressure_widget.setLayout(pressure_layout)
+        status_layout.addWidget(pressure_widget)
 
-        main_layout.addWidget(pressure_frame)
+        status_layout.addStretch()
+
+        status_card.add_layout(status_layout)
+        parent_layout.addWidget(status_card)
 
     def update_data(self, data: dict):
         """Handle data from collector signal - runs on UI thread"""
@@ -841,29 +944,28 @@ class MemoryView(QWidget, ScaleMixin):
         cached_pct = (mem_data.get('cached', 0) / mem_data['total']) * 100 if mem_data['total'] > 0 else 0
         free_pct = (free_gb / total_gb) * 100 if total_gb > 0 else 0
 
-        self._card_used.set_value(f"{used_gb:.1f} GB", used_pct)
-        self._card_available.set_value(f"{available_gb:.1f} GB", available_pct)
-        self._card_cached.set_value(f"{cached_gb:.1f} GB", cached_pct)
-        self._card_free.set_value(f"{free_gb:.1f} GB", free_pct)
+        # Update KPI cards
+        self._used_kpi.set_value(f"{used_gb:.1f} GB", f"{used_pct:.0f}%")
+        self._available_kpi.set_value(f"{available_gb:.1f} GB", f"{available_pct:.0f}%")
+        self._cached_kpi.set_value(f"{cached_gb:.1f} GB", f"{cached_pct:.0f}%")
+        self._free_kpi.set_value(f"{free_gb:.1f} GB", f"{free_pct:.0f}%")
 
-        if used_pct > 90:
-            self._card_used.set_color(colors.ACCENT_RED)
-        elif used_pct > 70:
-            self._card_used.set_color(colors.ACCENT_ORANGE)
-        elif used_pct > 40:
-            self._card_used.set_color(colors.ACCENT_YELLOW)
-        else:
-            self._card_used.set_color(colors.ACCENT_GREEN)
-
+        # Update header
         self._usage_indicator.setText(f"{used_pct:.0f}%")
         if used_pct > 90:
-            self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_RED}; font-size: 16px; font-weight: bold; background: transparent;")
+            color = colors.ACCENT_RED
         elif used_pct > 70:
-            self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_ORANGE}; font-size: 16px; font-weight: bold; background: transparent;")
+            color = colors.ACCENT_ORANGE
         elif used_pct > 40:
-            self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_YELLOW}; font-size: 16px; font-weight: bold; background: transparent;")
+            color = colors.ACCENT_YELLOW
         else:
-            self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_GREEN}; font-size: 16px; font-weight: bold; background: transparent;")
+            color = colors.ACCENT_GREEN
+
+        self._usage_indicator.setStyleSheet(f"color: {color}; background: transparent; font-size: {S.font_pt(16)}px; font-weight: bold;")
+
+        # Update status bar
+        self._total_label.setText(f"{total_gb:.0f} GB")
+        self._used_label.setText(f"{used_gb:.1f} GB")
 
     def _update_charts(self):
         if not self._current_memory_data:
@@ -905,89 +1007,18 @@ class MemoryView(QWidget, ScaleMixin):
             status, status_color = "Normal", colors.ACCENT_GREEN
 
         self._pressure_status.setText(status)
-        self._pressure_status.setStyleSheet(f"color: {status_color}; background-color: {colors.BG_SECONDARY}; padding: 3px 10px; border-radius: 8px; font-weight: bold;")
+        self._pressure_status.setStyleSheet(f"color: {status_color}; background: transparent; font-weight: bold;")
         self._pressure_label.setText(status)
-        self._pressure_label.setStyleSheet(f"color: {status_color}; padding: 3px 10px; background-color: {colors.BG_SECONDARY}; border-radius: 10px;")
+        self._pressure_label.setStyleSheet(f"color: {status_color}; padding: {S.px(3)}px {S.px(10)}px; background-color: {colors.BG_SECONDARY}; border-radius: {S.px(10)}px;")
 
-    def _update_processes(self):
-        try:
-            processes = []
-            for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'memory_info']):
-                try:
-                    info = proc.info
-                    if info['memory_percent'] and info['memory_percent'] > 0:
-                        mem_mb = info['memory_info'].rss / (1024**2) if info['memory_info'] else 0
-                        processes.append({
-                            'name': info['name'],
-                            'memory_mb': mem_mb,
-                            'percent': info['memory_percent'],
-                            'pid': info['pid'],
-                        })
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    pass
-
-            processes.sort(key=lambda x: x['percent'], reverse=True)
-            top_10 = processes[:10]
-
-            # Check if new #1 process
-            if top_10 and top_10[0]['pid'] != self._prev_top_pid:
-                self._prev_top_pid = top_10[0]['pid']
-                self._highlight_row(0)  # Highlight new #1
-
-            for i in range(10):
-                if i < len(top_10):
-                    proc = top_10[i]
-                    self._process_rows[i].update_values(
-                        proc['name'], proc['memory_mb'], proc['percent'], i + 1, proc['pid']
-                    )
-                    self._process_rows[i].show()
-                else:
-                    self._process_rows[i].hide()
-        except Exception as e:
-            print(f"Process update error: {e}")
-
-    def _highlight_row(self, index):
-        """Briefly highlight a row when it becomes the new #1"""
-        if index >= len(self._process_rows):
-            return
-        row = self._process_rows[index]
-        colors = c()
-
-        # Apply highlight animation
-        highlight_color = QColor(colors.ACCENT_GREEN)
-        highlight_color.setAlpha(40)
-        row.setStyleSheet(f"""
-            QFrame {{
-                background-color: {highlight_color.name()};
-                border-radius: 6px;
-                border: 1px solid {colors.ACCENT_GREEN};
-            }}
-        """)
-
-        # Stop any existing highlight timer and restart
-        self._highlight_timer.stop()
-        self._highlight_timer.start(1500)  # Remove highlight after 1.5s
-
-    def _clear_highlight(self):
-        """Remove highlight from highlighted row"""
-        self._highlight_timer.stop()
-        for row in self._process_rows:
-            if row.isVisible():
-                colors = c()
-                row.setStyleSheet(f"""
-                    QFrame {{
-                        background-color: {colors.BG_SECONDARY};
-                        border-radius: 6px;
-                    }}
-                    QFrame:hover {{
-                        background-color: {colors.BG_CARD};
-                    }}
-                """)
+        # Update health indicator
+        self._health_label.setText("Healthy" if pressure < 70 else "Warning" if pressure < 90 else "Critical")
+        health_color = colors.ACCENT_GREEN if pressure < 70 else colors.ACCENT_ORANGE if pressure < 90 else colors.ACCENT_RED
+        self._health_label.setStyleSheet(f"color: {health_color}; background: transparent; font-weight: bold;")
 
     def _show_all_processes(self):
         """Show dialog with all running processes"""
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QFrame, QLabel
-        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView
 
         dialog = QDialog(self)
         dialog.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
@@ -995,7 +1026,6 @@ class MemoryView(QWidget, ScaleMixin):
         dialog.resize(900, 650)
         colors = c()
 
-        # Main layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -1044,7 +1074,7 @@ class MemoryView(QWidget, ScaleMixin):
         table.horizontalHeader().setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         table.verticalHeader().setVisible(False)
         table.setShowGrid(False)
-        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
         table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         table.setStyleSheet(f"""
@@ -1055,7 +1085,7 @@ class MemoryView(QWidget, ScaleMixin):
                 gridline-color: {colors.BORDER};
             }}
             QTableWidget::item {{
-                padding: 8px 12px;
+                padding: {S.px(8)}px {S.px(12)}px;
                 border: none;
                 border-bottom: 1px solid {colors.BORDER};
             }}
@@ -1070,7 +1100,7 @@ class MemoryView(QWidget, ScaleMixin):
                 color: {colors.TEXT_SECONDARY};
                 border: none;
                 border-bottom: 1px solid {colors.BORDER};
-                padding: 10px 12px;
+                padding: {S.px(10)}px {S.px(12)}px;
                 font-weight: bold;
             }}
             QHeaderView {{

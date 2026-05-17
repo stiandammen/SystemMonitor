@@ -5,15 +5,17 @@ Professional enterprise-grade network monitoring with real-time data
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea,
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QComboBox,
-    QGridLayout, QProgressBar, QTabWidget, QTabBar, QPushButton
+    QGridLayout, QProgressBar, QTabWidget, QTabBar, QPushButton, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPointF
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QLinearGradient, QBrush, QIcon, QPolygonF, QPaintEvent
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPointF, QRectF
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QLinearGradient, QBrush, QIcon, QPolygonF, QPaintEvent, QPainterPath, QRadialGradient
+import math
 
 import psutil
 import socket
 import platform
 import time
+import random
 from collections import deque
 from typing import Dict, List, Optional, Tuple
 import qtawesome as qta
@@ -106,6 +108,7 @@ class KpiCard(QFrame):
         self._apply_theme()
 
     def _setup_ui(self):
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout = QVBoxLayout()
         layout.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
         layout.setSpacing(S.px(10))
@@ -555,74 +558,577 @@ class DeviceRow(QFrame):
         layout.addWidget(bar)
 
 
-class NetworkTopologyWidget(QWidget):
-    """Network topology map visualization"""
+class JarvisRadar(QWidget):
+    """Premium military-grade radar with authentic professional styling"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(180)
+        self.setMinimumHeight(240)
+        self._angle = 0
+        self._refresh_colors()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+        from PyQt6.QtCore import QTimer
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._animate)
+        self._timer.start(25)  # 40fps
+
+        # Network nodes with positions
+        self._nodes = [
+            {"id": "ROUTER", "dist": 0.26, "angle": 90, "status": "active"},
+            {"id": "SERVER", "dist": 0.52, "angle": 38, "status": "active"},
+            {"id": "NAS", "dist": 0.52, "angle": 142, "status": "active"},
+            {"id": "PC-01", "dist": 0.78, "angle": 12, "status": "active"},
+            {"id": "PC-02", "dist": 0.78, "angle": 72, "status": "standby"},
+            {"id": "CAM", "dist": 0.78, "angle": 128, "status": "active"},
+            {"id": "IOT", "dist": 0.78, "angle": 168, "status": "offline"},
+        ]
+
+        # Trail history for afterglow effect
+        self._trail_history = [(0, []) for _ in range(720)]
+
+    def _on_theme_changed(self, theme_name: str):
+        self._refresh_colors()
+        self.update()
+
+    def _refresh_colors(self):
+        c = theme_manager.colors
+        # Custom JARVIS green glow color
+        self._glow_green = QColor(0x0b, 0x9e, 0x70)
+        self._primary = self._glow_green
+        self._secondary = c.ACCENT_BLUE
+        self._accent = c.ACCENT_CYAN
+        self._warning = c.ACCENT_ORANGE
+        self._danger = c.ACCENT_RED
+        self._text = c.TEXT_PRIMARY
+        self._muted = c.TEXT_MUTED
+        self._bg = c.BG_CARD
+        self._grid = c.BORDER
+
+    def _animate(self):
+        self._angle = (self._angle + 1) % 360
+        self.update()
 
     def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.LosslessImageRendering)
 
-        c = theme_manager.colors
         w = self.width()
         h = self.height()
+        size = min(w, h)
 
-        painter.fillRect(self.rect(), QColor(c.BG_CARD))
+        painter.fillRect(self.rect(), QColor(self._bg))
 
-        # Draw network nodes
-        nodes = [
-            ("Internet", w/2, 30, c.ACCENT_BLUE),
-            ("Router", w/2, 80, c.ACCENT_GREEN),
-            ("Server", w/3, 130, c.ACCENT_ORANGE),
-            ("NAS", w*2/3, 130, c.ACCENT_PURPLE),
-            ("PC 1", w/4, 170, c.TEXT_SECONDARY),
-            ("PC 2", w/2, 170, c.TEXT_SECONDARY),
-            ("Camera", w*3/4, 170, c.TEXT_SECONDARY),
-        ]
+        cx = w / 2
+        cy = h / 2
+        r = size * 0.43
 
-        def draw_node(label, x, y, color):
-            # Node circle
-            painter.setBrush(QBrush(QColor(color)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(int(x - 12), int(y - 12), 24, 24)
-
-            # Glow effect
-            glow = QLinearGradient(x - 20, y, x + 20, y)
-            glow.setColorAt(0, QColor(color))
-            glow.setColorAt(1, QColor(color))
-            painter.setBrush(glow)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setOpacity(0.3)
-            painter.drawEllipse(int(x - 16), int(y - 16), 32, 32)
-            painter.setOpacity(1.0)
-
-            # Label
-            painter.setFont(QFont("Segoe UI", 8))
-            painter.setPen(QColor(c.TEXT_PRIMARY))
-            fm = painter.fontMetrics()
-            label_w = fm.horizontalAdvance(label)
-            painter.drawText(int(x - label_w/2), int(y + 22), label)
-
-        # Draw connections
-        painter.setPen(QPen(QColor(c.BORDER), 1, Qt.PenStyle.DashLine))
-        connections = [
-            (w/2, 18, w/2, 68),
-            (w/2, 68, w/3, 118),
-            (w/2, 68, w*2/3, 118),
-            (w/3, 118, w/4, 158),
-            (w/3, 118, w/2, 158),
-            (w*2/3, 118, w*3/4, 158),
-        ]
-        for x1, y1, x2, y2 in connections:
-            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
-
-        # Draw nodes
-        for label, x, y, color in nodes:
-            draw_node(label, x, y, color)
+        # Draw radar layers (back to front)
+        self._draw_background(painter, cx, cy, r)
+        self._draw_precision_grid(painter, cx, cy, r)
+        self._draw_sweep_afterglow(painter, cx, cy, r)
+        self._draw_concentric_rings(painter, cx, cy, r)
+        self._draw_azimuth_ticks(painter, cx, cy, r)
+        self._draw_sweep(painter, cx, cy, r)
+        self._draw_nodes(painter, cx, cy, r)
+        self._draw_center_hub(painter, cx, cy, r)
+        self._draw_digital_overlay(painter, cx, cy, r)
 
         painter.end()
+
+    def _draw_background(self, painter, cx, cy, r):
+        """Draw sophisticated radar background with depth"""
+        import math
+
+        # Main radial gradient
+        bg_gradient = QRadialGradient(cx, cy, r * 1.1)
+        bg_gradient.setColorAt(0, QColor(self._bg))
+        bg_gradient.setColorAt(0.6, QColor(self._bg).darker(102))
+        bg_gradient.setColorAt(1.0, QColor(self._bg).darker(108))
+        painter.fillRect(self.rect(), bg_gradient)
+
+        # Subtle circular vignette rings
+        for i in range(5):
+            vignette_r = r * (0.25 + i * 0.2)
+            vignette_alpha = 8 - i * 1.5
+            vig_color = QColor(self._primary)
+            vig_color.setAlpha(int(max(vignette_alpha, 2)))
+            painter.setPen(QPen(vig_color, 1))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(int(cx - vignette_r), int(cy - vignette_r),
+                              int(vignette_r * 2), int(vignette_r * 2))
+
+    def _draw_precision_grid(self, painter, cx, cy, r):
+        """Draw precision grid pattern like military radar"""
+        import math
+
+        # Diagonal guide lines at 45° increments
+        painter.setPen(QPen(QColor(self._grid).darker(170), 0.5, Qt.PenStyle.DotLine))
+        for angle in range(0, 360, 45):
+            rad = math.radians(angle)
+            x2 = cx + r * 1.05 * math.cos(rad)
+            y2 = cy + r * 1.05 * math.sin(rad)
+            painter.drawLine(int(cx), int(cy), int(x2), int(y2))
+
+        # Fine grid circles
+        for frac in [0.15, 0.35, 0.55, 0.75]:
+            grid_r = r * frac
+            grid_color = QColor(self._grid).darker(180)
+            grid_color.setAlpha(60)
+            painter.setPen(QPen(grid_color, 0.5, Qt.PenStyle.DotLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(int(cx - grid_r), int(cy - grid_r),
+                              int(grid_r * 2), int(grid_r * 2))
+
+    def _draw_concentric_rings(self, painter, cx, cy, r):
+        """Draw professional concentric rings with varied styling"""
+        import math
+
+        # Main range rings at 25%, 50%, 75%
+        for frac in [0.25, 0.50, 0.75]:
+            ring_r = r * frac
+
+            # Primary ring - solid with subtle glow
+            for glow_offset in [4, 2]:
+                glow_alpha = 25 - glow_offset * 5
+                glow_color = QColor(self._primary)
+                glow_color.setAlpha(max(glow_alpha, 5))
+                painter.setPen(QPen(glow_color, glow_offset))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(int(cx - ring_r - glow_offset),
+                                  int(cy - ring_r - glow_offset),
+                                  int((ring_r + glow_offset) * 2),
+                                  int((ring_r + glow_offset) * 2))
+
+            # Main ring
+            painter.setPen(QPen(QColor(self._primary).darker(140), 1.5))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(int(cx - ring_r), int(cy - ring_r),
+                              int(ring_r * 2), int(ring_r * 2))
+
+            # Range label
+            range_label = f"{int(frac * 100)}%"
+            painter.setFont(QFont("Segoe UI", 6))
+            painter.setPen(QColor(self._grid))
+            fm = painter.fontMetrics()
+            lw = fm.horizontalAdvance(range_label)
+            painter.drawText(int(cx - ring_r - lw - 8), int(cy - 4), range_label)
+
+        # Outer boundary ring with strong glow
+        for glow_r_offset in [14, 9, 5]:
+            glow_alpha = 35 - glow_r_offset * 3
+            glow_color = QColor(self._primary)
+            glow_color.setAlpha(max(glow_alpha, 8))
+            painter.setPen(QPen(glow_color, glow_r_offset // 2 + 1))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(int(cx - r - glow_r_offset),
+                              int(cy - r - glow_r_offset),
+                              int((r + glow_r_offset) * 2),
+                              int((r + glow_r_offset) * 2))
+
+        # Main outer ring
+        painter.setPen(QPen(QColor(self._primary).darker(120), 2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(int(cx - r), int(cy - r), int(r * 2), int(r * 2))
+
+    def _draw_azimuth_ticks(self, painter, cx, cy, r):
+        """Draw detailed azimuth tick marks"""
+        import math
+
+        for deg in range(0, 360, 3):
+            rad = math.radians(deg - 90)
+
+            if deg % 30 == 0:  # Major tick every 30°
+                tick_len = 12
+                pen_width = 2
+                tick_color = QColor(self._primary)
+            elif deg % 10 == 0:  # Medium tick every 10°
+                tick_len = 7
+                pen_width = 1.5
+                tick_color = QColor(self._primary).darker(130)
+            elif deg % 5 == 0:  # Minor tick every 5°
+                tick_len = 4
+                pen_width = 1
+                tick_color = QColor(self._grid)
+            else:  # Fine tick every 3°
+                tick_len = 2
+                pen_width = 0.5
+                tick_color = QColor(self._grid).darker(150)
+
+            inner_r = r + 3
+            outer_r = inner_r + tick_len
+
+            x1 = cx + inner_r * math.cos(rad)
+            y1 = cy + inner_r * math.sin(rad)
+            x2 = cx + outer_r * math.cos(rad)
+            y2 = cy + outer_r * math.sin(rad)
+
+            painter.setPen(QPen(tick_color, pen_width))
+            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+
+            # Draw degree numbers at major ticks
+            if deg % 30 == 0:
+                label_r = outer_r + 10
+                label_x = cx + label_r * math.cos(rad)
+                label_y = cy + label_r * math.sin(rad)
+
+                label = str(deg)
+                if deg == 0:
+                    label = "N"
+                elif deg == 90:
+                    label = "E"
+                elif deg == 180:
+                    label = "S"
+                elif deg == 270:
+                    label = "W"
+
+                painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+                fm = painter.fontMetrics()
+                lw = fm.horizontalAdvance(label)
+
+                # Glow for text
+                glow_c = QColor(self._primary)
+                glow_c.setAlpha(60)
+                painter.setPen(glow_c)
+                painter.drawText(int(label_x - lw/2 + 1), int(label_y + 1), label)
+
+                painter.setPen(QColor(self._primary))
+                painter.drawText(int(label_x - lw/2), int(label_y), label)
+
+    def _draw_sweep_afterglow(self, painter, cx, cy, r):
+        """Draw afterglow effect showing recent sweep path"""
+        import math
+
+        # Store current angle
+        current_angle = self._angle
+
+        # Draw afterglow for past sweep positions
+        afterglow_count = 18
+        for i in range(afterglow_count):
+            trail_angle = (current_angle - i * 3) % 360
+            trail_rad = math.radians(trail_angle - 90)
+
+            # Intensity decreases with age
+            intensity = 1.0 - (i / afterglow_count)
+            alpha = int(40 * intensity ** 2)
+
+            if alpha < 5:
+                continue
+
+            trail_color = QColor(self._primary)
+            trail_color.setAlpha(alpha)
+
+            # Draw arc segment
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(trail_color)
+
+            outer_r = r * (0.08 + intensity * 0.88)
+
+            path = QPainterPath()
+            path.moveTo(cx, cy)
+            path.arcTo(int(cx - outer_r), int(cy - outer_r), int(outer_r * 2), int(outer_r * 2),
+                      trail_angle - 90, -4)
+            path.closeSubpath()
+            painter.drawPath(path)
+
+    def _draw_sweep(self, painter, cx, cy, r):
+        """Draw radar sweep with multi-layer glow effect"""
+        import math
+        sweep_rad = math.radians(self._angle - 90)
+
+        # Draw sweep trail (gradient arc)
+        painter.save()
+        trail_segments = 30
+        for i in range(trail_segments):
+            t = i / trail_segments
+            alpha = int(180 * (1 - t) ** 1.8)
+            if alpha < 8:
+                continue
+
+            seg_rad = sweep_rad - math.radians(t * 75)
+            seg_color = QColor(self._primary)
+            seg_color.setAlpha(alpha)
+
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(seg_color)
+
+            outer_r = r * (0.06 + t * 0.94)
+
+            path = QPainterPath()
+            path.moveTo(cx, cy)
+            path.arcTo(int(cx - outer_r), int(cy - outer_r), int(outer_r * 2), int(outer_r * 2),
+                      math.degrees(seg_rad) + 90, -5)
+            path.closeSubpath()
+            painter.drawPath(path)
+        painter.restore()
+
+        # Calculate sweep head position
+        x2 = cx + r * math.cos(sweep_rad)
+        y2 = cy + r * math.sin(sweep_rad)
+
+        # Multi-layer sweep line with extensive glow
+        glow_configs = [
+            (24, 12),
+            (18, 20),
+            (14, 35),
+            (10, 55),
+            (6, 90),
+            (3, 140),
+        ]
+
+        for glow_w, glow_alpha in glow_configs:
+            glow_color = QColor(self._primary)
+            glow_color.setAlpha(glow_alpha)
+            painter.setPen(QPen(glow_color, glow_w))
+            painter.drawLine(int(cx), int(cy), int(x2), int(y2))
+
+        # Core sweep line - bright white
+        painter.setPen(QPen(QColor(self._primary), 1.5))
+        painter.drawLine(int(cx), int(cy), int(x2), int(y2))
+
+        # Sweep head with concentric glow orbs
+        for orb_r, orb_alpha in [(20, 15), (14, 30), (10, 55), (7, 90), (4, 150)]:
+            orb_color = QColor(self._primary)
+            orb_color.setAlpha(orb_alpha)
+            painter.setBrush(orb_color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(int(x2 - orb_r), int(y2 - orb_r),
+                              int(orb_r * 2), int(orb_r * 2))
+
+        # Bright tip center
+        tip = QColor(self._primary)
+        tip.setAlpha(230)
+        painter.setBrush(tip)
+        painter.drawEllipse(int(x2 - 4), int(y2 - 4), 8, 8)
+
+        # White hot center
+        hot_center = QColor(255, 255, 255)
+        hot_center.setAlpha(200)
+        painter.setBrush(hot_center)
+        painter.drawEllipse(int(x2 - 2), int(y2 - 2), 4, 4)
+
+    def _draw_nodes(self, painter, cx, cy, r):
+        """Draw network nodes with premium styling"""
+        import math
+
+        for node in self._nodes:
+            rad = math.radians(node["angle"] - 90)
+            nr = r * node["dist"]
+            nx = cx + nr * math.cos(rad)
+            ny = cy + nr * math.sin(rad)
+
+            # Node color based on status
+            if node["status"] == "active":
+                node_color = QColor(self._primary)
+            elif node["status"] == "standby":
+                node_color = QColor(self._warning)
+            else:
+                node_color = QColor(self._danger).darker(200)
+
+            # Pulse animation
+            pulse = (math.sin(math.radians(self._angle * 1.2 + node["angle"])) + 1) / 2
+            node_size = int(5 + pulse * 3)
+
+            # Outer atmospheric glow (largest, most diffuse)
+            for glow_layer, (glow_offset, glow_alpha_base) in enumerate([(14, 12), (10, 18), (6, 28)]):
+                glow_alpha = int(glow_alpha_base * (0.5 + pulse * 0.5))
+                glow = QColor(node_color)
+                glow.setAlpha(glow_alpha)
+                painter.setBrush(glow)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawEllipse(int(nx - node_size - glow_offset),
+                                  int(ny - node_size - glow_offset),
+                                  int((node_size + glow_offset) * 2),
+                                  int((node_size + glow_offset) * 2))
+
+            # Main node body
+            painter.setBrush(node_color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(int(nx - node_size), int(ny - node_size),
+                              int(node_size * 2), int(node_size * 2))
+
+            # Inner highlight ring
+            inner = max(2, int(node_size * 0.5))
+            inner_color = QColor(node_color)
+            inner_color.setAlpha(160)
+            painter.setBrush(inner_color)
+            painter.drawEllipse(int(nx - inner), int(ny - inner),
+                              int(inner * 2), int(inner * 2))
+
+            # Core center
+            center = max(2, int(node_size * 0.25))
+            center_color = QColor(node_color)
+            center_color.setAlpha(230)
+            painter.setBrush(center_color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(int(nx - center), int(ny - center),
+                              int(center * 2), int(center * 2))
+
+            # Status indicator ring
+            status_ring = node_size + 3
+            status_alpha = 80 + int(pulse * 60)
+            status_color = QColor(node_color)
+            status_color.setAlpha(status_alpha)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(status_color, 1.5))
+            painter.drawEllipse(int(nx - status_ring), int(ny - status_ring),
+                              int(status_ring * 2), int(status_ring * 2))
+
+            # Label
+            label = node["id"]
+            painter.setFont(QFont("Segoe UI", 8, QFont.Weight.Medium))
+            fm = painter.fontMetrics()
+            lw = fm.horizontalAdvance(label)
+            lh = fm.height()
+
+            ly = ny + node_size + 10
+            lx = nx - lw / 2
+
+            # Refined label background
+            bg_rect = QRectF(lx - 4, ly - lh + 3, lw + 8, lh + 2)
+            painter.fillRect(bg_rect, QColor(self._bg).darker(115))
+
+            # Subtle border on label
+            label_border = QColor(self._grid).darker(140)
+            painter.setPen(label_border)
+            painter.drawRect(bg_rect)
+
+            # Label text with subtle shadow
+            painter.setPen(QColor(self._muted))
+            painter.drawText(int(lx + 1), int(ly + 1), label)
+            painter.setPen(QColor(self._text))
+            painter.drawText(int(lx), int(ly), label)
+
+    def _draw_center_hub(self, painter, cx, cy, r):
+        """Draw sophisticated center hub"""
+        import math
+
+        # Outer calibration ring (dashed)
+        dash_pen = QPen(QColor(self._primary).darker(170), 1, Qt.PenStyle.CustomDashLine)
+        dash_pen.setDashPattern([4, 4])
+        dash_pen.setDashOffset(0)
+        painter.setPen(dash_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(int(cx - 22), int(cy - 22), 44, 44)
+
+        # Main hub body with gradient
+        hub_gradient = QRadialGradient(cx, cy, 18)
+        hub_gradient.setColorAt(0, QColor(self._primary).darker(90))
+        hub_gradient.setColorAt(0.5, QColor(self._bg))
+        hub_gradient.setColorAt(1, QColor(self._bg))
+
+        # Hub outer glow
+        for glow_off in [4, 2]:
+            glow_alpha = 30 - glow_off * 5
+            glow_color = QColor(self._primary)
+            glow_color.setAlpha(max(glow_alpha, 10))
+            painter.setPen(QPen(glow_color, glow_off))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(int(cx - 18 - glow_off), int(cy - 18 - glow_off),
+                              int((18 + glow_off) * 2), int((18 + glow_off) * 2))
+
+        painter.setPen(QPen(QColor(self._primary).darker(130), 2))
+        painter.setBrush(hub_gradient)
+        painter.drawEllipse(int(cx - 18), int(cy - 18), 36, 36)
+
+        # Precision inner rings
+        painter.setPen(QPen(QColor(self._primary).darker(140), 1.5))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(int(cx - 13), int(cy - 13), 26, 26)
+
+        painter.setPen(QPen(QColor(self._primary), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(int(cx - 8), int(cy - 8), 16, 16)
+
+        # Rotating indicator
+        rot_rad = math.radians(self._angle * 3)
+        ix = cx + 10 * math.cos(rot_rad)
+        iy = cy + 10 * math.sin(rot_rad)
+
+        # Indicator glow
+        ind_glow = QColor(self._primary)
+        ind_glow.setAlpha(60)
+        painter.setPen(QPen(ind_glow, 6))
+        painter.drawLine(int(cx), int(cy), int(ix), int(iy))
+
+        painter.setPen(QPen(QColor(self._primary), 2.5))
+        painter.drawLine(int(cx), int(cy), int(ix), int(iy))
+
+        # Center with pulse effect
+        pulse = (math.sin(math.radians(self._angle * 2.5)) + 1) / 2
+        cs = 3 + int(pulse * 2)
+
+        # Center glow rings
+        for glow_sz, glow_alpha in [(cs + 5, 50), (cs + 3, 80), (cs + 1, 120)]:
+            glow = QColor(self._primary)
+            glow.setAlpha(glow_alpha)
+            painter.setBrush(glow)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(int(cx - glow_sz), int(cy - glow_sz),
+                              int(glow_sz * 2), int(glow_sz * 2))
+
+        # Bright core
+        core = QColor(self._primary)
+        core.setAlpha(240)
+        painter.setBrush(core)
+        painter.drawEllipse(int(cx - cs), int(cy - cs), int(cs * 2), int(cs * 2))
+
+    def _draw_digital_overlay(self, painter, cx, cy, r):
+        """Draw digital readouts and data overlay"""
+        import math
+
+        # Draw bearing indicator at current sweep position
+        bearing = self._angle
+        bearing_rad = math.radians(bearing - 90)
+        bearing_r = r + 24
+        bx = cx + bearing_r * math.cos(bearing_rad)
+        by = cy + bearing_r * math.sin(bearing_rad)
+
+        # Bearing marker triangle
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(self._primary))
+        triangle_size = 6
+
+        path = QPainterPath()
+        path.moveTo(bx, by - triangle_size)
+        path.lineTo(bx - triangle_size * 0.6, by + triangle_size * 0.5)
+        path.lineTo(bx + triangle_size * 0.6, by + triangle_size * 0.5)
+        path.closeSubpath()
+        painter.drawPath(path)
+
+        # Digital bearing readout
+        bearing_text = f"{bearing:03.0f}°"
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        fm = painter.fontMetrics()
+        bw = fm.horizontalAdvance(bearing_text)
+        painter.setPen(QColor(self._primary))
+        painter.drawText(int(cx - bw/2), int(cy + r + 36), bearing_text)
+
+        # Subtle corner brackets for framing
+        corner_size = 15
+        corner_alpha = 40
+        corner_color = QColor(self._primary)
+        corner_color.setAlpha(corner_alpha)
+        painter.setPen(QPen(corner_color, 2))
+
+        corners = [
+            (cx - r - 5, cy - r - 5, 1, 1),   # Top-left
+            (cx + r - corner_size + 5, cy - r - 5, -1, 1),  # Top-right
+            (cx - r - 5, cy + r - corner_size + 5, 1, -1),   # Bottom-left
+            (cx + r - corner_size + 5, cy + r - corner_size + 5, -1, -1), # Bottom-right
+        ]
+
+        for cx_pos, cy_pos, dx, dy in corners:
+            path = QPainterPath()
+            path.moveTo(cx_pos, cy_pos + dy * corner_size)
+            path.lineTo(cx_pos, cy_pos)
+            path.lineTo(cx_pos + dx * corner_size, cy_pos)
+            painter.drawPath(path)
+
+
+class NetworkTopologyWidget(JarvisRadar):
+    """Alias for backward compatibility"""
+    pass
 
 
 class ConnectionsTable(QTableWidget):
@@ -714,109 +1220,113 @@ class NetworkView(QWidget, ScaleMixin):
 
     def _setup_ui(self):
         """Setup network monitoring dashboard UI"""
-        # Main scroll area
-        self._scroll_area = QScrollArea()
-        self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        colors = theme_manager.colors
+        self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        content_widget = QWidget()
-        content_widget.setMaximumWidth(1400)
-
+        # Main layout (no scroll area - will fit in available space)
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(S.px(20), S.px(20), S.px(20), S.px(20))
-        main_layout.setSpacing(S.px(20))
-        content_widget.setLayout(main_layout)
-
-        self._scroll_area.setWidget(content_widget)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._scroll_area)
-        self.setLayout(layout)
+        main_layout.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
+        main_layout.setSpacing(S.px(12))
+        self.setLayout(main_layout)
 
         # ===== TOP BAR =====
         self._setup_top_bar(main_layout)
 
-        # ===== KPI CARDS =====
+        # ===== KPI CARDS ROW =====
         kpi_layout = QHBoxLayout()
-        kpi_layout.setSpacing(S.px(16))
+        kpi_layout.setSpacing(S.px(12))
 
         self._traffic_card = KpiCard("Total Traffic", "mdi.network", theme_manager.colors.ACCENT_GREEN, "Mbps")
-        kpi_layout.addWidget(self._traffic_card, stretch=1)
+        self._connections_card = KpiCard("Active Connections", "mdi.link", theme_manager.colors.ACCENT_BLUE, "")
+        self._devices_card = KpiCard("Online Devices", "mdi.lan", theme_manager.colors.ACCENT_PURPLE, "")
+        self._ping_card = KpiCard("Average Ping", "mdi.access-point", theme_manager.colors.ACCENT_ORANGE, "ms")
 
-        self._connections_card = KpiCard("Active Connections", "mdi.link", theme_manager.colors.ACCENT_GREEN, "")
-        kpi_layout.addWidget(self._connections_card, stretch=1)
-
-        self._devices_card = KpiCard("Online Devices", "mdi.lan", theme_manager.colors.ACCENT_GREEN, "")
-        kpi_layout.addWidget(self._devices_card, stretch=1)
-
-        self._ping_card = KpiCard("Average Ping", "mdi.access-point", theme_manager.colors.ACCENT_GREEN, "ms")
-        kpi_layout.addWidget(self._ping_card, stretch=1)
+        for card in [self._traffic_card, self._connections_card, self._devices_card, self._ping_card]:
+            card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            kpi_layout.addWidget(card, stretch=1)
 
         main_layout.addLayout(kpi_layout)
 
-        # ===== MAIN CONTENT GRID =====
-        content_grid = QGridLayout()
-        content_grid.setSpacing(S.px(16))
+        # ===== MAIN CONTENT AREA (2 columns) =====
+        content_container = QWidget()
+        content_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        content_layout = QHBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(S.px(12))
+        content_container.setLayout(content_layout)
 
-        # Left column (wider)
-        left_col = QVBoxLayout()
-        left_col.setSpacing(S.px(16))
+        # LEFT COLUMN - Traffic graph and connections
+        left_widget = QWidget()
+        left_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(S.px(10))
+        left_widget.setLayout(left_layout)
 
-        # Main traffic graph
         traffic_card = Card(title="Network Traffic", icon="📊")
         self._traffic_graph = NetworkTrafficGraph()
+        self._traffic_graph.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._traffic_graph.setMinimumHeight(120)
+        self._traffic_graph.setMaximumHeight(180)
         traffic_card.add_widget(self._traffic_graph)
-        left_col.addWidget(traffic_card)
+        left_layout.addWidget(traffic_card, stretch=1)
 
-        # Connections table
         conn_card = Card(title="Active Connections", icon="🔗")
         self._connections_table = ConnectionsTable()
+        self._connections_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         conn_card.add_widget(self._connections_table)
-        left_col.addWidget(conn_card)
+        left_layout.addWidget(conn_card, stretch=2)
 
-        content_grid.addLayout(left_col, 0, 0, 2, 1)
+        content_layout.addWidget(left_widget, stretch=2)
 
-        # Right column
-        right_col = QVBoxLayout()
-        right_col.setSpacing(S.px(16))
+        # RIGHT COLUMN - Alerts and interfaces stacked
+        right_widget = QWidget()
+        right_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(S.px(10))
+        right_widget.setLayout(right_layout)
 
-        # Alerts panel
         alerts_card = Card(title="Active Alerts", icon="⚠️")
+        alerts_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._alerts_container = QVBoxLayout()
-        self._alerts_container.setSpacing(S.px(8))
+        self._alerts_container.setSpacing(S.px(6))
         alerts_widget = QWidget()
         alerts_widget.setLayout(self._alerts_container)
         alerts_card.add_widget(alerts_widget)
-        right_col.addWidget(alerts_card)
+        right_layout.addWidget(alerts_card)
 
-        # Interface status
         interfaces_card = Card(title="Interface Status", icon="🌐")
+        interfaces_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._interfaces_container = QVBoxLayout()
-        self._interfaces_container.setSpacing(S.px(8))
+        self._interfaces_container.setSpacing(S.px(6))
         interfaces_widget = QWidget()
         interfaces_widget.setLayout(self._interfaces_container)
         interfaces_card.add_widget(interfaces_widget)
-        right_col.addWidget(interfaces_card)
+        right_layout.addWidget(interfaces_card, stretch=1)
 
-        content_grid.addLayout(right_col, 0, 1, 1, 1)
+        content_layout.addWidget(right_widget, stretch=1)
 
-        # Middle panels row
-        middle_row = QHBoxLayout()
-        middle_row.setSpacing(S.px(16))
+        main_layout.addWidget(content_container, stretch=1)
+
+        # ===== BOTTOM ROW - 3 panels =====
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(S.px(12))
 
         # Traffic distribution
         dist_card = Card(title="Traffic Distribution", icon="🥧")
+        dist_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         dist_content = QHBoxLayout()
-        dist_content.setSpacing(S.px(20))
+        dist_content.setSpacing(S.px(16))
+        dist_content.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self._donut_chart = DonutChart()
-        self._donut_chart.setFixedSize(120, 120)
+        self._donut_chart.setFixedSize(100, 100)
         dist_content.addWidget(self._donut_chart)
 
         self._protocol_legend = QVBoxLayout()
-        self._protocol_legend.setSpacing(S.px(6))
+        self._protocol_legend.setSpacing(S.px(4))
         legend_widget = QWidget()
         legend_widget.setLayout(self._protocol_legend)
         dist_content.addWidget(legend_widget)
@@ -824,42 +1334,43 @@ class NetworkView(QWidget, ScaleMixin):
         dist_widget = QWidget()
         dist_widget.setLayout(dist_content)
         dist_card.add_widget(dist_widget)
-        middle_row.addWidget(dist_card, stretch=1)
+        bottom_layout.addWidget(dist_card, stretch=1)
 
         # Top devices
         devices_card = Card(title="Top Devices by Traffic", icon="📱")
+        devices_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._devices_list = QVBoxLayout()
         self._devices_list.setSpacing(S.px(4))
         devices_widget = QWidget()
         devices_widget.setLayout(self._devices_list)
         devices_card.add_widget(devices_widget)
-        middle_row.addWidget(devices_card, stretch=1)
+        bottom_layout.addWidget(devices_card, stretch=1)
 
         # Network topology
         topology_card = Card(title="Network Map", icon="🗺️")
-        topology_card.add_widget(NetworkTopologyWidget())
-        middle_row.addWidget(topology_card, stretch=1)
+        topology_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._topology_widget = NetworkTopologyWidget()
+        self._topology_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._topology_widget.setMinimumHeight(100)
+        topology_card.add_widget(self._topology_widget)
+        bottom_layout.addWidget(topology_card, stretch=1)
 
-        content_grid.addLayout(middle_row, 1, 1, 1, 1)
+        main_layout.addLayout(bottom_layout)
 
-        main_layout.addLayout(content_grid)
-
-        # System status
+        # ===== SYSTEM STATUS =====
         self._setup_system_status(main_layout)
-
-        main_layout.addStretch()
 
     def _setup_top_bar(self, parent_layout):
         """Setup top navigation bar"""
         c = theme_manager.colors
 
         top_bar = QFrame()
+        top_bar.setFixedHeight(S.px(48))
         top_bar.setStyleSheet(f"""
             QFrame {{
                 background-color: {c.BG_CARD};
                 border: none;
-                border-radius: {S.px(12)}px;
-                padding: {S.px(12)}px {S.px(16)}px;
+                border-radius: {S.px(10)}px;
             }}
         """)
 

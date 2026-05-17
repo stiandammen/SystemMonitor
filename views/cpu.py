@@ -74,7 +74,7 @@ class CpuGraphWidget(QWidget):
         graph_h = h - pad * 2 - 20
 
         painter.setBrush(QColor(colors.BG_CARD))
-        painter.setPen(QPen(QColor(colors.BORDER), 1))
+        painter.setPen(QPen(QColor(colors.BORDER), 0))  # No border
         painter.drawRoundedRect(0, 0, int(w), int(h), 8, 8)
 
         if not self._history:
@@ -232,7 +232,7 @@ class CPUView(QWidget, ScaleMixin):
         header.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_CARD};
-                border: 1px solid {colors.BORDER};
+                border: none;
                 border-radius: 10px;
             }}
         """)
@@ -260,7 +260,7 @@ class CPUView(QWidget, ScaleMixin):
         section.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_CARD};
-                border: 1px solid {colors.BORDER};
+                border: none;
                 border-radius: 10px;
             }}
         """)

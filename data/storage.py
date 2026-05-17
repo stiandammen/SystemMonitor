@@ -76,6 +76,7 @@ class StorageCollector(QThread):
                 'disks': [],
                 'total_read_rate': 0,
                 'total_write_rate': 0,
+                'station_name': self._get_station_name(),
             }
 
             # Collect per-disk information
@@ -107,6 +108,21 @@ class StorageCollector(QThread):
         except Exception as e:
             log_exception(LogCategory.DISK, "Storage collection failed", e)
             return {}
+
+    def _get_station_name(self) -> str:
+        """Get the computer/station name"""
+        try:
+            if platform.system() == 'Windows':
+                import ctypes
+                buffer = ctypes.create_unicode_buffer(256)
+                size = ctypes.sizeof(buffer)
+                ctypes.windll.kernel32.GetComputerNameW(buffer, ctypes.byref(ctypes.c_int(size)))
+                return buffer.value or 'Unknown'
+            else:
+                import socket
+                return socket.gethostname()
+        except Exception:
+            return 'Unknown'
 
     def _get_disk_list(self) -> List[Dict[str, Any]]:
         """Get comprehensive list of all disks with metadata"""
@@ -141,6 +157,7 @@ class StorageCollector(QThread):
                             'serial': 'N/A',
                             'is_removable': False,
                             'partitions': [],
+                            'station_name': self._get_station_name(),
                         })
                     except (PermissionError, OSError):
                         pass
@@ -185,6 +202,7 @@ class StorageCollector(QThread):
                             'write_rate': 0,
                             'temperature': None,
                             'smart': None,
+                            'station_name': self._get_station_name(),
                         }
 
                         # Get partitions for this disk
@@ -202,6 +220,7 @@ class StorageCollector(QThread):
                                                 'used': usage.used,
                                                 'free': usage.free,
                                                 'percent': usage.percent,
+                                                'station_name': self._get_station_name(),
                                             }
                                             disk_info['partitions'].append(logical_info)
                                         except (PermissionError, OSError):
@@ -276,6 +295,7 @@ class StorageCollector(QThread):
                     'serial': 'N/A',
                     'is_removable': part.fstype == '' or 'removable' in str(part.opts).lower(),
                     'partitions': [],
+                    'station_name': self._get_station_name(),
                 })
             except (PermissionError, OSError):
                 pass

@@ -36,7 +36,24 @@
       "Bash(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Recurse -Filter \"*.py\")",
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(powershell.exe *)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(Get-ChildItem *)",
+      "Bash(Get-Content *)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Bash(ls /e/python*/python.exe)",
+      "Read(//c/Users/RSman/AppData/Local/Microsoft/WindowsApps/**)",
+      "Bash(cmd.exe /c \"where python\")",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(/c/Users/RSman/AppData/Local/Programs/Python/Python312/python.exe *)",
+      "Bash(E:/'[python - prosjekter]'/SystemMonitor/'C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe' *)",
+      "Bash(cmd.exe *)",
+      "Bash(CYGWIN=nontsec cmd.exe *)",
+      "Bash('/e/[python - prosjekter]/SystemMonitor/.venv/Scripts/python.exe' -m py_compile views/memory.py views/storage.py views/network.py widgets/card.py)",
+      "Bash('/e/[python - prosjekter]/SystemMonitor/.venv/Scripts/python.exe' -m py_compile views/network.py)",
+      "Bash(ls *)",
+      "Bash(E: *)",
+      "Bash(grep *)"
     ]
   }
 }

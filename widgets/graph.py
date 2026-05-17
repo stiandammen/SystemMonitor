@@ -1,5 +1,5 @@
 """
-Graph Widget - Line/area charts for time-series data
+Graph Widget - Premium line/area charts for time-series data
 """
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
@@ -11,7 +11,7 @@ from styles.theme import theme_manager
 
 class Graph(QWidget):
     """
-    Time-series graph widget with line and area modes
+    Premium time-series graph widget with glass styling
     Supports multiple series and automatic scaling
     Optimized with throttled repaints.
     """
@@ -57,46 +57,47 @@ class Graph(QWidget):
         if not self._pending_update:
             self._pending_update = True
             self._update_timer.start(33)
-    
+
     def paintEvent(self, event):
-        """Paint the graph"""
+        """Paint the premium graph"""
         if not self._data:
             return
-        
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         c = theme_manager.colors
         width = self.width()
         height = self.height()
-        
+
         # Calculate bounds
         values = [v for _, v in self._data]
         if not values:
+            painter.end()
             return
-        
+
         min_val = 0
         max_val = self._max_value if self._max_value else max(values) * 1.1
         if max_val == 0:
             max_val = 1
-        
+
         # Margins
-        margin_left = 40
-        margin_right = 10
-        margin_top = 10
-        margin_bottom = 20
-        
+        margin_left = 45
+        margin_right = 15
+        margin_top = 12
+        margin_bottom = 24
+
         graph_width = width - margin_left - margin_right
         graph_height = height - margin_top - margin_bottom
-        
-        # Draw grid lines
-        painter.setPen(QPen(QColor(c.BORDER), 1, Qt.PenStyle.DotLine))
+
+        # Draw subtle grid lines
+        painter.setPen(QPen(QColor(c.CHART_GRID), 1, Qt.PenStyle.DotLine))
         for i in range(5):
             y = margin_top + (graph_height * i / 4)
             painter.drawLine(int(margin_left), int(y), int(width - margin_right), int(y))
-        
-        # Draw Y-axis labels
-        painter.setFont(QFont("Segoe UI", 8))
+
+        # Draw Y-axis labels with premium styling
+        painter.setFont(QFont("Segoe UI", 9))
         painter.setPen(QColor(c.TEXT_MUTED))
         for i in range(5):
             value = max_val * (4 - i) / 4
@@ -104,41 +105,42 @@ class Graph(QWidget):
             label = f"{value:.0f}"
             fm = painter.fontMetrics()
             text_width = fm.horizontalAdvance(label)
-            painter.drawText(int(margin_left - text_width - 5), int(y + 4), label)
-        
-        # Draw graph line
+            painter.drawText(int(margin_left - text_width - 8), int(y + 4), label)
+
+        # Draw graph line and fill
         if len(self._data) > 1:
             points = []
             for i, (timestamp, value) in enumerate(self._data):
                 x = margin_left + (graph_width * i / max(len(self._data) - 1, 1))
                 y = margin_top + graph_height - (graph_height * value / max_val)
                 points.append((x, y))
-            
-            # Draw fill area
+
+            # Draw fill area with gradient
             if self._fill and len(points) > 1:
                 fill_path = []
                 fill_path.append((points[0][0], margin_top + graph_height))
                 fill_path.extend(points)
                 fill_path.append((points[-1][0], margin_top + graph_height))
-                
-                # Create gradient
+
+                # Create gradient with Heimdal styling
                 gradient = QLinearGradient(0, margin_top, 0, margin_top + graph_height)
-                gradient.setColorAt(0, QColor(self._color))
-                gradient.setColorAt(1, QColor(c.BG_PRIMARY))
-                
+                if theme_manager.current_theme == "heimdal":
+                    gradient.setColorAt(0, QColor("#4A6CF7"))
+                    gradient.setColorAt(0.6, QColor("rgba(74,108,247,0.15)"))
+                    gradient.setColorAt(1, QColor("rgba(74,108,247,0.0)"))
+                else:
+                    gradient.setColorAt(0, QColor(self._color).lighter(130))
+                    gradient.setColorAt(0.5, QColor(self._color))
+                    gradient.setColorAt(1, QColor(c.BG_PRIMARY))
+
                 painter.setBrush(gradient)
                 painter.setPen(Qt.PenStyle.NoPen)
-                
+
                 # Draw polygon
-                polygon = []
-                for x, y in fill_path:
-                    polygon.append((int(x), int(y)))
-                
-                # Use drawPolygon with QPoint
-                qpoints = [QPointF(int(x), int(y)) for x, y in polygon]
+                qpoints = [QPointF(int(x), int(y)) for x, y in fill_path]
                 if len(qpoints) >= 3:
                     painter.drawPolygon(*qpoints)
-            
+
             # Draw line
             painter.setPen(QPen(QColor(self._color), 2, Qt.PenStyle.SolidLine))
             for i in range(len(points) - 1):
@@ -146,5 +148,5 @@ class Graph(QWidget):
                     int(points[i][0]), int(points[i][1]),
                     int(points[i + 1][0]), int(points[i + 1][1])
                 )
-        
+
         painter.end()

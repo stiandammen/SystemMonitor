@@ -1,11 +1,79 @@
 """
-Theme Management - Professional theme system with 4 distinctive themes
+Theme Management - Professional theme system with glassmorphism and premium dark themes
 """
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
-# Default colors (saved as reference)
+# Premium Glassmorphism Dark Theme Colors
+PREMIUM_DARK = {
+    # Backgrounds - Deep dark base
+    "BG_PRIMARY": "#080b10",
+    "BG_SECONDARY": "#0d1117",
+    "BG_CARD": "rgba(22, 27, 34, 0.75)",
+    "BG_CARD_SOLID": "#161b22",
+    "BG_HOVER": "rgba(33, 38, 45, 0.8)",
+    "BG_INPUT": "#0d1117",
+
+    # Glass effects
+    "GLASS_BG": "rgba(13, 17, 23, 0.6)",
+    "GLASS_BORDER": "rgba(48, 54, 61, 0.6)",
+    "GLASS_SHADOW": "rgba(0, 0, 0, 0.4)",
+
+    # Green glow - signature accent
+    "ACCENT_GREEN": "#10b981",
+    "ACCENT_GREEN_DIM": "rgba(16, 185, 129, 0.15)",
+    "ACCENT_GREEN_GLOW": "rgba(16, 185, 129, 0.4)",
+    "ACCENT_GREEN_BRIGHT": "#34d399",
+    "ACCENT_GREEN_PULSE": "rgba(16, 185, 129, 0.6)",
+
+    # Text
+    "TEXT_PRIMARY": "#f0f6fc",
+    "TEXT_SECONDARY": "#8b949e",
+    "TEXT_MUTED": "#484f58",
+    "TEXT_DISABLED": "#30363d",
+
+    # Accent colors
+    "ACCENT_BLUE": "#58a6ff",
+    "ACCENT_ORANGE": "#f0883e",
+    "ACCENT_RED": "#f85149",
+    "ACCENT_YELLOW": "#d29922",
+    "ACCENT_CYAN": "#39c5cf",
+    "ACCENT_PURPLE": "#a371f7",
+    "ACCENT_PINK": "#db61a2",
+
+    # Status colors
+    "STATUS_RED": "#f85149",
+    "STATUS_ORANGE": "#f0883e",
+    "STATUS_YELLOW": "#d29922",
+    "STATUS_GREEN": "#3fb950",
+
+    # Borders
+    "BORDER": "rgba(48, 54, 61, 0.8)",
+    "BORDER_SUBTLE": "rgba(48, 54, 61, 0.4)",
+    "BORDER_GLOW": "rgba(16, 185, 129, 0.3)",
+
+    # UI Elements
+    "GAUGE_BG": "rgba(33, 38, 45, 0.6)",
+    "GAUGE_FILL": "#10b981",
+    "CHART_FILL": "rgba(16, 185, 129, 0.1)",
+    "CHART_LINE": "#10b981",
+    "CHART_GRID": "rgba(48, 54, 61, 0.4)",
+
+    # Shadows & overlays
+    "SHADOW": "rgba(0, 0, 0, 0.5)",
+    "GLOW": "0 0 20px rgba(16, 185, 129, 0.15)",
+    "GLOW_STRONG": "0 0 30px rgba(16, 185, 129, 0.25)",
+
+    # Status backgrounds
+    "SUCCESS_BG": "rgba(63, 185, 80, 0.1)",
+    "WARNING_BG": "rgba(210, 153, 34, 0.1)",
+    "ERROR_BG": "rgba(248, 81, 73, 0.1)",
+    "INFO_BG": "rgba(88, 166, 255, 0.1)",
+}
+
+
+# Default colors (legacy compatibility)
 DEFAULT_COLORS = {
     "BG_PRIMARY": "#101920",
     "BG_SECONDARY": "#0d1218",
@@ -38,6 +106,76 @@ DEFAULT_COLORS = {
     "CHART_FILL": "#0a1a20",
     "CHART_LINE": "#0c997f",
 }
+
+
+class PremiumDarkTheme:
+    """Premium glassmorphism dark theme with green glow effects"""
+
+    # Backgrounds - Deep dark base
+    BG_PRIMARY = "#080b10"
+    BG_SECONDARY = "#0d1117"
+    BG_CARD = "rgba(22, 27, 34, 0.75)"
+    BG_CARD_SOLID = "#161b22"
+    BG_HOVER = "rgba(33, 38, 45, 0.8)"
+    BG_INPUT = "#0d1117"
+    BG_ACTIVE = "#10b981"
+
+    # Glass effects
+    GLASS_BG = "rgba(13, 17, 23, 0.6)"
+    GLASS_BORDER = "rgba(48, 54, 61, 0.6)"
+    GLASS_SHADOW = "rgba(0, 0, 0, 0.4)"
+
+    # Green glow - signature accent
+    ACCENT_GREEN = "#10b981"
+    ACCENT_GREEN_DIM = "rgba(16, 185, 129, 0.15)"
+    ACCENT_GREEN_GLOW = "rgba(16, 185, 129, 0.4)"
+    ACCENT_GREEN_BRIGHT = "#34d399"
+    ACCENT_GREEN_PULSE = "rgba(16, 185, 129, 0.6)"
+
+    # Text
+    TEXT_PRIMARY = "#f0f6fc"
+    TEXT_SECONDARY = "#8b949e"
+    TEXT_MUTED = "#484f58"
+    TEXT_DISABLED = "#30363d"
+
+    # Accent colors
+    ACCENT_BLUE = "#58a6ff"
+    ACCENT_ORANGE = "#f0883e"
+    ACCENT_RED = "#f85149"
+    ACCENT_YELLOW = "#d29922"
+    ACCENT_CYAN = "#39c5cf"
+    ACCENT_PURPLE = "#a371f7"
+    ACCENT_PINK = "#db61a2"
+
+    # Status colors
+    STATUS_RED = "#f85149"
+    STATUS_ORANGE = "#f0883e"
+    STATUS_YELLOW = "#d29922"
+    STATUS_GREEN = "#3fb950"
+
+    # Borders
+    BORDER = "rgba(48, 54, 61, 0.8)"
+    BORDER_SUBTLE = "rgba(48, 54, 61, 0.4)"
+    BORDER_FOCUS = "#10b981"
+    BORDER_GLOW = "rgba(16, 185, 129, 0.3)"
+
+    # UI Elements
+    GAUGE_BG = "rgba(33, 38, 45, 0.6)"
+    GAUGE_FILL = "#10b981"
+    CHART_FILL = "rgba(16, 185, 129, 0.1)"
+    CHART_LINE = "#10b981"
+    CHART_GRID = "rgba(48, 54, 61, 0.4)"
+
+    # Shadows & overlays
+    SHADOW = "rgba(0, 0, 0, 0.5)"
+    GLOW = "0 0 20px rgba(16, 185, 129, 0.15)"
+    GLOW_STRONG = "0 0 30px rgba(16, 185, 129, 0.25)"
+
+    # Status backgrounds
+    SUCCESS_BG = "rgba(63, 185, 80, 0.1)"
+    WARNING_BG = "rgba(210, 153, 34, 0.1)"
+    ERROR_BG = "rgba(248, 81, 73, 0.1)"
+    INFO_BG = "rgba(88, 166, 255, 0.1)"
 
 
 class MidnightTheme:
@@ -293,6 +431,76 @@ class EmberTheme:
     INFO_BG = "#141a20"
 
 
+class HeimdalTheme:
+    """Heimdal Security-inspired deep navy blue enterprise theme"""
+
+    # Backgrounds
+    BG_PRIMARY = "#12152A"
+    BG_SECONDARY = "#1A1E35"
+    BG_CARD = "rgba(30, 35, 64, 0.85)"
+    BG_CARD_SOLID = "#1E2340"
+    BG_HOVER = "#252A47"
+    BG_INPUT = "#1A1E35"
+    BG_ACTIVE = "#4A6CF7"
+
+    # Glass effects
+    GLASS_BG = "rgba(26, 30, 53, 0.7)"
+    GLASS_BORDER = "rgba(74, 108, 247, 0.25)"
+    GLASS_SHADOW = "rgba(0, 0, 0, 0.5)"
+
+    # Primary accent — Heimdal blue
+    ACCENT_GREEN = "#4A6CF7"
+    ACCENT_GREEN_DIM = "rgba(74, 108, 247, 0.15)"
+    ACCENT_GREEN_GLOW = "rgba(74, 108, 247, 0.4)"
+    ACCENT_GREEN_BRIGHT = "#6B8BF9"
+    ACCENT_GREEN_PULSE = "rgba(74, 108, 247, 0.6)"
+
+    # Text
+    TEXT_PRIMARY = "#E8ECFF"
+    TEXT_SECONDARY = "#8A92B2"
+    TEXT_MUTED = "#525A7A"
+    TEXT_DISABLED = "#2E3356"
+
+    # Secondary accents
+    ACCENT_BLUE = "#00D4FF"
+    ACCENT_ORANGE = "#FF6B35"
+    ACCENT_RED = "#FF4757"
+    ACCENT_YELLOW = "#FFB830"
+    ACCENT_CYAN = "#00D4FF"
+    ACCENT_PURPLE = "#7B5CF0"
+    ACCENT_PINK = "#FF4FCE"
+
+    # Status colors
+    STATUS_RED = "#FF4757"
+    STATUS_ORANGE = "#FF6B35"
+    STATUS_YELLOW = "#FFB830"
+    STATUS_GREEN = "#00E096"
+
+    # Borders
+    BORDER = "rgba(74, 108, 247, 0.2)"
+    BORDER_SUBTLE = "rgba(74, 108, 247, 0.1)"
+    BORDER_FOCUS = "#4A6CF7"
+    BORDER_GLOW = "rgba(74, 108, 247, 0.4)"
+
+    # UI Elements
+    GAUGE_BG = "rgba(255, 255, 255, 0.06)"
+    GAUGE_FILL = "#4A6CF7"
+    CHART_FILL = "rgba(74, 108, 247, 0.15)"
+    CHART_LINE = "#4A6CF7"
+    CHART_GRID = "rgba(255, 255, 255, 0.05)"
+
+    # Shadows & overlays
+    SHADOW = "rgba(0, 0, 0, 0.6)"
+    GLOW = "0 0 20px rgba(74, 108, 247, 0.2)"
+    GLOW_STRONG = "0 0 30px rgba(74, 108, 247, 0.35)"
+
+    # Status backgrounds
+    SUCCESS_BG = "rgba(0, 224, 150, 0.1)"
+    WARNING_BG = "rgba(255, 107, 53, 0.1)"
+    ERROR_BG = "rgba(255, 71, 87, 0.1)"
+    INFO_BG = "rgba(74, 108, 247, 0.1)"
+
+
 class ThemeManager(QObject):
     """Manages application theme (singleton)"""
     theme_changed = pyqtSignal(str)  # Emits theme name
@@ -300,19 +508,23 @@ class ThemeManager(QObject):
     _instance = None
 
     _themes = {
+        "premium": PremiumDarkTheme,
         "midnight": MidnightTheme,
         "custom": CustomTheme,
         "cyberpunk": CyberpunkTheme,
         "nordic": NordicTheme,
         "ember": EmberTheme,
+        "heimdal": HeimdalTheme,
     }
 
     _theme_names = {
+        "premium": "Premium Dark",
         "midnight": "Midnight",
         "custom": "Custom",
         "cyberpunk": "Cyberpunk",
         "nordic": "Nordic",
         "ember": "Ember",
+        "heimdal": "Heimdal Security",
     }
 
     def __new__(cls):
@@ -326,8 +538,8 @@ class ThemeManager(QObject):
             return
         super().__init__()
         self._initialized = True
-        self._current_theme = "midnight"
-        self._colors = MidnightTheme()
+        self._current_theme = "heimdal"
+        self._colors = HeimdalTheme()
 
     @property
     def current_theme(self) -> str:
@@ -392,7 +604,7 @@ class ThemeManager(QObject):
         QMainWindow {{
             background-color: {c.BG_PRIMARY};
             color: {c.TEXT_PRIMARY};
-            border: none;
+            border: 1px solid {c.BORDER};
         }}
 
         QWidget {{
@@ -413,24 +625,24 @@ class ThemeManager(QObject):
         }}
 
         QPushButton {{
-            background-color: {c.BG_CARD};
+            background-color: {c.ACCENT_GREEN_DIM};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 6px;
-            padding: 8px 16px;
+            border-radius: 8px;
+            padding: 10px 20px;
             font-family: "Segoe UI", sans-serif;
             font-size: 13px;
         }}
 
         QPushButton:hover {{
-            background-color: {c.BG_HOVER};
-            border-color: {c.BORDER};
+            background-color: {c.ACCENT_GREEN};
+            border-color: {c.ACCENT_GREEN};
         }}
 
         QPushButton:pressed {{
-            background-color: {c.ACCENT_GREEN};
+            background-color: {c.ACCENT_GREEN_BRIGHT};
             color: #ffffff;
-            border-color: {c.ACCENT_GREEN};
+            border-color: {c.ACCENT_GREEN_BRIGHT};
         }}
 
         QPushButton:disabled {{
@@ -440,31 +652,31 @@ class ThemeManager(QObject):
         }}
 
         QLineEdit {{
-            background-color: {c.BG_INPUT};
+            background-color: {c.GLASS_BG};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 6px;
-            padding: 8px 12px;
+            border-radius: 8px;
+            padding: 10px 14px;
             font-family: "Segoe UI", sans-serif;
             font-size: 13px;
         }}
 
         QLineEdit:focus {{
-            border-color: {c.BORDER_FOCUS};
+            border-color: {c.ACCENT_GREEN};
         }}
 
         QComboBox {{
-            background-color: {c.BG_INPUT};
+            background-color: {c.GLASS_BG};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 6px;
-            padding: 8px 12px;
+            border-radius: 8px;
+            padding: 10px 14px;
             font-family: "Segoe UI", sans-serif;
             font-size: 13px;
         }}
 
         QComboBox:hover {{
-            border-color: {c.BORDER_FOCUS};
+            border-color: {c.ACCENT_GREEN};
         }}
 
         QComboBox::drop-down {{
@@ -476,24 +688,24 @@ class ThemeManager(QObject):
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 6px;
+            border-radius: 8px;
             selection-background-color: {c.BG_HOVER};
         }}
 
         QScrollBar:vertical {{
             background-color: {c.BG_SECONDARY};
-            width: 10px;
-            border-radius: 5px;
+            width: 8px;
+            border-radius: 4px;
         }}
 
         QScrollBar::handle:vertical {{
-            background-color: {c.BORDER};
-            border-radius: 5px;
+            background-color: rgba(74, 108, 247, 0.3);
+            border-radius: 4px;
             min-height: 30px;
         }}
 
         QScrollBar::handle:vertical:hover {{
-            background-color: {c.TEXT_MUTED};
+            background-color: {c.ACCENT_GREEN};
         }}
 
         QScrollBar::add-line:vertical,
@@ -503,18 +715,18 @@ class ThemeManager(QObject):
 
         QScrollBar:horizontal {{
             background-color: {c.BG_SECONDARY};
-            height: 10px;
-            border-radius: 5px;
+            height: 8px;
+            border-radius: 4px;
         }}
 
         QScrollBar::handle:horizontal {{
-            background-color: {c.BORDER};
-            border-radius: 5px;
+            background-color: rgba(74, 108, 247, 0.3);
+            border-radius: 4px;
             min-width: 30px;
         }}
 
         QScrollBar::handle:horizontal:hover {{
-            background-color: {c.TEXT_MUTED};
+            background-color: {c.ACCENT_GREEN};
         }}
 
         QScrollBar::add-line:horizontal,
@@ -526,13 +738,17 @@ class ThemeManager(QObject):
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 8px;
+            border-radius: 12px;
             gridline-color: {c.BORDER};
         }}
 
         QTableWidget::item {{
-            padding: 8px;
+            padding: 12px;
             border-bottom: 1px solid {c.BORDER};
+        }}
+
+        QTableWidget::item:hover {{
+            background-color: rgba(74, 108, 247, 0.08);
         }}
 
         QTableWidget::item:selected {{
@@ -541,12 +757,15 @@ class ThemeManager(QObject):
         }}
 
         QHeaderView::section {{
-            background-color: {c.BG_SECONDARY};
+            background-color: {c.BG_PRIMARY};
             color: {c.TEXT_SECONDARY};
-            padding: 10px;
+            padding: 12px;
             border: none;
             border-bottom: 2px solid {c.BORDER};
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }}
 
         QHeaderView::section:hover {{
@@ -555,21 +774,21 @@ class ThemeManager(QObject):
 
         QTabWidget::pane {{
             border: 1px solid {c.BORDER};
-            border-radius: 8px;
+            border-radius: 12px;
             background-color: {c.BG_CARD};
         }}
 
         QTabBar::tab {{
             background-color: {c.BG_SECONDARY};
             color: {c.TEXT_SECONDARY};
-            padding: 10px 20px;
+            padding: 12px 24px;
             border: none;
             border-bottom: 2px solid transparent;
         }}
 
         QTabBar::tab:selected {{
             background-color: {c.BG_CARD};
-            color: {c.TEXT_PRIMARY};
+            color: {c.ACCENT_GREEN};
             border-bottom: 2px solid {c.ACCENT_GREEN};
         }}
 
@@ -580,22 +799,22 @@ class ThemeManager(QObject):
         QProgressBar {{
             background-color: {c.BG_SECONDARY};
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             text-align: center;
             color: {c.TEXT_PRIMARY};
         }}
 
         QProgressBar::chunk {{
-            background-color: {c.ACCENT_GREEN};
-            border-radius: 4px;
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c.ACCENT_GREEN}, stop:1 {c.ACCENT_PURPLE});
+            border-radius: 6px;
         }}
 
         QToolTip {{
             background-color: {c.BG_CARD};
             color: {c.TEXT_PRIMARY};
             border: 1px solid {c.BORDER};
-            border-radius: 6px;
-            padding: 8px;
+            border-radius: 8px;
+            padding: 10px;
         }}
         """
 

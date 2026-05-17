@@ -4,8 +4,9 @@ Clean enterprise-grade settings interface
 """
 from pathlib import Path
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QPushButton, QComboBox, QSlider, QFileDialog, QMessageBox, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QComboBox, QSlider, QFileDialog, QMessageBox, QFrame,
+    QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QRect
 from PyQt6.QtGui import QFont, QPainter, QColor
@@ -104,36 +105,23 @@ class SettingsView(QWidget, ScaleMixin):
 
         c = theme_manager.colors
         self.setStyleSheet(f"background-color: {c.BG_PRIMARY};")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        # Main scroll area
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{
-                background-color: {c.BG_PRIMARY};
-                border: none;
-            }}
-            QScrollArea > QWidget {{
-                background-color: {c.BG_PRIMARY};
-            }}
-        """)
-
-        # Content container
-        content = QWidget()
-        content.setMaximumWidth(900)
-
-        # Main layout
+        # Main layout (no scroll area - fits in window)
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(32, 32, 32, 32)
-        main_layout.setSpacing(24)
-        content.setLayout(main_layout)
+        main_layout.setContentsMargins(S.px(32), S.px(32), S.px(32), S.px(32))
+        main_layout.setSpacing(S.px(24))
+        self.setLayout(main_layout)
 
-        scroll.setWidget(content)
-        self.setLayout(QVBoxLayout())
-        self.layout().setContentsMargins(0, 0, 0, 0)
-        self.layout().addWidget(scroll)
+        # Content container with max width for readability
+        content = QWidget()
+        content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        content.setMaximumWidth(S.px(900))
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(S.px(24))
+        content.setLayout(content_layout)
+        main_layout.addWidget(content, stretch=1)
 
         # Title
         title = QLabel("Settings")

@@ -70,7 +70,7 @@ class GlassCard(QFrame, ScaleMixin):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_card']};
-                border: 1px solid {COLORS['border_card']};
+                border: none;
                 border-radius: 12px;
             }}
         """)
@@ -258,6 +258,7 @@ class StatTile(QFrame, ScaleMixin):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_deeper']};
+                border: none;
                 border-radius: 8px;
             }}
         """)
@@ -425,7 +426,7 @@ class GPUView(QWidget, ScaleMixin):
                     QFrame {{
                         background-color: {COLORS.get('bg_card', '#151d28')};
                         border-radius: 10px;
-                        border: 1px solid {COLORS.get('border', '#2a3a4a')};
+                        border: none;
                     }}
                 """)
         except Exception as e:
@@ -473,7 +474,7 @@ class GPUView(QWidget, ScaleMixin):
             QFrame {{
                 background-color: {COLORS['bg_card']};
                 border-radius: 10px;
-                border: 1px solid {COLORS['border']};
+                border: none;
             }}
         """)
         layout = QHBoxLayout()
@@ -554,7 +555,7 @@ class GPUView(QWidget, ScaleMixin):
             QFrame {{
                 background-color: {COLORS['bg_card']};
                 border-radius: 10px;
-                border: 1px solid {COLORS['border']};
+                border: none;
             }}
         """)
         layout = QVBoxLayout()

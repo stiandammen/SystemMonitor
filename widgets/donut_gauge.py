@@ -2,7 +2,7 @@
 DonutGauge Widget - Circular progress indicator
 """
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush
+from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush, QConicalGradient
 from PyQt6.QtCore import Qt, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
 
 from styles.theme import theme_manager
@@ -70,10 +70,6 @@ class DonutGauge(QWidget):
 
         colors = theme_manager.colors
 
-        # Colors - use theme colors
-        bg_color = QColor(colors.BG_CARD)
-        gauge_color = QColor(self._get_effective_color())
-
         # Geometry
         margin = 8
         rect = QRectF(margin, margin, self._size - 2 * margin, self._size - 2 * margin)
@@ -81,17 +77,28 @@ class DonutGauge(QWidget):
 
         # Background circle (full arc)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        bg_pen = QPen(bg_color)
+        bg_pen = QPen(QColor(colors.GAUGE_BG))
         bg_pen.setWidth(pen_width)
         bg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(bg_pen)
         painter.drawArc(int(margin), int(margin), int(self._size - 2 * margin), int(self._size - 2 * margin), 225 * 16, -270 * 16)
 
-        # Progress arc
+        # Progress arc with gradient
         progress = self._animated_value / 100.0
         angle = int(progress * 270)
 
-        progress_pen = QPen(gauge_color)
+        cx = self._size / 2
+        cy = self._size / 2
+
+        # Check if theme is heimdal for gradient, otherwise use solid color
+        if theme_manager.current_theme == "heimdal":
+            gradient = QConicalGradient(cx, cy, 225)
+            gradient.setColorAt(0.0, QColor("#4A6CF7"))
+            gradient.setColorAt(0.75, QColor("#7B5CF0"))
+            gradient.setColorAt(1.0, QColor("#4A6CF7"))
+            progress_pen = QPen(QBrush(gradient), pen_width)
+        else:
+            progress_pen = QPen(QColor(self._get_effective_color()))
         progress_pen.setWidth(pen_width)
         progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(progress_pen)

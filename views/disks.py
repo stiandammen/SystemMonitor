@@ -5,8 +5,8 @@ Glass effect cards with subtle glow and frosted appearance.
 import psutil
 import platform
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QProgressBar
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QFrame, QProgressBar, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QRectF, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
@@ -72,7 +72,7 @@ class GlassCard(QFrame):
         glass_gradient.setColorAt(0.3, QColor(255, 255, 255, int(8 * self._intensity)))
         glass_gradient.setColorAt(1, QColor(255, 255, 255, 0))
         painter.setBrush(glass_gradient)
-        painter.setPen(QPen(QColor(c.BORDER), 0.8))
+        painter.setPen(QPen(QColor(c.BORDER), 0))
         painter.drawRoundedRect(inner_rect, self._corner_radius, self._corner_radius)
 
         # --- Subtle inner border highlight (top-left light catch) ---
@@ -507,40 +507,31 @@ class DisksView(QWidget, ScaleMixin):
     def _setup_ui(self):
         c = theme_manager.colors
         self.setStyleSheet(f"background-color: {c.BG_PRIMARY};")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(S.px(20))
+        main_layout.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
         self.setLayout(main_layout)
 
         # Header
         header = QLabel("Disks")
-        header.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        header.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
         header.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
+        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         main_layout.addWidget(header)
 
-        # Scroll area with cards
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{
-                background: transparent;
-                border: none;
-            }}
-            QScrollArea > QWidget > QWidget {{
-                background: transparent;
-            }}
-        """)
-
+        # Cards container widget (no scroll area)
         cards_widget = QWidget()
+        cards_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         cards_widget.setStyleSheet("background: transparent;")
 
         self._cards_layout = QVBoxLayout()
-        self._cards_layout.setSpacing(16)
-        self._cards_layout.addStretch()
+        self._cards_layout.setSpacing(S.px(16))
+        self._cards_layout.setContentsMargins(0, 0, 0, 0)
         cards_widget.setLayout(self._cards_layout)
 
-        scroll.setWidget(cards_widget)
-        main_layout.addWidget(scroll)
+        main_layout.addWidget(cards_widget, stretch=1)
 
         self._scan_disks()
 
@@ -642,9 +633,7 @@ class DisksView(QWidget, ScaleMixin):
                     else:
                         card = DiskCard(drive_info)
                         self._disk_cards[device] = card
-                        self._cards_layout.insertWidget(
-                            self._cards_layout.count() - 1, card
-                        )
+                        self._cards_layout.addWidget(card)
 
                 except (PermissionError, OSError):
                     continue

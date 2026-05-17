@@ -103,42 +103,81 @@ class PremiumNavItem(QPushButton, ScaleMixin):
         c = theme_manager.colors
         accent = self._accent or c.ACCENT_GREEN
 
-        # Subtle glow border for active state (no solid background)
-        glow_border = f"""
-            border-left: 2px solid {accent};
-        """
-        normal_border = "border-left: 2px solid transparent;"
+        if theme_manager.current_theme == "heimdal":
+            # Heimdal theme styling
+            active_border = "border-left: 4px solid #4A6CF7;"
+            normal_border = "border-left: 4px solid transparent;"
+            active_bg = "background-color: rgba(74, 108, 247, 0.15);"
+            hover_bg = "background-color: rgba(74, 108, 247, 0.08);"
 
-        self.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {c.TEXT_SECONDARY};
-                border: none;
-                {normal_border}
-                padding: {S.px(12)}px {S.px(16)}px;
-                text-align: left;
-                border-radius: {S.px(6)}px;
-                font-family: "Segoe UI", sans-serif;
-                font-size: {S.px(13)}px;
-                font-weight: 500;
-            }}
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: #8A92B2;
+                    border: none;
+                    {normal_border}
+                    padding: {S.px(12)}px {S.px(16)}px;
+                    text-align: left;
+                    border-radius: {S.px(6)}px;
+                    font-family: "Segoe UI", sans-serif;
+                    font-size: {S.px(13)}px;
+                    font-weight: 500;
+                }}
 
-            QPushButton:hover {{
-                background-color: {c.BG_HOVER};
-                color: {c.TEXT_PRIMARY};
-            }}
+                QPushButton:hover {{
+                    {hover_bg}
+                    color: #E8ECFF;
+                    border-left: 4px solid rgba(74, 108, 247, 0.4);
+                }}
 
-            QPushButton:checked {{
-                background-color: transparent;
-                color: {c.TEXT_PRIMARY};
-                {glow_border}
-            }}
+                QPushButton:checked {{
+                    {active_bg}
+                    color: #E8ECFF;
+                    {active_border}
+                }}
 
-            QPushButton:pressed {{
-                background-color: {c.BG_HOVER};
-                color: {c.TEXT_PRIMARY};
-            }}
-        """)
+                QPushButton:pressed {{
+                    {hover_bg}
+                    color: #E8ECFF;
+                }}
+            """)
+        else:
+            # Subtle glow border for active state (no solid background)
+            glow_border = f"""
+                border-left: 2px solid {accent};
+            """
+            normal_border = "border-left: 2px solid transparent;"
+
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {c.TEXT_SECONDARY};
+                    border: none;
+                    {normal_border}
+                    padding: {S.px(12)}px {S.px(16)}px;
+                    text-align: left;
+                    border-radius: {S.px(6)}px;
+                    font-family: "Segoe UI", sans-serif;
+                    font-size: {S.px(13)}px;
+                    font-weight: 500;
+                }}
+
+                QPushButton:hover {{
+                    background-color: {c.BG_HOVER};
+                    color: {c.TEXT_PRIMARY};
+                }}
+
+                QPushButton:checked {{
+                    background-color: transparent;
+                    color: {c.TEXT_PRIMARY};
+                    {glow_border}
+                }}
+
+                QPushButton:pressed {{
+                    background-color: {c.BG_HOVER};
+                    color: {c.TEXT_PRIMARY};
+                }}
+            """)
 
     def set_active(self, active: bool):
         """Set active state with premium effect"""
@@ -242,13 +281,22 @@ class PremiumSidebar(QFrame, ScaleMixin):
 
         header = QFrame()
         header.setFixedHeight(70)
-        header.setStyleSheet(f"""
-            QFrame {{
-                background-color: {c.BG_PRIMARY};
-                border: none;
-                border-radius: 0px;
-            }}
-        """)
+        if theme_manager.current_theme == "heimdal":
+            header.setStyleSheet(f"""
+                QFrame {{
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 0px;
+                }}
+            """)
+        else:
+            header.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c.BG_PRIMARY};
+                    border: none;
+                    border-radius: 0px;
+                }}
+            """)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(20, 12, 20, 12)
@@ -259,12 +307,20 @@ class PremiumSidebar(QFrame, ScaleMixin):
         # App icon - modern styled container
         icon_container = QFrame()
         icon_container.setFixedSize(44, 44)
-        icon_container.setStyleSheet(f"""
-            QFrame {{
-                background-color: {c.ACCENT_GREEN};
-                border-radius: 10px;
-            }}
-        """)
+        if theme_manager.current_theme == "heimdal":
+            icon_container.setStyleSheet(f"""
+                QFrame {{
+                    background-color: #4A6CF7;
+                    border-radius: 10px;
+                }}
+            """)
+        else:
+            icon_container.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c.ACCENT_GREEN};
+                    border-radius: 10px;
+                }}
+            """)
 
         icon_layout = QVBoxLayout()
         icon_layout.setContentsMargins(0, 0, 0, 0)
@@ -351,13 +407,26 @@ class PremiumSidebar(QFrame, ScaleMixin):
     def _apply_theme(self):
         """Apply theme styles"""
         c = theme_manager.colors
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {c.BG_SECONDARY};
-                border: none;
-                border-radius: 0px;
-            }}
-        """)
+
+        if theme_manager.current_theme == "heimdal":
+            # Heimdal theme: vertical gradient background
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #1A1E35,
+                        stop:1 #12152A);
+                    border: none;
+                    border-radius: 0px;
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c.BG_SECONDARY};
+                    border: none;
+                    border-radius: 0px;
+                }}
+            """)
 
     def _on_item_clicked(self, key: str):
         """Handle navigation item click"""

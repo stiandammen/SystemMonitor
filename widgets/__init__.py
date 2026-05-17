@@ -15,10 +15,13 @@ from .cpu_info_panel import CpuInfoPanel
 from .donut_gauge import DonutGauge
 from .sparkline import SparklineWidget
 from .disk_monitor import DiskMonitor, DiskCard, SpeedGauge, TemperatureIndicator
+from .glass_card import GlassCard, PremiumMetricCard
+from .glass_sidebar import GlassSidebar
 
 __all__ = [
     'Card', 'Gauge', 'Graph', 'SortableTable',
     'NavItem', 'ToggleSwitch', 'SearchBar', 'AlertBadge', 'StatChip',
     'CoreGraphWidget', 'CpuInfoPanel', 'DonutGauge', 'SparklineWidget',
-    'DiskMonitor', 'DiskCard', 'SpeedGauge', 'TemperatureIndicator'
+    'DiskMonitor', 'DiskCard', 'SpeedGauge', 'TemperatureIndicator',
+    'GlassCard', 'PremiumMetricCard', 'GlassSidebar'
 ]

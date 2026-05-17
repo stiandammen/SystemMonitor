@@ -141,10 +141,16 @@ class SparklineWidget(QWidget):
             fill_pts.append((coords[-1][0], height))
 
             gradient = QLinearGradient(0, 0, 0, height)
-            fill_color = QColor(color)
-            fill_color.setAlpha(50)
-            gradient.setColorAt(0, fill_color)
-            gradient.setColorAt(1, Qt.GlobalColor.transparent)
+            if theme_manager.current_theme == "heimdal":
+                fill_color = QColor("#4A6CF7")
+                fill_color.setAlpha(50)
+                gradient.setColorAt(0, fill_color)
+                gradient.setColorAt(1, Qt.GlobalColor.transparent)
+            else:
+                fill_color = QColor(color)
+                fill_color.setAlpha(50)
+                gradient.setColorAt(0, fill_color)
+                gradient.setColorAt(1, Qt.GlobalColor.transparent)
 
             from PyQt6.QtCore import QPoint
             qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
@@ -154,7 +160,8 @@ class SparklineWidget(QWidget):
                 painter.drawPolygon(*qpoints)
 
             # ── Line ────────────────────────────────────────────────────────
-            pen = QPen(QColor(color), 1.5)
+            line_color = "#4A6CF7" if theme_manager.current_theme == "heimdal" else color
+            pen = QPen(QColor(line_color), 1.5)
             painter.setPen(pen)
             for i in range(len(coords) - 1):
                 painter.drawLine(

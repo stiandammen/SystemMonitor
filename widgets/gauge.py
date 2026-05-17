@@ -69,24 +69,24 @@ class Gauge(QFrame):
         """Paint the gauge"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         c = theme_manager.colors
-        
+
         # Calculate geometry
         margin = 8
-        rect = QRectF(margin, margin, 
-                     self._size - 2 * margin, 
+        rect = QRectF(margin, margin,
+                     self._size - 2 * margin,
                      self._size - 2 * margin)
-        
+
         # Draw background circle
         painter.setBrush(QBrush(QColor(c.GAUGE_BG)))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(rect)
-        
+
         # Calculate progress
         progress = self._value / self._max_value if self._max_value > 0 else 0
         angle = progress * 360
-        
+
         # Draw progress arc
         pen_width = 8
         progress_rect = QRectF(
@@ -95,49 +95,59 @@ class Gauge(QFrame):
             self._size - 2 * margin - pen_width,
             self._size - 2 * margin - pen_width
         )
-        
-        # Get color based on value
+
+        # Get color based on value (but baseline is accent_green)
+        base_color = c.ACCENT_GREEN
         color = self._get_color_for_value(progress * 100)
-        
+
         # Draw background arc
         bg_pen = QPen(QColor(c.BORDER))
         bg_pen.setWidth(pen_width)
         bg_pen.setCapStyle(Qt.PenStyle.RoundCap)
         painter.setPen(bg_pen)
         painter.drawArc(progress_rect, 0, 360 * 16)
-        
-        # Draw progress arc
-        progress_pen = QPen(QColor(color))
+
+        # Draw progress arc with gradient for Heimdal theme
+        if theme_manager.current_theme == "heimdal":
+            cx = self._size / 2
+            cy = self._size / 2
+            gradient = QConicalGradient(cx, cy, 225)
+            gradient.setColorAt(0.0, QColor("#4A6CF7"))
+            gradient.setColorAt(0.75, QColor("#7B5CF0"))
+            gradient.setColorAt(1.0, QColor("#4A6CF7"))
+            progress_pen = QPen(QBrush(gradient), pen_width)
+        else:
+            progress_pen = QPen(QColor(color))
         progress_pen.setWidth(pen_width)
         progress_pen.setCapStyle(Qt.PenStyle.RoundCap)
         painter.setPen(progress_pen)
         painter.drawArc(progress_rect, 90 * 16, -angle * 16)
-        
+
         # Draw center text
         center_x = self._size / 2
         center_y = self._size / 2
-        
+
         # Value text
         painter.setFont(FontConfig.VALUE_LARGE)
         painter.setPen(QColor(c.TEXT_PRIMARY))
         value_text = f"{int(self._value)}{self._unit}"
-        
+
         # Center text
         fm = painter.fontMetrics()
         text_width = fm.horizontalAdvance(value_text)
-        painter.drawText(int(center_x - text_width / 2), 
-                        int(center_y - 5), 
+        painter.drawText(int(center_x - text_width / 2),
+                        int(center_y - 5),
                         value_text)
-        
+
         # Title text
         if self._title:
             painter.setFont(FontConfig.SMALL)
             painter.setPen(QColor(c.TEXT_SECONDARY))
             title_width = fm.horizontalAdvance(self._title)
-            painter.drawText(int(center_x - title_width / 2), 
-                           int(center_y + 20), 
+            painter.drawText(int(center_x - title_width / 2),
+                           int(center_y + 20),
                            self._title)
-        
+
         painter.end()
     
     def _get_color_for_value(self, percentage: float) -> str:

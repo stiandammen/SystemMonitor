@@ -75,7 +75,7 @@ class OverviewView(QWidget, ScaleMixin):
         card.setStyleSheet("""
             QFrame {
                 background-color: #161f2a;
-                border: 1px solid #2a3441;
+                border: none;
                 border-radius: 8px;
                 padding: 16px;
             }
