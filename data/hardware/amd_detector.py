@@ -211,6 +211,7 @@ class ADLDetector(GPUDetector):
         """Initialize ADL context"""
         try:
             if not self.ADL_Main_Control_Create:
+                self.logger.error("ADL_Main_Control_Create is not available")
                 return False
 
             # Create malloc callback
@@ -225,6 +226,10 @@ class ADLDetector(GPUDetector):
                     return False
 
             # Get number of adapters
+            if not self.ADL_Adapter_NumberOfAdapters_Get:
+                self.logger.error("ADL_Adapter_NumberOfAdapters_Get is not available")
+                return False
+
             adapter_count = ctypes.c_int()
             result = self.ADL_Adapter_NumberOfAdapters_Get(ctypes.byref(adapter_count))
             if result != 0:
@@ -270,6 +275,10 @@ class ADLDetector(GPUDetector):
         """Parse an ADL adapter"""
         try:
             # Get adapter name
+            if not self.ADL_Adapter_Name_Get:
+                self.logger.warning("ADL_Adapter_Name_Get is not available")
+                return None
+
             name_buffer = ctypes.create_string_buffer(256)
             result = self.ADL_Adapter_Name_Get(adapter_index, name_buffer)
             if result != 0:
@@ -284,18 +293,29 @@ class ADLDetector(GPUDetector):
                 name = "Unknown AMD GPU"
 
             # Check if adapter is active
+            if not self.ADL_Adapter_Active_Get:
+                self.logger.warning("ADL_Adapter_Active_Get is not available")
+                # Continue anyway - not critical
+
             active = ctypes.c_int()
-            result = self.ADL_Adapter_Active_Get(adapter_index, ctypes.byref(active))
-            if result != 0 or active.value == 0:
-                # Adapter not active, skip or mark as inactive
-                pass
+            if self.ADL_Adapter_Active_Get:
+                result = self.ADL_Adapter_Active_Get(adapter_index, ctypes.byref(active))
+                if result != 0 or active.value == 0:
+                    # Adapter not active, skip or mark as inactive
+                    pass
 
             # Get adapter info
-            adapter_info = self.ADLAdapterInfo()
-            adapter_info.iSize = ctypes.sizeof(self.ADLAdapterInfo)
-            result = self.ADL_Adapter_AD2nd_Info_Get(adapter_index, ctypes.byref(adapter_info))
-            if result != 0:
-                self.logger.warning(f"ADL_Adapter_AD2nd_Info_Get failed for adapter {adapter_index}")
+            if not self.ADL_Adapter_AD2nd_Info_Get:
+                self.logger.warning("ADL_Adapter_AD2nd_Info_Get is not available")
+                # Create empty adapter info
+                adapter_info = self.ADLAdapterInfo()
+                adapter_info.iSize = ctypes.sizeof(self.ADLAdapterInfo)
+            else:
+                adapter_info = self.ADLAdapterInfo()
+                adapter_info.iSize = ctypes.sizeof(self.ADLAdapterInfo)
+                result = self.ADL_Adapter_AD2nd_Info_Get(adapter_index, ctypes.byref(adapter_info))
+                if result != 0:
+                    self.logger.warning(f"ADL_Adapter_AD2nd_Info_Get failed for adapter {adapter_index}")
 
             # Get temperature (try Overdrive6 first, then Overdrive5)
             temperature = None
@@ -320,27 +340,33 @@ class ADLDetector(GPUDetector):
 
             # Get current activity (usage)
             activity_percent = 0
-            try:
-                activity = self.ADLOD5CurrentActivity()
-                activity.iSize = ctypes.sizeof(self.ADLOD5CurrentActivity)
-                result = self.ADL_Overdrive5_CurrentActivity_Get(adapter_index, ctypes.byref(activity))
-                if result == 0:
-                    activity_percent = activity.iActivityPercent
-            except:
-                pass
+            if not self.ADL_Overdrive5_CurrentActivity_Get:
+                self.logger.warning("ADL_Overdrive5_CurrentActivity_Get is not available")
+            else:
+                try:
+                    activity = self.ADLOD5CurrentActivity()
+                    activity.iSize = ctypes.sizeof(self.ADLOD5CurrentActivity)
+                    result = self.ADL_Overdrive5_CurrentActivity_Get(adapter_index, ctypes.byref(activity))
+                    if result == 0:
+                        activity_percent = activity.iActivityPercent
+                except:
+                    pass
 
             # Get clock speeds
             engine_clock = 0
             memory_clock = 0
-            try:
-                activity = self.ADLOD5CurrentActivity()
-                activity.iSize = ctypes.sizeof(self.ADLOD5CurrentActivity)
-                result = self.ADL_Overdrive5_CurrentActivity_Get(adapter_index, ctypes.byref(activity))
-                if result == 0:
-                    engine_clock = activity.iEngineClock  # in MHz
-                    memory_clock = activity.iMemoryClock  # in MHz
-            except:
-                pass
+            if not self.ADL_Overdrive5_CurrentActivity_Get:
+                self.logger.warning("ADL_Overdrive5_CurrentActivity_Get is not available")
+            else:
+                try:
+                    activity = self.ADLOD5CurrentActivity()
+                    activity.iSize = ctypes.sizeof(self.ADLOD5CurrentActivity)
+                    result = self.ADL_Overdrive5_CurrentActivity_Get(adapter_index, ctypes.byref(activity))
+                    if result == 0:
+                        engine_clock = activity.iEngineClock  # in MHz
+                        memory_clock = activity.iMemoryClock  # in MHz
+                except:
+                    pass
 
             # Get VRAM size (approximate from adapter info or other methods)
             vram_mb = 0

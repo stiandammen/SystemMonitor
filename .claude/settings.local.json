@@ -67,7 +67,8 @@
       "Bash(\"/e/[python - prosjekter]/SystemMonitor/.venv/Scripts/python.exe\" -c \"import sys; sys.path.insert\\(0, r'E:\\\\[python - prosjekter]\\\\SystemMonitor'\\); from scaler import S, ScaleMixin, LayoutMode; print\\('scaler OK'\\)\")",
       "Bash(taskkill *)",
       "Bash(del *)",
-      "Bash(dir *)"
+      "Bash(dir *)",
+      "Bash(pip install *)"
     ]
   }
 }

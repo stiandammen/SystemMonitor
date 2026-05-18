@@ -30,7 +30,7 @@ class NVMLDetector(GPUDetector):
             self._device_count = self._nvml.nvmlDeviceGetCount()
             self.logger.info(f"NVML initialized successfully - found {self._device_count} NVIDIA GPU(s)")
         except ImportError:
-            self.logger.warning("NVML (pynvml) module not available")
+            self.logger.warning("NVML (pynvml/nvidia-ml-py) module not available. Install with: pip install nvidia-ml-py")
             self._nvml_available = False
         except Exception as e:
             self.logger.error(f"Failed to initialize NVML: {e}")
@@ -80,37 +80,50 @@ class NVMLDetector(GPUDetector):
             # Get GPU utilization
             try:
                 utilization = self._nvml.nvmlDeviceGetUtilizationRates(handle)
-                gpu_util = utilization.gpu
-                memory_util = utilization.memory
+                gpu_util = float(utilization.gpu)
+                memory_util = float(utilization.memory)
             except:
-                gpu_util = 0
-                memory_util = 0
+                gpu_util = 0.0
+                memory_util = 0.0
 
             # Get memory information
             try:
                 mem_info = self._nvml.nvmlDeviceGetMemoryInfo(handle)
-                vram_total_mb = mem_info.total / (1024 * 1024)
-                vram_used_mb = mem_info.used / (1024 * 1024)
-                vram_free_mb = mem_info.free / (1024 * 1024)
-                vram_percent = (vram_used_mb / vram_total_mb * 100) if vram_total_mb > 0 else 0
+                vram_total_mb = float(mem_info.total) / (1024 * 1024)
+                vram_used_mb = float(mem_info.used) / (1024 * 1024)
+                vram_free_mb = float(mem_info.free) / (1024 * 1024)
+                # Avoid division by zero or extremely small numbers
+                if vram_total_mb > 0.1:  # At least 0.1 MB
+                    vram_percent = (vram_used_mb / vram_total_mb) * 100
+                else:
+                    vram_percent = 0.0
             except:
-                vram_total_mb = vram_used_mb = vram_free_mb = vram_percent = 0
+                vram_total_mb = 0.0
+                vram_used_mb = 0.0
+                vram_free_mb = 0.0
+                vram_percent = 0.0
 
             # Get temperature
             try:
                 temp = self._nvml.nvmlDeviceGetTemperature(handle, self._nvml.NVML_TEMPERATURE_GPU)
+                # Validate temperature is in a reasonable range
+                if temp is not None and (temp < -50 or temp > 200):
+                    self.logger.warning(f"Unrealistic temperature value {temp}°C from NVML, ignoring")
+                    temp = None
             except:
                 temp = None
 
             # Get power usage
             try:
-                power = self._nvml.nvmlDeviceGetPowerUsage(handle) / 1000.0  # Convert mW to W
+                power_value = self._nvml.nvmlDeviceGetPowerUsage(handle)
+                power = float(power_value) / 1000.0  # Convert mW to W
             except:
                 power = None
 
             try:
                 power_limit = self._nvml.nvmlDeviceGetPowerManagementLimitConstraints(handle)
-                power_limit_watts = power_limit[1] / 1000.0  # Max power limit in W
+                power_limit_value = power_limit[1]
+                power_limit_watts = float(power_limit_value) / 1000.0  # Max power limit in W
             except:
                 power_limit_watts = None
 
@@ -122,11 +135,13 @@ class NVMLDetector(GPUDetector):
 
             # Get clock speeds
             try:
-                graphics_clock = self._nvml.nvmlDeviceGetClockInfo(handle, self._nvml.NVML_CLOCK_GRAPHICS)
-                mem_clock = self._nvml.nvmlDeviceGetClockInfo(handle, self._nvml.NVML_CLOCK_MEM)
-                sm_clock = self._nvml.nvmlDeviceGetClockInfo(handle, self._nvml.NVML_CLOCK_SM)
+                graphics_clock = float(self._nvml.nvmlDeviceGetClockInfo(handle, self._nvml.NVML_CLOCK_GRAPHICS))
+                mem_clock = float(self._nvml.nvmlDeviceGetClockInfo(handle, self._nvml.NVML_CLOCK_MEM))
+                sm_clock = float(self._nvml.nvmlDeviceGetClockInfo(handle, self._nvml.NVML_CLOCK_SM))
             except:
-                graphics_clock = mem_clock = sm_clock = 0
+                graphics_clock = 0.0
+                mem_clock = 0.0
+                sm_clock = 0.0
 
             # Get compute capabilities
             try:

@@ -258,13 +258,13 @@ class WMIDetector(GPUDetector):
                         parts = pnp_id.split('&')
                         for part in parts:
                             if part.startswith('VEN_'):
-                                gpu_info.raw_data['pci_vendor_id'] = part[4:]
+                                pci_info['pci_vendor_id'] = part[4:]
                             elif part.startswith('DEV_'):
-                                gpu_info.raw_data['pci_device_id'] = part[4:]
+                                pci_info['pci_device_id'] = part[4:]
                             elif part.startswith('SUBSYS_'):
-                                gpu_info.raw_data['pci_subsystem_id'] = part[7:]
+                                pci_info['pci_subsystem_id'] = part[7:]
                             elif part.startswith('REV_'):
-                                gpu_info.raw_data['pci_revision_id'] = part[4:]
+                                pci_info['pci_revision_id'] = part[4:]
 
         except Exception as e:
             self.logger.debug(f"Could not get PCI info: {e}")
