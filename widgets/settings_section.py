@@ -64,7 +64,7 @@ class SettingsSection(QFrame, ScaleMixin):
         self.setStyleSheet(f"""
             SettingsSection {{
                 background-color: {c.BG_CARD};
-                border: 1px solid {c.BORDER};
+                border: 0px solid {c.BORDER};
                 border-radius: 12px;
             }}
         """)

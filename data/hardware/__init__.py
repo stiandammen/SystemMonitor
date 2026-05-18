@@ -1,0 +1,3 @@
+"""
+Hardware detection package
+"""

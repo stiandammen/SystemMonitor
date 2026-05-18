@@ -503,54 +503,76 @@ class NetworkCollectorThread(BaseCollector):
 
 
 class GPUCollectorThread(BaseCollector):
-    """GPU data collector - runs in background thread"""
+    """GPU data collector - runs in background thread using enhanced GPU manager"""
 
     REFRESH_INTERVAL = 1.0  # 1 second for GPU
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._gpu_collector = None
+        self._gpu_manager = None
         self._gpu_init_error = None
-        self._init_gpu()
+        self._init_gpu_manager()
 
-    def _init_gpu(self):
-        """Initialize GPU collector backend"""
+    def _init_gpu_manager(self):
+        """Initialize GPU manager"""
         try:
-            from data.gpu import GPUCollector
-            self._gpu_collector = GPUCollector()
-            log_info(LogCategory.GPU, "GPU collector initialized")
+            from data.hardware.gpu_manager import GPUManager
+            self._gpu_manager = GPUManager()
+            log_info(LogCategory.GPU, "Enhanced GPU manager initialized")
         except Exception as e:
             self._gpu_init_error = str(e)
-            log_error(LogCategory.GPU, f"GPU collector init failed: {e}")
-            self._gpu_collector = None
+            log_error(LogCategory.GPU, f"GPU manager init failed: {e}")
+            self._gpu_manager = None
 
     def _collect(self) -> dict:
-        """Collect GPU data"""
-        if self._gpu_collector is None:
-            return {'available': False}
+        """Collect GPU data using the enhanced GPU manager"""
+        if self._gpu_manager is None:
+            return {'available': False, 'error': self._gpu_init_error or 'GPU manager not initialized'}
 
         try:
-            gpu_data = self._gpu_collector.collect()
-            gpu_info = self._gpu_collector.get_info()
+            # Detect all GPUs
+            gpus = self._gpu_manager.detect_gpus()
 
-            return {
-                'available': gpu_data.get('available', False),
-                'load': gpu_data.get('load', 0),
-                'memory_used': gpu_data.get('memory_used', 0),
-                'memory_total': gpu_data.get('memory_total', 0),
-                'memory_percent': gpu_data.get('memory_percent', 0),
-                'temperature': gpu_data.get('temperature'),
-                'power': gpu_data.get('power'),
-                'fan_speed': gpu_data.get('fan_speed'),
-                'vendor': gpu_info.vendor if gpu_info else 'Unknown',
-                'name': gpu_info.name if gpu_info else 'Unknown',
-                'vram_mb': gpu_info.vram_mb if gpu_info else 0,
-                'driver_version': gpu_info.driver_version if gpu_info else 'N/A',
+            if not gpus:
+                return {'available': False}
+
+            # Format data for backward compatibility with existing UI
+            # While also providing access to full GPU information
+            primary_gpu = gpus[0] if gpus else None
+
+            # Prepare comprehensive GPU data
+            gpu_data = {
+                'available': True,
+                'count': len(gpus),
+                'gpus': [gpu.to_dict() for gpu in gpus],  # Full information for all GPUs
             }
+
+            # Add backward-compatible fields for primary GPU (for existing UI)
+            if primary_gpu:
+                gpu_data.update({
+                    'name': primary_gpu.name,
+                    'vendor': primary_gpu.vendor.value,
+                    'load': primary_gpu.gpu_utilization_percent,
+                    'memory_used': primary_gpu.vram_used_mb,
+                    'memory_total': primary_gpu.vram_total_mb,
+                    'memory_percent': primary_gpu.vram_percent,
+                    'temperature': primary_gpu.temperature_celsius,
+                    'hotspot_temp': primary_gpu.hotspot_temp_celsius,
+                    'memory_temp': primary_gpu.memory_temp_celsius,
+                    'power': primary_gpu.power_draw_watts,
+                    'fan_speed': primary_gpu.fan_speed_percent,
+                    'uuid': primary_gpu.uuid,
+                    'device_id': primary_gpu.device_id,
+                    'pci_bus': primary_gpu.pci_bus,
+                    'driver_version': primary_gpu.driver_version,
+                    'gpu_type': primary_gpu.gpu_type.value,
+                })
+
+            return gpu_data
 
         except Exception as e:
             log_exception(LogCategory.GPU, "GPU collection failed", e)
-            return {'available': False}
+            return {'available': False, 'error': str(e)}
 
 
 class SystemInfoCollectorThread(BaseCollector):

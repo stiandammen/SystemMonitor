@@ -15,6 +15,8 @@ from config import settings
 from utils.autostart import AutostartManager
 from scaler import S, ScaleMixin
 from styles.theme import theme_manager
+from widgets.settings_section import SettingsSection
+from widgets.settings_row import SettingsRow
 
 
 class ToggleWidget(QWidget, ScaleMixin):
@@ -161,61 +163,17 @@ class SettingsView(QWidget, ScaleMixin):
 
     def _create_section(self, title: str, parent_layout):
         """Create a settings section"""
-        c = theme_manager.colors
-        section = QWidget()
-        section_layout = QVBoxLayout()
-        section_layout.setContentsMargins(0, 0, 0, 0)
-        section_layout.setSpacing(8)
-        section.setLayout(section_layout)
-
-        # Section title
-        title_label = QLabel(title)
-        title_label.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
-        title_label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
-        section_layout.addWidget(title_label)
-
-        # Content area
-        content_widget = QWidget()
-        content_widget.setStyleSheet(f"""
-            background-color: {c.BG_CARD};
-            border-radius: 12px;
-            border: 1px solid {c.BORDER};
-        """)
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 4, 0, 4)
-        content_layout.setSpacing(0)
-        content_widget.setLayout(content_layout)
-        section_layout.addWidget(content_widget)
-
+        section = SettingsSection(title)
         parent_layout.addWidget(section)
-        return content_layout
+        return section.get_content_layout()
 
     def _add_row(self, layout, label_text, control):
         """Add a row to a section layout"""
-        c = theme_manager.colors
-        row = QWidget()
-        row.setStyleSheet(f"""
-            QWidget {{
-                background-color: transparent;
-            }}
-            QWidget:hover {{
-                background-color: {c.BG_HOVER};
-            }}
-        """)
-        row_layout = QHBoxLayout()
-        row_layout.setContentsMargins(16, 12, 16, 12)
-        row_layout.setSpacing(16)
-        row.setLayout(row_layout)
-
-        label = QLabel(label_text)
-        label.setFont(QFont("Segoe UI", 13))
-        label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
-        row_layout.addWidget(label, 1)
-
-        row_layout.addWidget(control)
+        row = SettingsRow(label_text)
+        row.set_control(control)
         layout.addWidget(row)
 
-    def _create_combo(self, items, current_index=0):
+    def _create_styled_combo(self, items, current_index=0):
         """Create a styled combo box"""
         c = theme_manager.colors
         combo = QComboBox()
@@ -225,7 +183,7 @@ class SettingsView(QWidget, ScaleMixin):
             QComboBox {{
                 background-color: {c.BG_INPUT};
                 color: {c.TEXT_PRIMARY};
-                border: 1px solid {c.BORDER};
+                border: 0px solid {c.BORDER};
                 border-radius: 6px;
                 padding: 8px 12px;
                 min-width: 100px;
@@ -239,7 +197,7 @@ class SettingsView(QWidget, ScaleMixin):
             QComboBox QAbstractItemView {{
                 background-color: {c.BG_CARD};
                 color: {c.TEXT_PRIMARY};
-                border: 1px solid {c.BORDER};
+                border: 0px solid {c.BORDER};
                 border-radius: 6px;
             }}
         """)
@@ -250,7 +208,7 @@ class SettingsView(QWidget, ScaleMixin):
         available_themes = theme_manager.get_available_themes()
         theme_display_names = [theme_manager.get_theme_display_name(t) for t in available_themes]
 
-        combo = self._create_combo(theme_display_names)
+        combo = self._create_styled_combo(theme_display_names)
         current_theme = settings.get('theme', 'midnight')
         try:
             current_index = available_themes.index(current_theme)
@@ -295,7 +253,7 @@ class SettingsView(QWidget, ScaleMixin):
         self.settings_changed.emit('theme', theme_name)
 
     def _add_performance_section(self, layout):
-        combo = self._create_combo(["250ms", "500ms", "1000ms", "2000ms"])
+        combo = self._create_styled_combo(["250ms", "500ms", "1000ms", "2000ms"])
         intervals = {250: 0, 500: 1, 1000: 2, 2000: 3}
         combo.setCurrentIndex(intervals.get(settings.get('update_interval', 500), 1))
         combo.currentIndexChanged.connect(lambda idx: self._on_setting_changed('update_interval', list(intervals.keys())[idx]))
@@ -361,7 +319,7 @@ class SettingsView(QWidget, ScaleMixin):
         self._add_row(layout, "Start Minimized", toggle)
 
     def _add_export_section(self, layout):
-        combo = self._create_combo(["CSV", "JSON"])
+        combo = self._create_styled_combo(["CSV", "JSON"])
         combo.setCurrentText(settings.get('export_format', 'csv').upper())
         combo.currentIndexChanged.connect(lambda idx: self._on_setting_changed('export_format', combo.currentText().lower()))
         self._add_row(layout, "Export Format", combo)

@@ -76,7 +76,7 @@ class SettingsRow(QFrame, ScaleMixin):
             SettingsRow {{
                 background-color: transparent;
                 border: none;
-                border-bottom: 1px solid {c.BORDER};
+                border-bottom: 0px solid {c.BORDER};
             }}
             SettingsRow:hover {{
                 background-color: {c.BG_HOVER};
@@ -189,7 +189,7 @@ class SettingsComboBox(QComboBox):
             QComboBox {{
                 background-color: {c.BG_INPUT};
                 color: {c.TEXT_PRIMARY};
-                border: 1px solid {c.BORDER};
+                border: 0px solid {c.BORDER};
                 border-radius: 8px;
                 padding: 10px 14px;
                 font-family: "Segoe UI", sans-serif;
@@ -216,7 +216,7 @@ class SettingsComboBox(QComboBox):
             QComboBox QAbstractItemView {{
                 background-color: {c.BG_CARD};
                 color: {c.TEXT_PRIMARY};
-                border: 1px solid {c.BORDER};
+                border: 0px solid {c.BORDER};
                 border-radius: 8px;
                 selection-background-color: {c.BG_HOVER};
                 padding: 4px;
