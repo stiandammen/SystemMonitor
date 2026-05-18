@@ -68,7 +68,11 @@
       "Bash(taskkill *)",
       "Bash(del *)",
       "Bash(dir *)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(pip list *)",
+      "Bash(findstr /i nvidia)",
+      "Bash(pip uninstall *)",
+      "Bash(findstr nvidia *)"
     ]
   }
 }

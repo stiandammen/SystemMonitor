@@ -10,6 +10,7 @@ import os
 from typing import List, Dict, Any, Optional
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
+from utils.opencl_vram import get_vram_via_opencl
 
 
 class ADLDetector(GPUDetector):
@@ -410,6 +411,13 @@ class ADLDetector(GPUDetector):
                     adapter_ram = getattr(controller, 'AdapterRAM', 0) or 0
                     if adapter_ram > 0:
                         gpu_info.vram_total_mb = adapter_ram / (1024 * 1024)
+                    else:
+                        # If WMI didn't provide VRAM, try OpenCL as fallback
+                        if gpu_info.vram_total_mb <= 0:
+                            opencl_vram = get_vram_via_opencl(gpu_info.name)
+                            if opencl_vram and opencl_vram > 0:
+                                gpu_info.vram_total_mb = opencl_vram
+                                self.logger.debug(f"Using OpenCL VRAM for AMD GPU {gpu_info.name}: {gpu_info.vram_total_mb:.0f} MB")
 
                     driver_version = getattr(controller, 'DriverVersion', '') or "Unknown"
                     if driver_version != "Unknown":

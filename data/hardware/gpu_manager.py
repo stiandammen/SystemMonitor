@@ -32,15 +32,7 @@ class GPUManager:
         try:
             self.logger.info("Initializing GPU detection backends...")
 
-            # Priority 1: WMI (broad compatibility, good for basic info)
-            wmi_detector = WMIDetector()
-            if wmi_detector.is_available():
-                self._detectors.append(wmi_detector)
-                self.logger.info("✓ WMI detector initialized")
-            else:
-                self.logger.warning("✗ WMI detector not available")
-
-            # Priority 2: NVML (NVIDIA-specific, detailed info)
+            # Priority 1: NVML (NVIDIA-specific, detailed info) - try first for best NVIDIA support
             nvml_detector = NVMLDetector()
             if nvml_detector.is_available():
                 self._detectors.append(nvml_detector)
@@ -48,7 +40,15 @@ class GPUManager:
             else:
                 self.logger.warning("✗ NVML detector not available")
 
-            # Priority 3: ADL (AMD-specific)
+            # Priority 2: WMI (broad compatibility, good for basic info and fallback)
+            wmi_detector = WMIDetector()
+            if wmi_detector.is_available():
+                self._detectors.append(wmi_detector)
+                self.logger.info("✓ WMI detector initialized")
+            else:
+                self.logger.warning("✗ WMI detector not available")
+
+            # Priority 3: ADL (AMD-specific for enhanced features like temperature, clock speeds)
             adl_detector = ADLDetector()
             if adl_detector.is_available():
                 self._detectors.append(adl_detector)
@@ -56,7 +56,7 @@ class GPUManager:
             else:
                 self.logger.warning("✗ ADL detector not available")
 
-            # Priority 4: Intel detector
+            # Priority 4: Intel detector (WMI-based with Intel-specific enhancements)
             intel_detector = IntelDetector()
             if intel_detector.is_available():
                 self._detectors.append(intel_detector)

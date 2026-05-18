@@ -8,6 +8,7 @@ import platform
 from typing import List, Dict, Any, Optional
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
+from utils.opencl_vram import get_vram_via_opencl
 
 
 class IntelDetector(GPUDetector):
@@ -108,6 +109,15 @@ class IntelDetector(GPUDetector):
             # VRAM information
             adapter_ram = getattr(controller, 'AdapterRAM', 0) or 0
             vram_total_mb = adapter_ram / (1024 * 1024) if adapter_ram > 0 else 0.0
+
+            # If VRAM from WMI is 0 or unavailable, try to get it via OpenCL
+            if vram_total_mb <= 0:
+                name = getattr(controller, 'Name', '') or ""
+                if name:
+                    opencl_vram = get_vram_via_opencl(name)
+                    if opencl_vram and opencl_vram > 0:
+                        vram_total_mb = opencl_vram
+                        self.logger.debug(f"Using OpenCL VRAM for Intel GPU {name}: {vram_total_mb:.0f} MB")
 
             # Driver version
             driver_version = getattr(controller, 'DriverVersion', '') or "Unknown"
