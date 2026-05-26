@@ -181,6 +181,8 @@ class ADLDetector(GPUDetector):
             if self.ADL_Adapter_Name_Get:
                 self.ADL_Adapter_Name_Get.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char)]
                 self.ADL_Adapter_Name_Get.restype = ctypes.c_int
+            else:
+                self.logger.debug("ADL_Adapter_Name_Get not exported by this DLL — will use fallback names")
 
             # ADL_Adapter_Active_Get
             self.ADL_Adapter_Active_Get = getattr(
@@ -277,21 +279,18 @@ class ADLDetector(GPUDetector):
         try:
             # Get adapter name
             if not self.ADL_Adapter_Name_Get:
-                self.logger.warning("ADL_Adapter_Name_Get is not available")
-                return None
-
-            name_buffer = ctypes.create_string_buffer(256)
-            result = self.ADL_Adapter_Name_Get(adapter_index, name_buffer)
-            if result != 0:
-                self.logger.warning(f"ADL_Adapter_Name_Get failed for adapter {adapter_index}")
-                name = b"Unknown AMD GPU"
+                name = f"AMD GPU {adapter_index}"
             else:
-                name = name_buffer.value
-
-            if isinstance(name, bytes):
-                name = name.decode('utf-8', errors='ignore').strip()
-            if not name:
-                name = "Unknown AMD GPU"
+                name_buffer = ctypes.create_string_buffer(256)
+                result = self.ADL_Adapter_Name_Get(adapter_index, name_buffer)
+                if result != 0:
+                    name = f"AMD GPU {adapter_index}"
+                else:
+                    name = name_buffer.value
+                    if isinstance(name, bytes):
+                        name = name.decode('utf-8', errors='ignore').strip()
+                    if not name:
+                        name = f"AMD GPU {adapter_index}"
 
             # Check if adapter is active
             if not self.ADL_Adapter_Active_Get:

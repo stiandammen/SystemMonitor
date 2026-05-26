@@ -38,13 +38,13 @@ class SettingsSection(QFrame, ScaleMixin):
     def _setup_ui(self):
         """Setup section UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 12)
-        layout.setSpacing(16)
+        layout.setContentsMargins(S.px(24), S.px(24), S.px(24), S.px(16))
+        layout.setSpacing(S.px(20))
         self.setLayout(layout)
 
         # Section title
         self._title_label = QLabel(self._title)
-        title_font = QFont("Segoe UI", 14)
+        title_font = QFont("Segoe UI", S.font_pt(14))
         title_font.setWeight(QFont.Weight.DemiBold)
         self._title_label.setFont(title_font)
         layout.addWidget(self._title_label)
@@ -52,20 +52,20 @@ class SettingsSection(QFrame, ScaleMixin):
         # Content container
         self._content_widget = QFrame()
         self._content_layout = QVBoxLayout()
-        self._content_layout.setContentsMargins(0, 8, 0, 8)
+        self._content_layout.setContentsMargins(0, S.px(8), 0, S.px(8))
         self._content_layout.setSpacing(0)
         self._content_layout.addStretch()
         self._content_widget.setLayout(self._content_layout)
         layout.addWidget(self._content_widget)
 
     def _apply_style(self):
-        """Apply section styles"""
+        """Apply section styles with glassmorphism effect"""
         c = theme_manager.colors
         self.setStyleSheet(f"""
             SettingsSection {{
                 background-color: {c.BG_CARD};
-                border: 0px solid {c.BORDER};
-                border-radius: 12px;
+                border: none;
+                border-radius: {S.px(12)}px;
             }}
         """)
         self._title_label.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent; border: none;")

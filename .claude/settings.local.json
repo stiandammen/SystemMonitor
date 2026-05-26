@@ -72,7 +72,23 @@
       "Bash(pip list *)",
       "Bash(findstr /i nvidia)",
       "Bash(pip uninstall *)",
-      "Bash(findstr nvidia *)"
+      "Bash(findstr nvidia *)",
+      "Bash(widgets/settings_row.py *)",
+      "Bash(.venv/Scripts/python *)",
+      "Bash(C:/Users/RSman/AppData/Local/Python/bin/python.exe *)",
+      "Bash(/c/Users/RSman/AppData/Local/Python/bin/python.exe *)",
+      "Bash(c:/Users/RSman/AppData/Local/Python/bin/python.exe *)",
+      "Bash(c:/Users/rsman/AppData/Local/Programs/Python/Python311/python.exe *)",
+      "PowerShell(Start-Process -FilePath \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"-m SystemMonitor\" -WorkingDirectory \"E:\\\\\" -PassThru -WindowStyle Normal)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(& \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Scripts\\\\python.exe\" \"C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Temp\\\\net_preview.py\" 2>&1)",
+      "PowerShell(& \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Scripts\\\\python.exe\" \"C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Temp\\\\net_bottom.py\" 2>&1)",
+      "PowerShell(& \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Scripts\\\\python.exe\" \"C:\\\\Users\\\\RSman\\\\AppData\\\\Local\\\\Temp\\\\ns.py\" 2>&1)",
+      "Bash(Start-Process -FilePath \".venv\\\\Scripts\\\\python.exe\" -ArgumentList \"main.py\" -WindowStyle Normal)",
+      "Bash(Start-Sleep -Seconds 4)",
+      "PowerShell(Start-Process -FilePath \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\main.py\" -WindowStyle Normal)",
+      "PowerShell(Get-ChildItem \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" | Where-Object { $_.Extension -eq \".py\" } | Select-Object Name)",
+      "Bash(Write-Host \"---\")"
     ]
   }
 }

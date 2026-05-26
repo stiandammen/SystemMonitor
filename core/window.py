@@ -3,7 +3,7 @@ Main Window - Application main window
 Professional enterprise-grade design with responsive layout and overlay mode
 """
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QStackedWidget, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer, QSize
@@ -446,7 +446,7 @@ class MainWindow(QMainWindow, ScaleMixin):
 
     def _on_theme_changed(self, theme_name: str):
         try:
-            self.setStyleSheet(theme_manager.get_stylesheet())
+            QApplication.instance().setStyleSheet(theme_manager.get_stylesheet())
             if hasattr(self, '_top_header'):
                 self._top_header._setup_ui()
             if hasattr(self, '_sidebar'):

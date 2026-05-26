@@ -1,7 +1,43 @@
 """
 Memory Data Collector
 """
+import subprocess
+import re
 from typing import Dict, Any, List, Optional
+
+_SMBIOS_TYPES = {
+    20: "DDR",
+    21: "DDR2",
+    24: "DDR3",
+    26: "DDR4",
+    30: "LPDDR4",
+    34: "DDR5",
+    35: "LPDDR5",
+}
+_ram_type_cache: str | None = None
+
+
+def get_ram_type() -> str:
+    """Detect RAM type via SMBIOSMemoryType (runs PowerShell once, then returns cached result)."""
+    global _ram_type_cache
+    if _ram_type_cache is not None:
+        return _ram_type_cache
+    try:
+        cmd = "Get-CimInstance Win32_PhysicalMemory | Select-Object -ExpandProperty SMBIOSMemoryType"
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
+            capture_output=True, text=True, timeout=8,
+        )
+        codes = re.findall(r'\d+', result.stdout)
+        if not codes:
+            _ram_type_cache = ""
+            return ""
+        detected = [_SMBIOS_TYPES[int(c)] for c in codes if int(c) in _SMBIOS_TYPES]
+        unique = list(dict.fromkeys(detected))
+        _ram_type_cache = ", ".join(unique) if unique else ""
+    except Exception:
+        _ram_type_cache = ""
+    return _ram_type_cache
 
 
 class MemoryCollector:

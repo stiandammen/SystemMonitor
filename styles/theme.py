@@ -501,6 +501,129 @@ class HeimdalTheme:
     INFO_BG = "rgba(74, 108, 247, 0.1)"
 
 
+class CyberCyanTheme:
+    """Cyber-Cyan: dark navy with emerald-green accent"""
+    BG_PRIMARY = "#0a0e17"
+    BG_SECONDARY = "#0d1117"
+    BG_CARD = "#161f2a"
+    BG_HOVER = "#1c2535"
+    BG_INPUT = "#0d1117"
+    BG_ACTIVE = "#10b981"
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#8b949e"
+    TEXT_MUTED = "#5a6370"
+    TEXT_DISABLED = "#3a4350"
+    ACCENT_GREEN = "#10b981"
+    ACCENT_GREEN_BRIGHT = "#34d399"
+    ACCENT_GREEN_DIM = "rgba(16, 185, 129, 0.15)"
+    ACCENT_BLUE = "#00d4ff"
+    ACCENT_ORANGE = "#f97316"
+    ACCENT_RED = "#ef4444"
+    ACCENT_YELLOW = "#fbbf24"
+    ACCENT_CYAN = "#06b6d4"
+    ACCENT_PURPLE = "#a371f7"
+    ACCENT_PINK = "#ec4899"
+    STATUS_RED = "#ef4444"
+    STATUS_ORANGE = "#f97316"
+    STATUS_YELLOW = "#fbbf24"
+    STATUS_GREEN = "#10b981"
+    BORDER = "#2a3a4a"
+    BORDER_SUBTLE = "#1a2838"
+    BORDER_FOCUS = "#10b981"
+    GAUGE_BG = "#1c2838"
+    GAUGE_FILL = "#10b981"
+    CHART_FILL = "rgba(16, 185, 129, 0.1)"
+    CHART_LINE = "#10b981"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
+    OVERLAY = "rgba(13, 17, 23, 0.9)"
+    SUCCESS_BG = "#0a2015"
+    WARNING_BG = "#201a0a"
+    ERROR_BG = "#200a0a"
+    INFO_BG = "#0a1520"
+
+
+class NeonPurpleTheme:
+    """Neon-Purple: deep void black with vivid violet accent"""
+    BG_PRIMARY = "#0a0a0f"
+    BG_SECONDARY = "#12121d"
+    BG_CARD = "#1c1c2b"
+    BG_HOVER = "#24243a"
+    BG_INPUT = "#12121d"
+    BG_ACTIVE = "#a371f7"
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#b0b0b0"
+    TEXT_MUTED = "#707070"
+    TEXT_DISABLED = "#404040"
+    ACCENT_GREEN = "#a371f7"
+    ACCENT_GREEN_BRIGHT = "#b98cf9"
+    ACCENT_GREEN_DIM = "rgba(163, 113, 247, 0.15)"
+    ACCENT_BLUE = "#58a6ff"
+    ACCENT_ORANGE = "#f97316"
+    ACCENT_RED = "#ef4444"
+    ACCENT_YELLOW = "#fbbf24"
+    ACCENT_CYAN = "#22d3ee"
+    ACCENT_PURPLE = "#7b5cf0"
+    ACCENT_PINK = "#f0a3e3"
+    STATUS_RED = "#ef4444"
+    STATUS_ORANGE = "#f97316"
+    STATUS_YELLOW = "#fbbf24"
+    STATUS_GREEN = "#22c55e"
+    BORDER = "#2d2d44"
+    BORDER_SUBTLE = "#1e1e30"
+    BORDER_FOCUS = "#a371f7"
+    GAUGE_BG = "#1c1c2b"
+    GAUGE_FILL = "#a371f7"
+    CHART_FILL = "rgba(163, 113, 247, 0.1)"
+    CHART_LINE = "#a371f7"
+    SHADOW = "rgba(0, 0, 0, 0.5)"
+    OVERLAY = "rgba(10, 10, 15, 0.9)"
+    SUCCESS_BG = "#0a2015"
+    WARNING_BG = "#201a0a"
+    ERROR_BG = "#200a0a"
+    INFO_BG = "#0f0f20"
+
+
+class InfernoTheme:
+    """Inferno: scorched dark red with ember-red accent"""
+    BG_PRIMARY = "#0f0505"
+    BG_SECONDARY = "#1a0808"
+    BG_CARD = "#2d0f0f"
+    BG_HOVER = "#3a1515"
+    BG_INPUT = "#1a0808"
+    BG_ACTIVE = "#ff4d4d"
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#a0a0a0"
+    TEXT_MUTED = "#666666"
+    TEXT_DISABLED = "#444444"
+    ACCENT_GREEN = "#ff4d4d"
+    ACCENT_GREEN_BRIGHT = "#ff6b6b"
+    ACCENT_GREEN_DIM = "rgba(255, 77, 77, 0.15)"
+    ACCENT_BLUE = "#58a6ff"
+    ACCENT_ORANGE = "#ff9100"
+    ACCENT_RED = "#ff2020"
+    ACCENT_YELLOW = "#ffd740"
+    ACCENT_CYAN = "#22d3ee"
+    ACCENT_PURPLE = "#a371f7"
+    ACCENT_PINK = "#ff4fcf"
+    STATUS_RED = "#ff2020"
+    STATUS_ORANGE = "#ff9100"
+    STATUS_YELLOW = "#ffd740"
+    STATUS_GREEN = "#22c55e"
+    BORDER = "#4a1515"
+    BORDER_SUBTLE = "#3a1010"
+    BORDER_FOCUS = "#ff4d4d"
+    GAUGE_BG = "#3a1515"
+    GAUGE_FILL = "#ff4d4d"
+    CHART_FILL = "rgba(255, 77, 77, 0.1)"
+    CHART_LINE = "#ff4d4d"
+    SHADOW = "rgba(0, 0, 0, 0.6)"
+    OVERLAY = "rgba(15, 5, 5, 0.9)"
+    SUCCESS_BG = "#0a2015"
+    WARNING_BG = "#201a0a"
+    ERROR_BG = "#2d0505"
+    INFO_BG = "#0a1520"
+
+
 class ThemeManager(QObject):
     """Manages application theme (singleton)"""
     theme_changed = pyqtSignal(str)  # Emits theme name
@@ -515,6 +638,9 @@ class ThemeManager(QObject):
         "nordic": NordicTheme,
         "ember": EmberTheme,
         "heimdal": HeimdalTheme,
+        "cyber-cyan": CyberCyanTheme,
+        "neon-purple": NeonPurpleTheme,
+        "inferno": InfernoTheme,
     }
 
     _theme_names = {
@@ -525,6 +651,9 @@ class ThemeManager(QObject):
         "nordic": "Nordic",
         "ember": "Ember",
         "heimdal": "Heimdal Security",
+        "cyber-cyan": "Cyber Cyan",
+        "neon-purple": "Neon Purple",
+        "inferno": "Inferno",
     }
 
     def __new__(cls):
@@ -709,7 +838,7 @@ class ThemeManager(QObject):
         }}
 
         QScrollBar::handle:vertical {{
-            background-color: rgba(74, 108, 247, 0.3);
+            background-color: {getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.3)')};
             border-radius: 3px;
             min-height: 30px;
         }}
@@ -731,7 +860,7 @@ class ThemeManager(QObject):
         }}
 
         QScrollBar::handle:horizontal {{
-            background-color: rgba(74, 108, 247, 0.3);
+            background-color: {getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.3)')};
             border-radius: 3px;
             min-width: 30px;
         }}

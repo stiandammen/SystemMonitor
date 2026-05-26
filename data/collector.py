@@ -258,6 +258,7 @@ class MemoryCollectorThread(BaseCollector):
         """Collect memory data"""
         try:
             import psutil
+            from data.memory import get_ram_type
 
             vm = psutil.virtual_memory()
             swap = psutil.swap_memory()
@@ -272,6 +273,7 @@ class MemoryCollectorThread(BaseCollector):
                 'swap_percent': swap.percent,
                 'swap_used': swap.used,
                 'swap_total': swap.total,
+                'ram_type': get_ram_type(),
             }
 
         except Exception as e:

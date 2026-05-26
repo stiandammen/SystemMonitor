@@ -2,10 +2,11 @@
 Memory View - Professional memory monitoring dashboard
 Enterprise-grade design with real-time graphs, donut charts, and process list
 """
+import math
 import time
 import psutil
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient, QPaintEvent, QShowEvent
+from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient, QPainterPath, QPaintEvent, QShowEvent
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QFrame, QProgressBar, QSizePolicy, QMenu, QPushButton
@@ -95,76 +96,174 @@ class MemoryKpiCard(QFrame, ScaleMixin):
         self._unit_label.setText(unit)
 
 
-class MemoryDonutChart(QWidget, ScaleMixin):
-    """Donut chart showing memory distribution"""
+class MemoryWaveChart(QWidget, ScaleMixin):
+    """Animated liquid-fill memory chart — three fluid layers with sine wave boundaries and neon glow."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._used_pct = 0
-        self._cached_pct = 0
-        self._available_pct = 0
+        self._cur_used      = 0.0
+        self._cur_cached    = 0.0
+        self._cur_available = 100.0
+        self._tgt_used      = 0.0
+        self._tgt_cached    = 0.0
+        self._tgt_available = 100.0
+        self._cur_pct  = 0.0
+        self._phase1   = 0.0
+        self._phase2   = math.pi
+        self._pulse    = 0.0
         self.scale_connect()
-        self.setMinimumSize(S.px(160), S.px(160))
-        self.setMaximumSize(S.px(200), S.px(200))
+        self.setMinimumSize(S.px(120), S.px(100))
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         theme_manager.theme_changed.connect(lambda _: self.update())
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(16)
 
-    def set_values(self, used: float, cached: float, available: float):
-        self._used_pct = max(0, min(100, used))
-        self._cached_pct = max(0, min(100, cached))
-        self._available_pct = max(0, min(100, available))
+    def _tick(self):
+        spd = 0.07
+        def lp(cur, tgt):
+            d = tgt - cur
+            return tgt if abs(d) < 0.05 else cur + d * spd
+        self._cur_used      = lp(self._cur_used,      self._tgt_used)
+        self._cur_cached    = lp(self._cur_cached,    self._tgt_cached)
+        self._cur_available = lp(self._cur_available, self._tgt_available)
+        total = max(self._cur_used + self._cur_cached + self._cur_available, 0.01)
+        self._cur_pct = lp(self._cur_pct, self._cur_used / total * 100)
+        self._phase1  = (self._phase1 + 0.06) % (2 * math.pi)
+        self._phase2  = (self._phase2 + 0.035) % (2 * math.pi)
+        self._pulse   = (self._pulse  + 0.04) % (2 * math.pi)
         self.update()
 
+    def set_values(self, used: float, cached: float, available: float):
+        self._tgt_used      = max(0.0, min(100.0, used))
+        self._tgt_cached    = max(0.0, min(100.0, cached))
+        self._tgt_available = max(0.0, min(100.0, available))
+
     def paintEvent(self, a0: QPaintEvent | None) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
         colors = c()
         w, h = self.width(), self.height()
         if w <= 0 or h <= 0:
-            painter.end()
+            p.end()
             return
 
-        size = min(w, h)
-        center = size / 2
-        radius = (size - 40) / 2
-        arc_rect = (size - 2 * radius) / 2
+        pad = float(S.px(6))
+        bx, by = pad, pad
+        bw, bh = float(w) - pad * 2, float(h) - pad * 2
+        rad = float(S.px(12))
+        amp = float(S.px(4))
+
+        total    = max(self._cur_used + self._cur_cached + self._cur_available, 0.01)
+        used_f   = self._cur_used / total
+        cached_f = self._cur_cached / total
+
+        # Base y for each layer boundary (fill rises from bottom)
+        y_used_base   = by + bh * (1.0 - used_f)
+        y_cached_base = by + bh * (1.0 - used_f - cached_f)
+
+        def wave_used(x: float) -> float:
+            rel = (x - bx) / bw if bw > 0 else 0.0
+            return y_used_base + amp * math.sin(rel * math.pi * 4 + self._phase1) + \
+                   amp * 0.4 * math.sin(rel * math.pi * 7 + self._phase2)
+
+        def wave_cached(x: float) -> float:
+            rel = (x - bx) / bw if bw > 0 else 0.0
+            return y_cached_base + amp * 0.7 * math.sin(rel * math.pi * 3 + self._phase2 + math.pi)
+
+        STEPS = 80
+
+        def fill_up_to(wave_fn) -> QPainterPath:
+            path = QPainterPath()
+            path.moveTo(bx, by + bh)
+            path.lineTo(bx + bw, by + bh)
+            path.lineTo(bx + bw, wave_fn(bx + bw))
+            for i in range(STEPS, -1, -1):
+                path.lineTo(bx + bw * i / STEPS, wave_fn(bx + bw * i / STEPS))
+            path.closeSubpath()
+            return path
+
+        # Clip all layer fills to the rounded container
+        clip = QPainterPath()
+        clip.addRoundedRect(bx, by, bw, bh, rad, rad)
+        p.setClipPath(clip)
+
+        pct = self._cur_pct
+        used_hex = (colors.ACCENT_RED    if pct > 90 else
+                    colors.ACCENT_ORANGE if pct > 70 else
+                    colors.ACCENT_YELLOW if pct > 40 else
+                    colors.ACCENT_GREEN)
 
         # Background
-        painter.setBrush(QColor(colors.BG_SECONDARY))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(int(arc_rect), int(arc_rect), int(2 * radius), int(2 * radius))
+        p.setBrush(QBrush(QColor(colors.BG_SECONDARY)))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRect(int(bx), int(by), int(bw + 1), int(bh + 1))
 
-        # Draw arc segments (270 degree arc)
-        start_angle = 135 * 16
-        total = self._used_pct + self._cached_pct + self._available_pct
-        if total <= 0:
-            total = 1
+        # Layer 1: available (blue backdrop)
+        avail_c = QColor(colors.ACCENT_BLUE); avail_c.setAlpha(45)
+        p.setBrush(QBrush(avail_c))
+        p.drawRect(int(bx), int(by), int(bw + 1), int(bh + 1))
 
-        # Used
-        used_arc = int(self._used_pct / total * 270 * 16)
-        painter.setPen(QPen(QColor(colors.ACCENT_GREEN), 12, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(int(arc_rect), int(arc_rect), int(2 * radius), int(2 * radius),
-                       start_angle, -used_arc)
+        # Layer 2: cached (purple, rises to cached wave)
+        cached_c = QColor(colors.ACCENT_PURPLE); cached_c.setAlpha(80)
+        p.setBrush(QBrush(cached_c))
+        p.drawPath(fill_up_to(wave_cached))
 
-        # Cached
-        cached_start = start_angle - used_arc
-        cached_arc = int(self._cached_pct / total * 270 * 16)
-        painter.setPen(QPen(QColor(colors.ACCENT_PURPLE), 12, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(int(arc_rect), int(arc_rect), int(2 * radius), int(2 * radius),
-                       cached_start, -cached_arc)
+        # Layer 3: used (theme accent color, rises to used wave)
+        used_c = QColor(used_hex); used_c.setAlpha(145)
+        p.setBrush(QBrush(used_c))
+        p.drawPath(fill_up_to(wave_used))
 
-        # Available
-        avail_start = cached_start - cached_arc
-        avail_arc = int(self._available_pct / total * 270 * 16)
-        painter.setPen(QPen(QColor(colors.ACCENT_BLUE), 12, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(int(arc_rect), int(arc_rect), int(2 * radius), int(2 * radius),
-                       avail_start, -avail_arc)
+        # Glow along the used-layer wave: wide soft halo then bright hard line
+        for pen_sz, alpha in ((S.px(6), 45), (S.px(3), 90), (max(1, S.px(1)), 230)):
+            gc = QColor(used_hex); gc.setAlpha(alpha)
+            p.setPen(QPen(gc, pen_sz, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            px0, py0 = bx, wave_used(bx)
+            for i in range(1, STEPS + 1):
+                px1 = bx + bw * i / STEPS
+                py1 = wave_used(px1)
+                if by <= py0 <= by + bh and by <= py1 <= by + bh:
+                    p.drawLine(int(px0), int(py0), int(px1), int(py1))
+                px0, py0 = px1, py1
 
-        # Center text
-        total_mem = getattr(psutil.virtual_memory(), 'total', 0) / (1024**3)
-        painter.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        painter.setPen(QColor(colors.TEXT_PRIMARY))
-        painter.drawText(int(center - S.px(25)), int(center + S.px(5)), f"{total_mem:.0f} GB")
+        # Release clip for overlays
+        p.setClipping(False)
 
-        painter.end()
+        # Container border
+        border_c = QColor(colors.BORDER); border_c.setAlpha(100)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(border_c, max(1, S.px(1))))
+        p.drawRoundedRect(int(bx), int(by), int(bw), int(bh), int(rad), int(rad))
+
+        # Side tick marks at 25 / 50 / 75%
+        tick_c = QColor(colors.TEXT_MUTED); tick_c.setAlpha(70)
+        p.setFont(QFont("Segoe UI", S.font_pt(7)))
+        for frac, label in ((0.25, "75%"), (0.5, "50%"), (0.75, "25%")):
+            ty = int(by + bh * frac)
+            p.setPen(QPen(tick_c, max(1, S.px(1))))
+            p.drawLine(int(bx + bw - S.px(10)), ty, int(bx + bw), ty)
+            p.setPen(QColor(colors.TEXT_MUTED))
+            p.drawText(int(bx + 4), ty + S.px(3), label)
+
+        # Center text: animated % with drop shadow
+        pct_str = f"{pct:.0f}%"
+        cx, cy_c = bx + bw / 2, by + bh / 2
+        p.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
+        fm = p.fontMetrics()
+        tx = int(cx - fm.horizontalAdvance(pct_str) / 2)
+        ty = int(cy_c + S.px(7))
+        p.setPen(QColor(0, 0, 0, 90))
+        p.drawText(tx + 1, ty + 1, pct_str)
+        p.setPen(QColor(colors.TEXT_PRIMARY))
+        p.drawText(tx, ty, pct_str)
+
+        # Sublabel
+        p.setFont(QFont("Segoe UI", S.font_pt(8)))
+        fm2 = p.fontMetrics()
+        p.setPen(QColor(colors.TEXT_MUTED))
+        p.drawText(int(cx - fm2.horizontalAdvance("Used") / 2), ty + S.px(15), "Used")
+
+        p.end()
 
 
 class MemoryPressureGraph(QWidget, ScaleMixin):
@@ -565,6 +664,7 @@ class MemoryView(QWidget, ScaleMixin):
         self._current_memory_data = None
         self._update_timer = None
         self._prev_top_pid = None
+        self._last_proc_update = 0
         self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -690,15 +790,8 @@ class MemoryView(QWidget, ScaleMixin):
 
         # Distribution card
         dist_card = Card(title="Memory Distribution", icon="📊")
-        donut_container = QWidget()
-        donut_layout = QVBoxLayout()
-        donut_layout.setContentsMargins(0, 0, 0, 0)
-        donut_layout.setSpacing(S.px(8))
-        donut_container.setLayout(donut_layout)
-
-        self._donut_chart = MemoryDonutChart()
-        donut_layout.addWidget(self._donut_chart, alignment=Qt.AlignmentFlag.AlignCenter)
-        dist_card.add_widget(donut_container)
+        self._wave_chart = MemoryWaveChart()
+        dist_card.add_widget(self._wave_chart)
         left_layout.addWidget(dist_card, stretch=1)
 
         # Usage graph card
@@ -904,6 +997,25 @@ class MemoryView(QWidget, ScaleMixin):
         pressure_widget.setLayout(pressure_layout)
         status_layout.addWidget(pressure_widget)
 
+        # Memory Type
+        type_widget = QWidget()
+        type_layout = QVBoxLayout()
+        type_layout.setSpacing(2)
+        type_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        type_title = QLabel("Memory Type")
+        type_title.setFont(QFont("Segoe UI", S.font_pt(9)))
+        type_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        type_layout.addWidget(type_title)
+
+        self._ram_type_label = QLabel("—")
+        self._ram_type_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._ram_type_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+        type_layout.addWidget(self._ram_type_label)
+
+        type_widget.setLayout(type_layout)
+        status_layout.addWidget(type_widget)
+
         status_layout.addStretch()
 
         status_card.add_layout(status_layout)
@@ -934,6 +1046,10 @@ class MemoryView(QWidget, ScaleMixin):
             self._update_stats(self._current_memory_data)
             self._update_charts()
             self._update_pressure()
+            now = time.time()
+            if now - self._last_proc_update >= 3:
+                self._last_proc_update = now
+                self._update_processes()
         except Exception as e:
             pass
 
@@ -972,6 +1088,9 @@ class MemoryView(QWidget, ScaleMixin):
         # Update status bar
         self._total_label.setText(f"{total_gb:.0f} GB")
         self._used_label.setText(f"{used_gb:.1f} GB")
+        ram_type = mem_data.get('ram_type', '')
+        if ram_type and hasattr(self, '_ram_type_label'):
+            self._ram_type_label.setText(ram_type)
 
     def _update_charts(self):
         if not self._current_memory_data:
@@ -985,7 +1104,7 @@ class MemoryView(QWidget, ScaleMixin):
         cached_pct = (mem.get('cached', 0) / total) * 100
         available_pct = ((mem['available'] - mem.get('cached', 0)) / total) * 100
 
-        self._donut_chart.set_values(used_pct, cached_pct, available_pct)
+        self._wave_chart.set_values(used_pct, cached_pct, available_pct)
 
         self._memory_history.append(used_pct)
         if len(self._memory_history) > self._max_history:
@@ -1021,6 +1140,34 @@ class MemoryView(QWidget, ScaleMixin):
         self._health_label.setText("Healthy" if pressure < 70 else "Warning" if pressure < 90 else "Critical")
         health_color = colors.ACCENT_GREEN if pressure < 70 else colors.ACCENT_ORANGE if pressure < 90 else colors.ACCENT_RED
         self._health_label.setStyleSheet(f"color: {health_color}; background: transparent; font-weight: bold;")
+
+    def _update_processes(self):
+        """Refresh top-10 memory consuming processes (called every ~3 s)."""
+        try:
+            procs = []
+            for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'memory_info']):
+                try:
+                    info = proc.info
+                    if info['memory_percent'] and info['memory_percent'] > 0:
+                        procs.append({
+                            'pid': info['pid'],
+                            'name': info['name'],
+                            'memory_percent': info['memory_percent'],
+                            'rss': info['memory_info'].rss if info['memory_info'] else 0,
+                        })
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            procs.sort(key=lambda x: x['memory_percent'], reverse=True)
+            top = procs[:10]
+            for i, row in enumerate(self._process_rows):
+                if i < len(top):
+                    proc = top[i]
+                    row.update_values(proc['name'], proc['rss'] / (1024 ** 2),
+                                      proc['memory_percent'], i + 1, proc['pid'])
+                else:
+                    row.update_values("--", 0, 0, i + 1)
+        except Exception:
+            pass
 
     def _show_all_processes(self):
         """Show dialog with all running processes"""

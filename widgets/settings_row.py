@@ -35,29 +35,29 @@ class SettingsRow(QFrame, ScaleMixin):
 
     def _setup_ui(self):
         """Setup row UI"""
-        self.setMinimumHeight(56)
+        self.setMinimumHeight(S.px(56))
         layout = QHBoxLayout()
-        layout.setContentsMargins(20, 14, 20, 14)
-        layout.setSpacing(24)
+        layout.setContentsMargins(S.px(20), S.px(14), S.px(20), S.px(14))
+        layout.setSpacing(S.px(24))
         self.setLayout(layout)
 
         # Left side - label and description
         left_widget = QWidget()
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(4)
+        left_layout.setSpacing(S.px(4))
         left_widget.setLayout(left_layout)
         layout.addWidget(left_widget, 1)
 
         self._label = QLabel(self._label_text)
-        label_font = QFont("Segoe UI", 13)
+        label_font = QFont("Segoe UI", S.font_pt(13))
         label_font.setWeight(QFont.Weight.Medium)
         self._label.setFont(label_font)
         left_layout.addWidget(self._label)
 
         if self._description_text:
             self._description = QLabel(self._description_text)
-            desc_font = QFont("Segoe UI", 11)
+            desc_font = QFont("Segoe UI", S.font_pt(11))
             self._description.setFont(desc_font)
             left_layout.addWidget(self._description)
 
@@ -70,13 +70,13 @@ class SettingsRow(QFrame, ScaleMixin):
         layout.addWidget(self._control_container)
 
     def _apply_style(self):
-        """Apply row styles"""
+        """Apply row styles with enhanced visual feedback"""
         c = theme_manager.colors
         self.setStyleSheet(f"""
             SettingsRow {{
                 background-color: transparent;
                 border: none;
-                border-bottom: 0px solid {c.BORDER};
+                border-bottom: 1px solid {c.BORDER};
             }}
             SettingsRow:hover {{
                 background-color: {c.BG_HOVER};
@@ -96,8 +96,57 @@ class SettingsRow(QFrame, ScaleMixin):
         return self._control_widget
 
 
+class ToggleWidget(QWidget, ScaleMixin):
+    """Toggle switch widget with green active state"""
+
+    toggled = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._checked = False
+        self.setFixedSize(S.px(50), S.px(26))
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        theme_manager.theme_changed.connect(lambda _: self.update())
+
+    def setChecked(self, checked: bool):
+        self._checked = checked
+        self.toggled.emit(checked)
+        self.update()
+
+    def isChecked(self) -> bool:
+        return self._checked
+
+    def mouseReleaseEvent(self, a0):
+        self._checked = not self._checked
+        self.toggled.emit(self._checked)
+        self.update()
+        super().mouseReleaseEvent(a0)
+
+    def paintEvent(self, a0):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        c = theme_manager.colors
+
+        # Track color
+        if self._checked:
+            track_color = QColor(c.ACCENT_GREEN)
+        else:
+            track_color = QColor(c.BORDER)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(track_color)
+        painter.drawRoundedRect(0, 0, S.px(50), S.px(26), S.px(13), S.px(13))
+
+        # Handle
+        handle_x = S.px(26) if self._checked else S.px(4)
+        handle_rect = QRect(handle_x, S.px(4), S.px(22), S.px(22))
+
+        painter.setBrush(QColor(255, 255, 255))
+        painter.drawEllipse(handle_rect)
+
+
 class SettingsButton(QPushButton):
-    """Styled settings button"""
+    """Styled settings button with modern appearance"""
 
     def __init__(self, text: str = "", parent=None):
         super().__init__(text, parent)
@@ -114,27 +163,26 @@ class SettingsButton(QPushButton):
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {c.ACCENT_GREEN};
-                color: #000000;
+                color: white;
                 border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
+                border-radius: {S.px(6)}px;
+                padding: {S.px(8)}px {S.px(16)}px;
                 font-family: "Segoe UI", sans-serif;
-                font-size: 13px;
-                font-weight: bold;
+                font-size: {S.font_pt(13)}pt;
+                font-weight: 600;
+                min-width: {S.px(80)}px;
             }}
             QPushButton:hover {{
-                background-color: {c.ACCENT_GREEN};
-                opacity: 0.85;
+                background-color: {c.ACCENT_BLUE};
             }}
             QPushButton:pressed {{
                 background-color: {c.ACCENT_GREEN};
-                opacity: 0.7;
             }}
         """)
 
 
 class DangerButton(QPushButton):
-    """Danger button for destructive actions"""
+    """Danger button for destructive actions with modern appearance"""
 
     def __init__(self, text: str = "", parent=None):
         super().__init__(text, parent)
@@ -151,27 +199,26 @@ class DangerButton(QPushButton):
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {c.ACCENT_RED};
-                color: #ffffff;
+                color: white;
                 border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
+                border-radius: {S.px(6)}px;
+                padding: {S.px(8)}px {S.px(16)}px;
                 font-family: "Segoe UI", sans-serif;
-                font-size: 13px;
-                font-weight: bold;
+                font-size: {S.font_pt(13)}pt;
+                font-weight: 600;
+                min-width: {S.px(80)}px;
             }}
             QPushButton:hover {{
-                background-color: {c.ACCENT_RED};
-                opacity: 0.85;
+                background-color: #c0392b;
             }}
             QPushButton:pressed {{
                 background-color: {c.ACCENT_RED};
-                opacity: 0.7;
             }}
         """)
 
 
 class SettingsComboBox(QComboBox):
-    """Styled settings dropdown"""
+    """Styled settings dropdown with modern appearance"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -189,37 +236,37 @@ class SettingsComboBox(QComboBox):
             QComboBox {{
                 background-color: {c.BG_INPUT};
                 color: {c.TEXT_PRIMARY};
-                border: 0px solid {c.BORDER};
-                border-radius: 8px;
-                padding: 10px 14px;
-                font-family: "Segoe UI", sans-serif;
-                font-size: 13px;
-                min-width: 120px;
+                border: none;
+                border-radius: S.px(6)px;
+                padding: S.px(8)px S.px(12)px;
+                font-family: "Segoe UI", "Segoe UI Variable", sans-serif;
+                font-size: S.px(13)px;
+                min-width: S.px(120)px;
             }}
             QComboBox:hover {{
-                border-color: {c.BORDER_FOCUS};
+                background-color: {c.BG_HOVER};
             }}
             QComboBox:focus {{
-                border-color: {c.ACCENT_GREEN};
+                border: 1px solid {c.ACCENT_GREEN};
             }}
             QComboBox::drop-down {{
                 border: none;
-                width: 32px;
+                width: S.px(24)px;
             }}
             QComboBox::down-arrow {{
                 image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 6px solid {c.TEXT_SECONDARY};
-                margin-right: 10px;
+                border-left: S.px(4)px solid transparent;
+                border-right: S.px(4)px solid transparent;
+                border-top: S.px(5)px solid {c.TEXT_MUTED};
+                margin-right: S.px(8)px;
             }}
             QComboBox QAbstractItemView {{
                 background-color: {c.BG_CARD};
                 color: {c.TEXT_PRIMARY};
-                border: 0px solid {c.BORDER};
-                border-radius: 8px;
+                border: none;
+                border-radius: S.px(6)px;
                 selection-background-color: {c.BG_HOVER};
-                padding: 4px;
+                padding: S.px(4)px;
             }}
         """)
 
@@ -242,7 +289,7 @@ class SettingsSlider(QSlider):
         self._value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._value_label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._value_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        font = QFont("Segoe UI", 11)
+        font = QFont("Segoe UI", S.font_pt(11))
         font.setWeight(QFont.Weight.DemiBold)
         self._value_label.setFont(font)
         self._update_value_label_position()
@@ -256,32 +303,32 @@ class SettingsSlider(QSlider):
         """Apply slider styles"""
         c = theme_manager.colors
         self.setStyleSheet(f"""
-            SettingsSlider {{
-                min-height: 36px;
+            QSlider {{
+                min-height: S.px(36)px;
             }}
-            SettingsSlider::groove:horizontal {{
+            QSlider::groove:horizontal {{
                 border: none;
-                height: 6px;
+                height: S.px(6)px;
                 background-color: {c.BORDER};
-                border-radius: 3px;
-                margin: 15px 8px;
+                border-radius: S.px(3)px;
+                margin: S.px(15)px S.px(8)px;
             }}
-            SettingsSlider::sub-page:horizontal {{
+            QSlider::sub-page:horizontal {{
                 background-color: {c.ACCENT_GREEN};
-                border-radius: 3px;
-                height: 6px;
+                border-radius: S.px(3)px;
+                height: S.px(6)px;
             }}
-            SettingsSlider::handle:horizontal {{
+            QSlider::handle:horizontal {{
                 background-color: {c.TEXT_PRIMARY};
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-                margin: -7px 0;
-                border: 2px solid {c.ACCENT_GREEN};
+                width: S.px(20)px;
+                height: S.px(20)px;
+                border-radius: S.px(10)px;
+                margin: S.px(-7)px 0;
+                border: S.px(2)px solid {c.ACCENT_GREEN};
             }}
-            SettingsSlider::handle:horizontal:hover {{
+            QSlider::handle:horizontal:hover {{
                 background-color: {c.TEXT_PRIMARY};
-                border: 2px solid {c.ACCENT_GREEN};
+                border: S.px(2)px solid {c.ACCENT_GREEN};
             }}
         """)
         self._update_value_label_style()
@@ -293,9 +340,9 @@ class SettingsSlider(QSlider):
             QLabel {{
                 color: {c.TEXT_PRIMARY};
                 background-color: {c.BG_HOVER};
-                border: 1px solid {c.ACCENT_GREEN};
-                border-radius: 6px;
-                padding: 4px 10px;
+                border: S.px(1)px solid {c.ACCENT_GREEN};
+                border-radius: S.px(6)px;
+                padding: S.px(4)px S.px(10)px;
                 font-weight: bold;
             }}
         """)
@@ -303,37 +350,37 @@ class SettingsSlider(QSlider):
     def _update_value_label_position(self):
         """Position the value label above the handle"""
         if self._value_label:
-            handle_width = 20
+            handle_width = S.px(20)
             available_width = self.width() - handle_width
             if available_width > 0:
                 ratio = (self.value() - self.minimum()) / max(1, self.maximum() - self.minimum())
                 x = int(ratio * available_width) + handle_width // 2 - self._value_label.width() // 2
-                y = -self._value_label.height() - 8
+                y = -self._value_label.height() - S.px(8)
                 self._value_label.move(x, y)
 
-    def setValue(self, value):
+    def setValue(self, a0):
         """Set slider value and update label"""
-        super().setValue(value)
-        self._current_value = value
+        super().setValue(a0)
+        self._current_value = a0
         if self._value_label:
-            self._value_label.setText(str(value))
+            self._value_label.setText(str(a0))
             self._update_value_label_position()
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, a0):
         """Handle resize to reposition label"""
-        super().resizeEvent(event)
+        super().resizeEvent(a0)
         self._update_value_label_position()
 
-    def showEvent(self, event):
+    def showEvent(self, a0):
         """Show label when slider appears"""
-        super().showEvent(event)
+        super().showEvent(a0)
         self._value_label.setText(str(self.value()))
         self._update_value_label_position()
         self._value_label.show()
 
-    def hideEvent(self, event):
+    def hideEvent(self, a0):
         """Hide label when slider disappears"""
-        super().hideEvent(event)
+        super().hideEvent(a0)
         self._value_label.hide()
 
     def sliderChange(self, change):

@@ -1017,39 +1017,13 @@ class OverviewPage(QWidget, ScaleMixin):
         try:
             mem = psutil.virtual_memory()
             total_gb = round(mem.total / (1024**3))
-
-            ram_type = "Unknown"
-            mem_obj = None
-            try:
-                import wmi
-                w = wmi.WMI()
-                for mem_obj in w.Win32_PhysicalMemory():
-                    if hasattr(mem_obj, 'MemoryType') and mem_obj.MemoryType:
-                        mem_type = int(mem_obj.MemoryType)
-                        type_map = {20: "DDR5", 21: "DDR4", 22: "DDR3", 24: "DDR2"}
-                        ram_type = type_map.get(mem_type, "Unknown")
-                        if ram_type != "Unknown":
-                            break
-                if ram_type == "Unknown" and mem_obj is not None and hasattr(mem_obj, 'Speed') and mem_obj.Speed:
-                    speed = int(mem_obj.Speed)
-                    if speed >= 6400:
-                        ram_type = "DDR5"
-                    elif speed >= 3200:
-                        ram_type = "DDR4"
-                    elif speed >= 2133:
-                        ram_type = "DDR3"
-            except:
-                pass
-
-            if ram_type != "Unknown":
-                result = f"{total_gb} GB {ram_type}"
-            else:
-                result = f"{total_gb} GB"
-
+            from data.memory import get_ram_type
+            ram_type = get_ram_type()
+            result = f"{total_gb} GB {ram_type}" if ram_type else f"{total_gb} GB"
             self._system_info_cache['ram_info'] = result
             self._system_info_cache_time = now
             return result
-        except:
+        except Exception:
             return "Unknown"
 
     def update_data(self, data):

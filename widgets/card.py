@@ -22,6 +22,7 @@ class Card(QFrame, ScaleMixin):
         super().__init__(parent)
         self._title = title
         self._icon = icon
+        self.setObjectName("Card")
         self.scale_connect()
         self._setup_ui()
         self._apply_theme()
@@ -38,6 +39,7 @@ class Card(QFrame, ScaleMixin):
     def _setup_ui(self):
         """Setup card UI"""
         colors = theme_manager.colors
+        self.setFrameShape(QFrame.Shape.NoFrame)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Main layout
@@ -89,8 +91,12 @@ class Card(QFrame, ScaleMixin):
                     border: none;
                     border-radius: {S.px(12)}px;
                 }}
+                Card QWidget, Card QLabel {{
+                    border: none;
+                }}
                 Card:hover, QFrame#Card:hover {{
-                    border-color: rgba(74, 108, 247, 0.5);
+                    background-color: rgba(37, 42, 71, 0.85);
+                    border: none;
                 }}
             """)
         else:
@@ -100,9 +106,12 @@ class Card(QFrame, ScaleMixin):
                     border: none;
                     border-radius: {S.px(12)}px;
                 }}
+                Card QWidget, Card QLabel {{
+                    border: none;
+                }}
                 Card:hover, QFrame#Card:hover {{
-                    border-color: {colors.ACCENT_BLUE};
                     background-color: {colors.BG_HOVER};
+                    border: none;
                 }}
             """)
 
