@@ -419,10 +419,17 @@ class DetailPanel(QFrame):
 
     def _rebuild_ui(self):
         """Rebuild the entire UI"""
-        while self.layout():
-            child = self.layout().takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        if self.layout():
+            old = self.layout()
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
 
         if self._device is None:
             self._setup_empty_state()
@@ -1116,12 +1123,17 @@ class UnitsView(QWidget, ScaleMixin):
 
     def _setup_ui(self):
         """Setup the main UI"""
-        # Clear existing layout
-        while self.layout():
-            old_layout = self.layout()
-            while old_layout.count():
-                old_layout.takeAt(0).widget().setParent(None)
-            old_layout.setParent(None)
+        if self.layout():
+            old = self.layout()
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
 
         self.setStyleSheet(f"background-color: {G['bg0']};")
 

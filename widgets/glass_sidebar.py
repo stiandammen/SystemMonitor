@@ -72,6 +72,8 @@ class GlassNavItem(QPushButton, ScaleMixin):
         self.scale_connect()
 
     def _on_theme_changed(self, theme_name: str):
+        # Refresh accent so nav items don't keep the old theme's color
+        self._accent = theme_manager.colors.ACCENT_GREEN
         self._apply_style()
         self._setup_icon()
 
@@ -103,10 +105,15 @@ class GlassNavItem(QPushButton, ScaleMixin):
                 color_active=active_color
             )
             self.setIcon(icon)
-            self.setIconSize(QSize(S.px(20), S.px(20)))
-            self.setText(f"  {self._label}")
+            if self._collapsed:
+                self.setIconSize(QSize(S.px(22), S.px(22)))
+                self.setText("")
+            else:
+                self.setIconSize(QSize(S.px(20), S.px(20)))
+                self.setText(f"  {self._label}")
         except Exception:
-            self.setText(f"  {self._label}")
+            if not self._collapsed:
+                self.setText(f"  {self._label}")
 
     def _apply_style(self):
         c = theme_manager.colors
@@ -245,7 +252,7 @@ class GlassSidebar(QFrame, ScaleMixin):
     def _on_theme_changed(self, theme_name: str):
         self._apply_theme()
         for item in self._items.values():
-            item._apply_style()
+            item._on_theme_changed(theme_name)
 
     def _toggle_collapse(self):
         self._collapsed = not self._collapsed
@@ -297,13 +304,7 @@ class GlassSidebar(QFrame, ScaleMixin):
 
         nav_container = QFrame()
         nav_container.setObjectName("nav_container")
-        nav_container.setStyleSheet("""
-            #nav_container {
-                background-color: rgba(26, 30, 53, 0.7);
-                border-top: 1px solid rgba(74, 108, 247, 0.15);
-                border-bottom: 1px solid rgba(74, 108, 247, 0.15);
-            }
-        """)
+        self._nav_container = nav_container
         nav_layout = QVBoxLayout()
         nav_layout.setContentsMargins(S.px(6), S.px(8), S.px(6), S.px(8))
         nav_layout.setSpacing(S.px(2))
@@ -361,19 +362,10 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._footer.setVisible(not self._collapsed)
 
     def _setup_header(self):
-        c = theme_manager.colors
-
         header = QFrame()
         header.setObjectName("sidebar_header")
         header.setMinimumHeight(S.px(48))
         header.setMaximumHeight(S.px(64))
-        header.setStyleSheet(f"""
-            #sidebar_header {{
-                background-color: rgba(26, 30, 53, 0.5);
-                border: none;
-                border-bottom: 1px solid rgba(74, 108, 247, 0.15);
-            }}
-        """)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(S.px(10), S.px(10), S.px(10), S.px(10))
@@ -381,39 +373,33 @@ class GlassSidebar(QFrame, ScaleMixin):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setLayout(layout)
 
-        icon_container = QFrame()
-        icon_container.setMinimumSize(S.px(32), S.px(32))
-        icon_container.setMaximumSize(S.px(40), S.px(40))
-        icon_container.setStyleSheet(f"""
-            background-color: #4A6CF7;
-            border-radius: {S.px(7)}px;
-        """)
+        self._icon_container = QFrame()
+        self._icon_container.setMinimumSize(S.px(32), S.px(32))
+        self._icon_container.setMaximumSize(S.px(40), S.px(40))
 
         icon_layout = QVBoxLayout()
         icon_layout.setContentsMargins(0, 0, 0, 0)
         icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_container.setLayout(icon_layout)
+        self._icon_container.setLayout(icon_layout)
 
         icon_label = QLabel("SM")
         icon_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         icon_label.setStyleSheet("color: white;")
         icon_layout.addWidget(icon_label)
 
-        layout.addWidget(icon_container)
+        layout.addWidget(self._icon_container)
 
         title_container = QVBoxLayout()
         title_container.setSpacing(1)
         title_container.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        title = QLabel("System Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
-        title.setStyleSheet("color: #E8ECFF; background: transparent;")
-        title_container.addWidget(title)
+        self._sidebar_title = QLabel("System Monitor")
+        self._sidebar_title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
+        title_container.addWidget(self._sidebar_title)
 
-        version = QLabel("v2.0")
-        version.setFont(QFont("Segoe UI", S.font_pt(8)))
-        version.setStyleSheet("color: #525A7A; background: transparent;")
-        title_container.addWidget(version)
+        self._sidebar_version = QLabel("v2.0")
+        self._sidebar_version.setFont(QFont("Segoe UI", S.font_pt(8)))
+        title_container.addWidget(self._sidebar_version)
 
         layout.addLayout(title_container)
         layout.addStretch()
@@ -427,13 +413,6 @@ class GlassSidebar(QFrame, ScaleMixin):
         footer.setFrameShape(QFrame.Shape.NoFrame)
         footer.setMinimumHeight(S.px(36))
         footer.setMaximumHeight(S.px(48))
-        footer.setStyleSheet(f"""
-            #sidebar_footer {{
-                background-color: rgba(26, 30, 53, 0.5);
-                border: none;
-                border-top: 1px solid rgba(74, 108, 247, 0.15);
-            }}
-        """)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
@@ -443,18 +422,13 @@ class GlassSidebar(QFrame, ScaleMixin):
         status_layout = QHBoxLayout()
         status_layout.setSpacing(S.px(6))
 
-        status_indicator = QFrame()
-        status_indicator.setFixedSize(S.px(6), S.px(6))
-        status_indicator.setStyleSheet(f"""
-            background-color: #00E096;
-            border-radius: {S.px(3)}px;
-        """)
-        status_layout.addWidget(status_indicator)
+        self._status_indicator = QFrame()
+        self._status_indicator.setFixedSize(S.px(6), S.px(6))
+        status_layout.addWidget(self._status_indicator)
 
-        status_text = QLabel("Operational")
-        status_text.setFont(QFont("Segoe UI", S.font_pt(8)))
-        status_text.setStyleSheet("color: #525A7A; background: transparent;")
-        status_layout.addWidget(status_text)
+        self._status_text = QLabel("Operational")
+        self._status_text.setFont(QFont("Segoe UI", S.font_pt(8)))
+        status_layout.addWidget(self._status_text)
         status_layout.addStretch()
 
         layout.addLayout(status_layout)
@@ -463,7 +437,10 @@ class GlassSidebar(QFrame, ScaleMixin):
         self.layout().insertWidget(self.layout().count(), footer)
 
     def _apply_theme(self):
-        if theme_manager.current_theme == "heimdal":
+        c = theme_manager.colors
+        is_heimdal = theme_manager.current_theme == "heimdal"
+
+        if is_heimdal:
             self.setStyleSheet("""
                 QFrame {
                     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -473,12 +450,98 @@ class GlassSidebar(QFrame, ScaleMixin):
                     border-radius: 0px;
                 }
             """)
+            nav_bg = "rgba(26, 30, 53, 0.7)"
+            nav_border = "rgba(74, 108, 247, 0.15)"
+            header_bg = "rgba(26, 30, 53, 0.5)"
+            footer_bg = "rgba(26, 30, 53, 0.5)"
+            icon_bg = "#4A6CF7"
+            title_color = "#E8ECFF"
+            muted_color = "#525A7A"
+            status_color = "#00E096"
+            collapse_bg = "rgba(30, 35, 64, 0.6)"
+            collapse_color = "#8A92B2"
+            collapse_hover_bg = "rgba(74, 108, 247, 0.15)"
+            collapse_hover_color = "#E8ECFF"
         else:
             self.setStyleSheet(f"""
                 QFrame {{
-                    background-color: {theme_manager.colors.BG_SECONDARY};
+                    background-color: {c.BG_SECONDARY};
                     border: none;
                     border-radius: 0px;
+                }}
+            """)
+            nav_bg = c.BG_SECONDARY
+            nav_border = c.BORDER
+            header_bg = c.BG_SECONDARY
+            footer_bg = c.BG_SECONDARY
+            icon_bg = c.ACCENT_GREEN
+            title_color = c.TEXT_PRIMARY
+            muted_color = c.TEXT_MUTED
+            status_color = c.STATUS_GREEN
+            collapse_bg = c.BG_HOVER
+            collapse_color = c.TEXT_SECONDARY
+            collapse_hover_bg = getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.15)')
+            collapse_hover_color = c.TEXT_PRIMARY
+
+        if hasattr(self, '_nav_container'):
+            self._nav_container.setStyleSheet(f"""
+                #nav_container {{
+                    background-color: {nav_bg};
+                    border-top: 1px solid {nav_border};
+                    border-bottom: 1px solid {nav_border};
+                }}
+            """)
+
+        if hasattr(self, '_header'):
+            self._header.setStyleSheet(f"""
+                #sidebar_header {{
+                    background-color: {header_bg};
+                    border: none;
+                    border-bottom: 1px solid {nav_border};
+                }}
+            """)
+
+        if hasattr(self, '_footer'):
+            self._footer.setStyleSheet(f"""
+                #sidebar_footer {{
+                    background-color: {footer_bg};
+                    border: none;
+                    border-top: 1px solid {nav_border};
+                }}
+            """)
+
+        if hasattr(self, '_icon_container'):
+            self._icon_container.setStyleSheet(f"""
+                background-color: {icon_bg};
+                border-radius: {S.px(7)}px;
+            """)
+
+        if hasattr(self, '_sidebar_title'):
+            self._sidebar_title.setStyleSheet(f"color: {title_color}; background: transparent;")
+
+        if hasattr(self, '_sidebar_version'):
+            self._sidebar_version.setStyleSheet(f"color: {muted_color}; background: transparent;")
+
+        if hasattr(self, '_status_indicator'):
+            self._status_indicator.setStyleSheet(f"""
+                background-color: {status_color};
+                border-radius: {S.px(3)}px;
+            """)
+
+        if hasattr(self, '_status_text'):
+            self._status_text.setStyleSheet(f"color: {muted_color}; background: transparent;")
+
+        if hasattr(self, '_collapse_btn'):
+            self._collapse_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {collapse_bg};
+                    color: {collapse_color};
+                    border: none;
+                    border-top: 1px solid {nav_border};
+                }}
+                QPushButton:hover {{
+                    background-color: {collapse_hover_bg};
+                    color: {collapse_hover_color};
                 }}
             """)
 

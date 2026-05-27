@@ -106,7 +106,14 @@ class ToggleWidget(QWidget, ScaleMixin):
         self._checked = False
         self.setFixedSize(S.px(50), S.px(26))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        theme_manager.theme_changed.connect(lambda _: self.update())
+        # Use a bound method, not a lambda — PyQt6 auto-disconnects bound
+        # QObject methods when the C++ object is destroyed. A lambda is just a
+        # plain Python callable: PyQt6 can't track it, so it stays connected
+        # after deleteLater() and fires on the destroyed object → RuntimeError.
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self, _):
+        self.update()
 
     def setChecked(self, checked: bool):
         self._checked = checked
