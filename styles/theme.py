@@ -197,6 +197,7 @@ class MidnightTheme:
     # Accents
     ACCENT_GREEN = "#0c997f"    # Primary teal accent
     ACCENT_GREEN_BRIGHT = "#0fb89a"
+    ACCENT_GREEN_DIM = "rgba(12, 153, 127, 0.15)"
     ACCENT_BLUE = "#3b82f6"
     ACCENT_ORANGE = "#f97316"
     ACCENT_RED = "#ef4444"
@@ -243,6 +244,7 @@ class CustomTheme:
     TEXT_DISABLED = "#505050"
     ACCENT_GREEN = "#0c997f"
     ACCENT_GREEN_BRIGHT = "#0fb89a"
+    ACCENT_GREEN_DIM = "rgba(12, 153, 127, 0.15)"
     ACCENT_BLUE = "#3b82f6"
     ACCENT_ORANGE = "#f97316"
     ACCENT_RED = "#ef4444"
@@ -282,24 +284,27 @@ class CustomTheme:
 
 
 class CyberpunkTheme:
-    """Neon cyberpunk theme with hot pink and cyan accents"""
-    # Backgrounds - same base with neon accents
-    BG_PRIMARY = "#101920"
-    BG_SECONDARY = "#0d1218"
-    BG_CARD = "#151d28"
-    BG_HOVER = "#1c2838"
-    BG_INPUT = "#101920"
+    """Neon cyberpunk theme — deep purple-black with hot pink primary accent"""
+    # Backgrounds — deep purple-black (distinct from Midnight's blue-black)
+    BG_PRIMARY = "#0d0015"
+    BG_SECONDARY = "#160025"
+    BG_CARD = "#1e1030"
+    BG_HOVER = "#2a1550"
+    BG_INPUT = "#0d0015"
     BG_ACTIVE = "#ff2d6a"
 
-    # Text - pure white for stability
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#c0c0c0"
-    TEXT_MUTED = "#808080"
-    TEXT_DISABLED = "#505050"
+    # Text
+    TEXT_PRIMARY = "#f0e6ff"
+    TEXT_SECONDARY = "#b090d0"
+    TEXT_MUTED = "#7050a0"
+    TEXT_DISABLED = "#402060"
 
-    # Accents - vibrant neon
-    ACCENT_GREEN = "#00ff9f"
-    ACCENT_GREEN_BRIGHT = "#00ffaa"
+    # Primary accent — hot pink (iconic cyberpunk)
+    ACCENT_GREEN = "#ff2d6a"
+    ACCENT_GREEN_BRIGHT = "#ff5090"
+    ACCENT_GREEN_DIM = "rgba(255, 45, 106, 0.15)"
+
+    # Secondary accents
     ACCENT_BLUE = "#00d4ff"
     ACCENT_ORANGE = "#ff6b35"
     ACCENT_RED = "#ff0055"
@@ -315,20 +320,20 @@ class CyberpunkTheme:
     STATUS_GREEN = "#00ff9f"
 
     # UI Elements
-    BORDER = "#2a3a4a"
-    BORDER_SUBTLE = "#1a2530"
+    BORDER = "#2d0e4a"
+    BORDER_SUBTLE = "#1e0a33"
     BORDER_FOCUS = "#ff2d6a"
-    GAUGE_BG = "#1c2838"
+    GAUGE_BG = "#2a1050"
     GAUGE_FILL = "#ff2d6a"
-    CHART_FILL = "#0a1a20"
-    CHART_LINE = "#00ff9f"
-    SHADOW = "rgba(0, 0, 0, 0.5)"
-    OVERLAY = "rgba(16, 25, 32, 0.9)"
+    CHART_FILL = "rgba(255, 45, 106, 0.1)"
+    CHART_LINE = "#ff2d6a"
+    SHADOW = "rgba(0, 0, 0, 0.7)"
+    OVERLAY = "rgba(13, 0, 21, 0.95)"
 
     SUCCESS_BG = "#0a2015"
     WARNING_BG = "#201a0a"
-    ERROR_BG = "#200a0a"
-    INFO_BG = "#0a1520"
+    ERROR_BG = "#200005"
+    INFO_BG = "#0a0515"
 
 
 class NordicTheme:
@@ -350,6 +355,7 @@ class NordicTheme:
     # Accents - muted steel blue
     ACCENT_GREEN = "#5d8aa8"
     ACCENT_GREEN_BRIGHT = "#7aa8c8"
+    ACCENT_GREEN_DIM = "rgba(93, 138, 168, 0.15)"
     ACCENT_BLUE = "#4a7a9a"
     ACCENT_ORANGE = "#d08770"
     ACCENT_RED = "#bf5656"
@@ -400,6 +406,7 @@ class EmberTheme:
     # Accents - warm amber and orange
     ACCENT_GREEN = "#7cb342"
     ACCENT_GREEN_BRIGHT = "#8bc34a"
+    ACCENT_GREEN_DIM = "rgba(124, 179, 66, 0.15)"
     ACCENT_BLUE = "#5c9ece"
     ACCENT_ORANGE = "#ff9100"
     ACCENT_RED = "#ff5252"

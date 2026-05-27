@@ -47,13 +47,21 @@ class SettingsView(QWidget, ScaleMixin):
     # ── Build ──────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
-        while self.layout():
+        if self.layout():
             old = self.layout()
             while old.count():
                 item = old.takeAt(0)
-                if item.widget():
-                    item.widget().setParent(None)
-            old.setParent(None)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.deleteLater()
+            # QWidget.setLayout() calls self.takeLayout() internally, which is the
+            # only reliable way to clear self.layout() (setParent(None) on the layout
+            # does NOT update QWidget's internal d->layout pointer, causing an
+            # infinite loop on the next iteration of "while self.layout()").
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
 
         c = _c()
         self.setStyleSheet(f"background-color: {c.BG_PRIMARY};")

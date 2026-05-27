@@ -187,7 +187,7 @@ class TopHeader(QWidget, ScaleMixin):
     def on_scale_changed(self, factor: float):
         if self._parent and self._parent._in_drag_resize:
             return
-        self._setup_ui()
+        self._apply_theme()
         self.update()
 
     def closeEvent(self, event):
@@ -195,14 +195,73 @@ class TopHeader(QWidget, ScaleMixin):
         super().closeEvent(event)
 
     def _on_theme_changed(self, theme_name: str):
-        self._setup_ui()
+        self._apply_theme()
 
     def _setup_ui(self):
-        colors = theme_manager.colors
         self.setMinimumHeight(S.px(48))
         self.setMaximumHeight(S.px(60))
 
-        if theme_manager.current_theme == "heimdal":
+        if not self.layout():
+            layout = QHBoxLayout()
+            layout.setContentsMargins(S.px(16), 0, S.px(8), 0)
+            layout.setSpacing(S.px(12))
+            self.setLayout(layout)
+            self._build_contents(layout)
+
+        self._apply_theme()
+
+    def _build_contents(self, layout):
+        self._icon_container = QFrame()
+        self._icon_container.setMinimumSize(S.px(32), S.px(32))
+        self._icon_container.setMaximumSize(S.px(40), S.px(40))
+        self._icon_container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+        icon_layout = QVBoxLayout()
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._icon_container.setLayout(icon_layout)
+
+        icon_label = QLabel("SM")
+        icon_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        icon_label.setStyleSheet("color: white;")
+        icon_layout.addWidget(icon_label)
+        layout.addWidget(self._icon_container)
+
+        self._title_label = QLabel("System Monitor")
+        self._title_label.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.DemiBold))
+        self._title_label.setCursor(Qt.CursorShape.SizeAllCursor)
+        layout.addWidget(self._title_label)
+
+        spacer = QWidget()
+        spacer.setCursor(Qt.CursorShape.SizeAllCursor)
+        layout.addWidget(spacer, stretch=1)
+
+        self._min_btn = QPushButton("─")
+        self._min_btn.setFixedSize(S.px(36), S.px(28))
+        self._min_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._min_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._min_btn.clicked.connect(self._minimize_window)
+        layout.addWidget(self._min_btn)
+
+        self._max_btn = QPushButton("□")
+        self._max_btn.setFixedSize(S.px(36), S.px(28))
+        self._max_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._max_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._max_btn.clicked.connect(self._toggle_maximize)
+        layout.addWidget(self._max_btn)
+
+        self._close_btn = QPushButton("✕")
+        self._close_btn.setFixedSize(S.px(36), S.px(28))
+        self._close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._close_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._close_btn.clicked.connect(self._close_window)
+        layout.addWidget(self._close_btn)
+
+    def _apply_theme(self):
+        colors = theme_manager.colors
+        is_heimdal = theme_manager.current_theme == "heimdal"
+
+        if is_heimdal:
             self.setStyleSheet("""
                 background-color: #12152A;
                 border: none;
@@ -215,78 +274,33 @@ class TopHeader(QWidget, ScaleMixin):
                 border-bottom: 1px solid {colors.BORDER};
             """)
 
-        layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(16), 0, S.px(8), 0)
-        layout.setSpacing(S.px(12))
-        self.setLayout(layout)
+        if hasattr(self, '_title_label'):
+            self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
 
-        self._create_icon(layout)
+        if hasattr(self, '_icon_container'):
+            self._icon_container.setStyleSheet(f"""
+                background-color: {colors.ACCENT_GREEN};
+                border-radius: {S.px(8)}px;
+            """)
 
-        title = QLabel("System Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.DemiBold))
-        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        title.setCursor(Qt.CursorShape.SizeAllCursor)
-        layout.addWidget(title)
+        if hasattr(self, '_close_btn'):
+            self._close_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {colors.TEXT_MUTED};
+                    border: none;
+                    border-radius: {S.px(6)}px;
+                }}
+                QPushButton:hover {{
+                    background-color: {colors.ACCENT_RED};
+                    color: white;
+                }}
+            """)
 
-        spacer = QWidget()
-        spacer.setCursor(Qt.CursorShape.SizeAllCursor)
-        layout.addWidget(spacer, stretch=1)
-
-        self._create_window_controls(layout)
-
-    def _create_icon(self, layout):
-        icon_container = QFrame()
-        icon_container.setMinimumSize(S.px(32), S.px(32))
-        icon_container.setMaximumSize(S.px(40), S.px(40))
-        icon_container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        accent = theme_manager.colors.ACCENT_GREEN
-        icon_container.setStyleSheet(f"""
-            background-color: {accent};
-            border-radius: {S.px(8)}px;
-        """)
-
-        icon_layout = QVBoxLayout()
-        icon_layout.setContentsMargins(0, 0, 0, 0)
-        icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_container.setLayout(icon_layout)
-
-        icon_label = QLabel("SM")
-        icon_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-        icon_label.setStyleSheet("color: white;")
-        icon_layout.addWidget(icon_label)
-
-        layout.addWidget(icon_container)
-
-    def _create_window_controls(self, layout):
-        colors = theme_manager.colors
-        is_heimdal = theme_manager.current_theme == "heimdal"
-
-        for text, slot, is_close in [
-            ("─", self._minimize_window, False),
-            ("□", self._toggle_maximize, False),
-            ("✕", self._close_window, True),
-        ]:
-            btn = QPushButton()
-            btn.setFixedSize(S.px(36), S.px(28))
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setText(text)
-            btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
-
-            if is_close:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: #8A92B2;
-                        border: none;
-                        border-radius: 6px;
-                    }
-                    QPushButton:hover {
-                        background-color: #FF4757;
-                        color: white;
-                    }
-                """)
-            elif is_heimdal:
+        for btn in [getattr(self, '_min_btn', None), getattr(self, '_max_btn', None)]:
+            if btn is None:
+                continue
+            if is_heimdal:
                 btn.setStyleSheet("""
                     QPushButton {
                         background-color: transparent;
@@ -312,10 +326,6 @@ class TopHeader(QWidget, ScaleMixin):
                         color: {colors.TEXT_PRIMARY};
                     }}
                 """)
-            btn.clicked.connect(slot)
-            layout.addWidget(btn)
-            if "□" in text or "❐" in text:
-                self._max_btn = btn
 
     def _minimize_window(self):
         if self._parent:
@@ -447,18 +457,40 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _on_theme_changed(self, theme_name: str):
         try:
             QApplication.instance().setStyleSheet(theme_manager.get_stylesheet())
+            c = theme_manager.colors
+
             if hasattr(self, '_top_header'):
-                self._top_header._setup_ui()
+                self._top_header._apply_theme()
+
+            if hasattr(self, '_content'):
+                if theme_name == "heimdal":
+                    self._content.setStyleSheet(f"""
+                        QStackedWidget {{
+                            background-color: {c.BG_PRIMARY};
+                            border-left: 1px solid rgba(74, 108, 247, 0.2);
+                        }}
+                    """)
+                else:
+                    self._content.setStyleSheet(f"""
+                        QStackedWidget {{
+                            background-color: {c.BG_PRIMARY};
+                        }}
+                    """)
+
             if hasattr(self, '_sidebar'):
                 self._sidebar._apply_theme()
                 for item in self._sidebar._items.values():
-                    item._apply_style()
+                    item._on_theme_changed(theme_name)
+
             if hasattr(self, '_resize_corner'):
                 self._resize_corner._on_theme_changed(theme_name)
+
             if hasattr(self, '_view_cache'):
                 for view in self._view_cache.values():
                     view.update()
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Theme change error: {e}")
 
     def _setup_ui(self):
