@@ -353,7 +353,7 @@ class SectionCard(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['bg_card']};
-                border: 1px solid {COLORS['border']};
+                border: none;
                 border-radius: 10px;
             }}
         """)
@@ -482,7 +482,7 @@ class GPUSingleView(QWidget, ScaleMixin):
         chart_card.setStyleSheet(f"""
             QFrame {{
                 background: {COLORS['bg_card']};
-                border: 1px solid {COLORS['border']};
+                border: none;
                 border-radius: 10px;
             }}
         """)
@@ -632,12 +632,93 @@ class GPUSingleView(QWidget, ScaleMixin):
 
 
 # ---------------------------------------------------------------------------
+# GPUInfoView – driverinfo-visning for integrerte/sekundære GPUer
+# ---------------------------------------------------------------------------
+class GPUInfoView(QWidget):
+    """Minimal driver and system info view for integrated/secondary GPUs."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._build()
+
+    def _build(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(S.px(8))
+
+        self._s_drv = SectionCard("DRIVER & SYSTEMINFORMASJON")
+        self._r_driver = self._s_drv.add_row("driver", "Driver Version:")
+        self._r_drv_dt = self._s_drv.add_row("drv_dt", "Driver Date:")
+        self._r_type   = self._s_drv.add_row("type",   "Type:")
+        self._r_vendor = self._s_drv.add_row("vendor", "Leverandør:")
+        self._r_pcie   = self._s_drv.add_row("pcie",   "PCIe:")
+        root.addWidget(self._s_drv)
+
+        self._s_hw = SectionCard("HARDWARE")
+        self._r_arch  = self._s_hw.add_row("arch",  "Arkitektur:")
+        self._r_vram  = self._s_hw.add_row("vram",  "VRAM:")
+        self._r_mem_t = self._s_hw.add_row("mem_t", "Minnetype:")
+        self._r_dx    = self._s_hw.add_row("dx",    "DirectX:")
+        self._r_vk    = self._s_hw.add_row("vk",    "Vulkan:")
+        root.addWidget(self._s_hw)
+
+        root.addStretch()
+
+    def update_gpu(self, gpu: dict):
+        driver   = gpu.get('driver_version', '') or ''
+        drv_dt   = gpu.get('driver_date', '') or ''
+        gpu_type = gpu.get('gpu_type', 'Unknown') or 'Unknown'
+        vendor   = gpu.get('vendor', 'Unknown') or 'Unknown'
+        pci_str  = gpu.get('pci_bus', '') or ''
+        arch     = gpu.get('architecture', '') or ''
+        vram_tot = _flt(gpu, 'vram_total_mb')
+        mem_type = gpu.get('memory_type', '') or ''
+        dx_ver   = gpu.get('directx_version', '') or ''
+        vk       = gpu.get('vulkan_support', False)
+
+        self._s_drv.set_value("driver", driver if driver and driver != "Unknown" else "N/A")
+        self._s_drv.show_row("drv_dt", bool(drv_dt and drv_dt != "Unknown"))
+        if drv_dt and drv_dt != "Unknown":
+            self._s_drv.set_value("drv_dt", drv_dt)
+        self._s_drv.set_value("type", GPUSingleView._type_label(gpu_type, gpu.get('name', '')))
+        self._s_drv.set_value("vendor", vendor if vendor != "Unknown" else "N/A")
+        self._s_drv.show_row("pcie", bool(pci_str))
+        if pci_str:
+            self._s_drv.set_value("pcie", pci_str)
+
+        self._s_hw.show_row("arch", bool(arch))
+        if arch:
+            self._s_hw.set_value("arch", arch)
+
+        has_vram = vram_tot is not None and vram_tot > 0
+        self._s_hw.show_row("vram", has_vram)
+        if has_vram:
+            self._s_hw.set_value("vram", f"{vram_tot:.0f} MB  ({vram_tot / 1024:.1f} GB)")
+
+        self._s_hw.show_row("mem_t", bool(mem_type))
+        if mem_type:
+            self._s_hw.set_value("mem_t", mem_type)
+
+        has_dx = bool(dx_ver) and dx_ver != "Unknown"
+        self._s_hw.show_row("dx", has_dx)
+        if has_dx:
+            self._s_hw.set_value("dx", dx_ver)
+
+        self._s_hw.show_row("vk", bool(vk))
+        if vk:
+            self._s_hw.set_value("vk", "Støttet")
+
+        hw_visible = any([arch, has_vram, mem_type, has_dx, vk])
+        self._s_hw.setVisible(hw_visible)
+
+
+# ---------------------------------------------------------------------------
 # GPUView – hoved-widget med støtte for flere GPUer
 # ---------------------------------------------------------------------------
 class GPUView(QWidget, ScaleMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._gpu_views:  List[GPUSingleView] = []
+        self._gpu_views:  List[QWidget] = []
         self._gpu_names:  List[str]           = []
         self._pending_data: Optional[dict]    = None
         self._update_sched = False
@@ -651,14 +732,24 @@ class GPUView(QWidget, ScaleMixin):
     # Layout
     # ------------------------------------------------------------------
     def _setup_ui(self):
-        # Remove old widgets
+        # Properly tear down existing layout so setLayout() succeeds.
+        # Qt6 silently ignores setLayout() when one already exists, which
+        # causes newly-created widgets (added to the rejected layout) to have
+        # no parent and appear as floating top-level windows.
         old = self.layout()
-        if old:
+        if old is not None:
             while old.count():
                 item = old.takeAt(0)
                 w = item.widget()
                 if w:
+                    w.hide()
+                    w.setParent(None)
                     w.deleteLater()
+            # Transfer the now-empty layout to a throwaway widget so that
+            # self.layout() returns None and the new setLayout() call below works.
+            _tmp = QWidget()
+            _tmp.setLayout(old)
+            _tmp.deleteLater()
 
         self._gpu_views = []
         self._gpu_names = []
@@ -724,8 +815,8 @@ class GPUView(QWidget, ScaleMixin):
         self._badge = QLabel("")
         self._badge.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         self._badge.setStyleSheet(
-            f"color: {COLORS['accent_blue']}; background: transparent; "
-            f"border: 1px solid {COLORS['accent_blue']}; border-radius: 4px; padding: 1px 6px;"
+            f"color: {COLORS['bg_primary']}; background: {COLORS['accent_blue']}; "
+            f"border: none; border-radius: 4px; padding: 1px 6px;"
         )
         self._badge.setVisible(False)
         hl.addWidget(self._badge)
@@ -819,7 +910,8 @@ class GPUView(QWidget, ScaleMixin):
         self._tabs.clear()
         self._gpu_views.clear()
         for i, gpu in enumerate(gpus):
-            view = GPUSingleView()
+            gpu_type = (gpu.get('gpu_type') or '').lower()
+            view: QWidget = GPUInfoView() if gpu_type == 'integrated' else GPUSingleView()
             self._gpu_views.append(view)
             name   = gpu.get('name', f'GPU {i}')
             vendor = (gpu.get('vendor') or '').upper()[:3]
@@ -893,4 +985,31 @@ class GPUView(QWidget, ScaleMixin):
 
     def _on_theme_changed(self, _):
         sync_colors()
-        self._setup_ui()
+        self._apply_theme()
+
+    def _apply_theme(self):
+        """Update colors on existing widgets without rebuilding the layout."""
+        if hasattr(self, '_tabs'):
+            self._tabs.setStyleSheet(self._tab_css())
+        if hasattr(self, '_no_gpu'):
+            self._no_gpu.setStyleSheet(
+                f"color: {COLORS['text_muted']}; background: transparent;"
+            )
+        if hasattr(self, '_status_dot'):
+            self._status_dot.setStyleSheet(
+                f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
+            )
+        if hasattr(self, '_gpu_name_lbl'):
+            self._gpu_name_lbl.setStyleSheet(
+                f"color: {COLORS['accent_cyan']}; background: transparent;"
+            )
+        if hasattr(self, '_badge'):
+            self._badge.setStyleSheet(
+                f"color: {COLORS['bg_primary']}; background: {COLORS['accent_blue']}; "
+                f"border: none; border-radius: 4px; padding: 1px 6px;"
+            )
+        # Force repaint of all GPU views (gauges and graphs read from COLORS at paint time)
+        for view in self._gpu_views:
+            view.update()
+        # Trigger repaint of this widget
+        self.update()
