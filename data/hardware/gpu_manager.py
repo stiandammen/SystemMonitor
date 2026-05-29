@@ -10,6 +10,8 @@ from .gpu_info import GPUInfo, GPUVendor, GPUType
 from .wmi_detector import WMIDetector
 from .nvml_detector import NVMLDetector
 from .amd_detector import ADLDetector
+from .adl2_detector import ADL2Detector
+from .nvidia_smi_detector import NvidiaSMIDetector
 from .intel_detector import IntelDetector
 
 
@@ -32,13 +34,20 @@ class GPUManager:
         try:
             self.logger.info("Initializing GPU detection backends...")
 
-            # Priority 1: NVML (NVIDIA-specific, detailed info) - try first for best NVIDIA support
+            # Priority 1: NVML (NVIDIA-specific, detailed info)
             nvml_detector = NVMLDetector()
             if nvml_detector.is_available():
                 self._detectors.append(nvml_detector)
                 self.logger.info("✓ NVML detector initialized")
             else:
                 self.logger.warning("✗ NVML detector not available")
+                # Fallback: nvidia-smi subprocess (no pynvml required)
+                smi_detector = NvidiaSMIDetector()
+                if smi_detector.is_available():
+                    self._detectors.append(smi_detector)
+                    self.logger.info("✓ nvidia-smi fallback detector initialized")
+                else:
+                    self.logger.warning("✗ nvidia-smi fallback not available")
 
             # Priority 2: WMI (broad compatibility, good for basic info and fallback)
             wmi_detector = WMIDetector()
@@ -48,7 +57,15 @@ class GPUManager:
             else:
                 self.logger.warning("✗ WMI detector not available")
 
-            # Priority 3: ADL (AMD-specific for enhanced features like temperature, clock speeds)
+            # Priority 3: ADL2 (AMD - newer API with comprehensive sensor data)
+            adl2_detector = ADL2Detector()
+            if adl2_detector.is_available():
+                self._detectors.append(adl2_detector)
+                self.logger.info("✓ ADL2 detector initialized")
+            else:
+                self.logger.warning("✗ ADL2 detector not available")
+
+            # Priority 4: ADL (AMD - older API, additional compatibility fallback)
             adl_detector = ADLDetector()
             if adl_detector.is_available():
                 self._detectors.append(adl_detector)
@@ -56,7 +73,7 @@ class GPUManager:
             else:
                 self.logger.warning("✗ ADL detector not available")
 
-            # Priority 4: Intel detector (WMI-based with Intel-specific enhancements)
+            # Priority 5: Intel detector (WMI-based with Intel-specific enhancements)
             intel_detector = IntelDetector()
             if intel_detector.is_available():
                 self._detectors.append(intel_detector)
@@ -175,9 +192,10 @@ class GPUManager:
             'memory_clock_mhz', 'core_clock_mhz', 'core_clock_boost_mhz',
             'gpu_utilization_percent', 'memory_utilization_percent',
             'temperature_celsius', 'hotspot_temp_celsius', 'memory_temp_celsius',
-            'power_draw_watts', 'power_limit_watts', 'fan_speed_percent',
+            'power_draw_watts', 'power_limit_watts', 'fan_speed_percent', 'fan_speed_rpm',
             'driver_version', 'driver_date', 'bios_version',
-            'pci_bus', 'cuda_cores', 'opencl_version', 'vulkan_support',
+            'pci_bus', 'pci_generation', 'pci_link_width',
+            'cuda_cores', 'opencl_version', 'vulkan_support',
             'max_resolution', 'max_monitors', 'uuid', 'serial_number'
         ]
 
@@ -222,6 +240,11 @@ class GPUManager:
                 # For clock speeds, memory sizes, etc. prefer non-zero
                 elif field_name in ['vram_total_mb', 'core_clock_mhz', 'memory_clock_mhz']:
                     if existing_val == 0 and new_val > 0:
+                        return True
+                    # A significantly larger VRAM reading wins: WMI AdapterRAM is a
+                    # 32-bit field that caps at ~4 GB; registry-based readers (ADL2)
+                    # return the correct 64-bit value for larger cards.
+                    if field_name == 'vram_total_mb' and new_val > existing_val * 1.4:
                         return True
                 # For most other fields, prefer new if existing is default/zero
                 elif existing_val == 0 or existing_val == "" or existing_val is None:

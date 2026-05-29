@@ -1,647 +1,896 @@
 """
-GPU View - GPU monitoring with gauges, charts, and real-time data
-Modern glassmorphism design with responsive layout
+GPU View - Rik GPU-overvåking med klokker, temperaturer og sanntidsdata.
+Støtter NVIDIA, AMD, Intel. Faner per GPU. Bærbar/integrert GPU-bevisst.
 """
-from typing import Optional
+from __future__ import annotations
+from typing import Optional, List, Dict, Any
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QGridLayout, QSizePolicy
+    QFrame, QSizePolicy, QTabWidget
 )
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QLinearGradient
 
 from styles.theme import theme_manager
 from scaler import S, ScaleMixin
 
 
-# Color palette
-COLORS = {
-    'bg_primary': '#0a0e14',
-    'bg_card': '#161f2a',
-    'bg_deeper': '#0d1117',
-    'bg_hover': '#1e2936',
-    'border': '#2a3441',
-    'border_card': '#1e2936',
-    'text_primary': '#f0f4f8',
-    'text_secondary': '#94a3b8',
-    'text_muted': '#64748b',
-    'accent_blue': '#3b82f6',
-    'accent_green': '#10b981',
+# ---------------------------------------------------------------------------
+# Fargepalett
+# ---------------------------------------------------------------------------
+COLORS: Dict[str, str] = {
+    'bg_primary':    '#0a0e14',
+    'bg_card':       '#161f2a',
+    'bg_deeper':     '#0d1117',
+    'bg_hover':      '#1e2936',
+    'border':        '#2a3441',
+    'text_primary':  '#f0f4f8',
+    'text_secondary':'#94a3b8',
+    'text_muted':    '#64748b',
+    'accent_blue':   '#3b82f6',
+    'accent_green':  '#10b981',
     'accent_purple': '#8b5cf6',
     'accent_orange': '#f59e0b',
-    'accent_cyan': '#06b6d4',
-    'accent_red': '#ef4444',
+    'accent_cyan':   '#06b6d4',
+    'accent_red':    '#ef4444',
     'accent_yellow': '#ffd740',
 }
 
 
-def sync_colors():
-    """Sync COLORS dict with theme_manager.colors"""
+def sync_colors() -> None:
     try:
         c = theme_manager.colors
         COLORS.update({
-            'bg_primary': c.BG_PRIMARY,
-            'bg_card': c.BG_CARD,
-            'bg_deeper': c.BG_HOVER,
-            'bg_hover': c.BG_HOVER,
-            'border': c.BORDER,
-            'border_card': c.BORDER,
-            'text_primary': c.TEXT_PRIMARY,
-            'text_secondary': c.TEXT_SECONDARY,
-            'text_muted': c.TEXT_MUTED,
-            'accent_blue': c.ACCENT_BLUE,
-            'accent_green': c.ACCENT_GREEN,
+            'bg_primary':    c.BG_PRIMARY,
+            'bg_card':       c.BG_CARD,
+            'bg_deeper':     c.BG_HOVER,
+            'bg_hover':      c.BG_HOVER,
+            'border':        c.BORDER,
+            'text_primary':  c.TEXT_PRIMARY,
+            'text_secondary':c.TEXT_SECONDARY,
+            'text_muted':    c.TEXT_MUTED,
+            'accent_blue':   c.ACCENT_BLUE,
+            'accent_green':  c.ACCENT_GREEN,
             'accent_purple': c.ACCENT_PURPLE,
             'accent_orange': c.ACCENT_ORANGE,
-            'accent_cyan': c.ACCENT_CYAN,
-            'accent_red': c.ACCENT_RED,
+            'accent_cyan':   c.ACCENT_CYAN,
+            'accent_red':    c.ACCENT_RED,
             'accent_yellow': c.ACCENT_YELLOW,
         })
-    except Exception as e:
-        print(f"sync_colors error: {e}")
+    except Exception:
+        pass
 
 
-class GlassCard(QFrame, ScaleMixin):
-    """Glass-effect card - optimized without shadow for better performance"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.scale_connect()
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_card']};
-                border: none;
-                border-radius: 12px;
-            }}
-        """)
+# ---------------------------------------------------------------------------
+# Hjelpefunksjoner
+# ---------------------------------------------------------------------------
+def _fmt(v, fmt: str = "{:.0f}", fallback: str = "N/A") -> str:
+    if v is None:
+        return fallback
+    try:
+        return fmt.format(float(v))
+    except Exception:
+        return str(v) if v is not None else fallback
 
 
+def _flt(d: dict, key: str, default=None):
+    v = d.get(key)
+    if v is None:
+        return default
+    try:
+        return float(v)
+    except Exception:
+        return default
+
+
+# ---------------------------------------------------------------------------
+# GPUGauge – sirkulær måler
+# ---------------------------------------------------------------------------
 class GPUGauge(QFrame, ScaleMixin):
-    """
-    Circular gauge with glow effect and pulse animation on value changes
-    """
     def __init__(self, title: str = "", unit: str = "%",
                  min_val: float = 0.0, max_val: float = 100.0,
                  warn_threshold: float = 70.0, crit_threshold: float = 90.0,
-                 size: int = 120, parent=None):
+                 size: int = 110, parent=None):
         super().__init__(parent)
-        self._title = title
-        self._unit = unit
-        self._min_val = min_val
-        self._max_val = max_val
-        self._warn_threshold = warn_threshold
-        self._crit_threshold = crit_threshold
-        self._size = size
-        self._display_value = 0.0
-        self._target_value = 0.0
-        self._pending_update = False
-        self._subtitle = ""
-        self._is_animating = False
-        self._glow_intensity = 0.0
-        self._last_color = COLORS.get('accent_green', '#0c997f')
+        self._title        = title
+        self._unit         = unit
+        self._min_val      = min_val
+        self._max_val      = max_val
+        self._warn         = warn_threshold
+        self._crit         = crit_threshold
+        self._display_val  = 0.0
+        self._target_val   = 0.0
+        self._subtitle     = ""
+        self._glow         = 0.0
+        self._pending      = False
 
         self.setMinimumSize(S.px(size), S.px(size))
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setStyleSheet("background-color: transparent; border: none;")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setStyleSheet("background: transparent; border: none;")
 
-        # Throttle updates to ~30fps max
-        self._update_timer = QTimer(self)
-        self._update_timer.setSingleShot(True)
-        self._update_timer.timeout.connect(self._do_update)
+        self._draw_timer = QTimer(self)
+        self._draw_timer.setSingleShot(True)
+        self._draw_timer.timeout.connect(self._do_draw)
 
-        # Animation timer for pulse effect
-        self._anim_timer = QTimer(self)
-        self._anim_timer.timeout.connect(self._animate_pulse)
+        self._glow_timer = QTimer(self)
+        self._glow_timer.timeout.connect(self._step_glow)
 
         self.scale_connect()
 
-    def on_scale_changed(self, factor: float):
+    def on_scale_changed(self, _): self.update()
+
+    def _do_draw(self):
+        self._pending = False
         self.update()
 
-    def _do_update(self):
-        self._pending_update = False
-        self.update()
-
-    def _animate_pulse(self):
-        """Animate the glow pulse effect"""
-        if self._glow_intensity > 0:
-            self._glow_intensity -= 0.05
-            if self._glow_intensity <= 0:
-                self._glow_intensity = 0
-                self._anim_timer.stop()
+    def _step_glow(self):
+        self._glow = max(0.0, self._glow - 0.05)
+        if self._glow <= 0:
+            self._glow_timer.stop()
         self.update()
 
     def set_value(self, value: float):
-        """Update gauge value with throttling and trigger animation"""
         if value is None:
-            value = 0
-        old_target = self._target_value
-        self._target_value = max(self._min_val, min(value, self._max_val))
+            value = 0.0
+        old = self._target_val
+        self._target_val = max(self._min_val, min(float(value), self._max_val))
+        if abs(self._target_val - old) > 1.0:
+            self._glow = 0.8
+            if not self._glow_timer.isActive():
+                self._glow_timer.start(16)
+        if not self._pending:
+            self._pending = True
+            self._draw_timer.start(16)
 
-        # Trigger pulse animation on significant change
-        if abs(self._target_value - old_target) > 1.0 and not self._is_animating:
-            self._glow_intensity = 0.8
-            if not self._anim_timer.isActive():
-                self._anim_timer.start(16)  # ~60fps
-
-        if not self._pending_update:
-            self._pending_update = True
-            self._update_timer.start(16)  # ~60fps for smoother animation
-
-    def set_max_value(self, max_val: float):
-        self._max_val = max_val if max_val is not None else 100.0
+    def set_max_value(self, v: float):
+        self._max_val = v if v and v > 0 else self._max_val
 
     def set_subtitle(self, text: str):
-        """Set subtitle text shown below the main value (e.g., '/ 16 GB')"""
         self._subtitle = text
 
-    def _get_color_for_value(self, percentage: float) -> str:
-        if percentage >= self._crit_threshold:
-            return COLORS.get('accent_red', '#ef4444')
-        elif percentage >= self._warn_threshold:
-            return COLORS.get('accent_orange', '#f97316')
-        return COLORS.get('accent_green', '#0c997f')
+    def _color(self, pct: float) -> str:
+        if pct >= self._crit: return COLORS['accent_red']
+        if pct >= self._warn: return COLORS['accent_orange']
+        return COLORS['accent_green']
 
-    def paintEvent(self, a0):
+    def paintEvent(self, _):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        size = min(self.width(), self.height())
-        center = size / 2
+        sz  = min(self.width(), self.height())
+        cx  = sz / 2
 
-        # Smooth animation towards target
-        diff = self._target_value - self._display_value
-        if abs(diff) > 0.1:
-            self._display_value += diff * 0.15
-        else:
-            self._display_value = self._target_value
+        diff = self._target_val - self._display_val
+        self._display_val += diff * 0.15 if abs(diff) > 0.1 else diff
 
-        # Progress calculation
-        range_val = self._max_val - self._min_val
-        progress = (self._display_value - self._min_val) / range_val if range_val > 0 else 0
-        progress = max(0.0, min(1.0, progress))
-        current_color = self._get_color_for_value(progress * 100)
+        rng     = self._max_val - self._min_val
+        pct     = (self._display_val - self._min_val) / rng if rng else 0
+        pct     = max(0.0, min(1.0, pct))
+        col     = self._color(pct * 100)
 
-        pen_width = S.px(8)
-        arc_rect = S.px(14)
+        pw   = S.px(7)
+        ar   = S.px(13)
+        arc_r = sz - ar * 2
 
-        # Background track
-        painter.setPen(QPen(QColor(COLORS['border']), pen_width, Qt.PenStyle.SolidLine))
+        # Track
+        painter.setPen(QPen(QColor(COLORS['border']), pw))
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
-                       135 * 16, -270 * 16)
+        painter.drawArc(ar, ar, arc_r, arc_r, 135 * 16, -270 * 16)
 
-        # Animated glow effect - enhanced during pulse
-        glow_alpha = 40 + int(self._glow_intensity * 80)
-        glow_color = QColor(current_color)
-        glow_color.setAlpha(glow_alpha)
-        glow_pen = QPen(glow_color, pen_width + 6 + int(self._glow_intensity * 8), Qt.PenStyle.SolidLine)
-        glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(glow_pen)
-        painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
-                       135 * 16, -270 * 16)
+        # Glow
+        gc = QColor(col)
+        gc.setAlpha(40 + int(self._glow * 80))
+        gp = QPen(gc, pw + 5 + int(self._glow * 7))
+        gp.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(gp)
+        painter.drawArc(ar, ar, arc_r, arc_r, 135 * 16, -270 * 16)
 
-        # Progress arc with smooth color transition
-        progress_color = QColor(current_color)
-        progress_pen = QPen(progress_color, pen_width, Qt.PenStyle.SolidLine)
-        progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(progress_pen)
-        painter.drawArc(arc_rect, arc_rect, size - arc_rect * 2, size - arc_rect * 2,
-                       135 * 16, int(-270 * 16 * progress))
+        # Arc
+        ap = QPen(QColor(col), pw)
+        ap.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(ap)
+        painter.drawArc(ar, ar, arc_r, arc_r, 135 * 16, int(-270 * 16 * pct))
 
-        # Outer ring pulse effect during animation
-        if self._glow_intensity > 0:
-            pulse_color = QColor(current_color)
-            pulse_color.setAlpha(int(self._glow_intensity * 30))
-            pulse_pen = QPen(pulse_color, 2, Qt.PenStyle.SolidLine)
-            painter.setPen(pulse_pen)
-            painter.drawArc(arc_rect - 4, arc_rect - 4, size - arc_rect * 2 + 8, size - arc_rect * 2 + 8,
-                           135 * 16, -270 * 16)
-
-        # Center value - for VRAM gauge show total memory (16) at center with GB below
-        painter.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Light))
+        # Center text
+        fm = painter.fontMetrics()
         painter.setPen(QColor(COLORS['text_primary']))
+        painter.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Light))
+        fm = painter.fontMetrics()
+
         if self._title == "VRAM":
-            max_val = self._max_val if self._max_val > 0 else 16
-            value_text = f"{max_val:.0f}"
-            fm = painter.fontMetrics()
-            text_width = fm.width(value_text)
-            painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
-            painter.setFont(QFont("Segoe UI", S.font_pt(9)))
+            # Show total GB at center
+            gb_str  = f"{self._max_val / 1024:.0f}" if self._max_val >= 1024 else f"{self._max_val:.0f}"
+            tw = fm.horizontalAdvance(gb_str)
+            painter.drawText(int(cx - tw / 2), int(cx + 5), gb_str)
+            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
             painter.setPen(QColor(COLORS['text_secondary']))
-            gb_width = fm.width("GB")
-            painter.drawText(int(center - gb_width / 2), int(center + S.px(20)), "GB")
+            fm2 = painter.fontMetrics()
+            painter.drawText(int(cx - fm2.horizontalAdvance("GB") / 2), int(cx + S.px(18)), "GB")
         else:
-            value_text = f"{self._display_value:.0f}{self._unit}"
-            fm = painter.fontMetrics()
-            text_width = fm.width(value_text)
-            painter.drawText(int(center - text_width / 2), int(center + 5), value_text)
+            val_str = f"{self._display_val:.0f}{self._unit}"
+            tw = fm.horizontalAdvance(val_str)
+            painter.drawText(int(cx - tw / 2), int(cx + 5), val_str)
 
         # Title
         if self._title:
-            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
+            painter.setFont(QFont("Segoe UI", S.font_pt(7)))
             painter.setPen(QColor(COLORS['text_muted']))
-            title_width = fm.width(self._title)
-            painter.drawText(int(center - title_width / 2), int(center + S.px(35)), self._title)
+            fm3 = painter.fontMetrics()
+            tw3 = fm3.horizontalAdvance(self._title)
+            painter.drawText(int(cx - tw3 / 2), int(cx + S.px(32)), self._title)
 
         painter.end()
 
 
-class StatTile(QFrame, ScaleMixin):
-    """Compact stat tile for info display"""
-    def __init__(self, label: str = "", value: str = "--", color: Optional[str] = None, parent=None):
-        super().__init__(parent)
-        self._color = color or COLORS['accent_cyan']
-        self.scale_connect()
-        self._setup_ui(label, value)
-
-    def _setup_ui(self, label, value):
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_deeper']};
-                border: none;
-                border-radius: 8px;
-            }}
-        """)
-        layout = QVBoxLayout()
-        layout.setSpacing(S.px(2))
-        layout.setContentsMargins(S.px(10), S.px(10), S.px(10), S.px(10))
-        self.setLayout(layout)
-
-        self._value_lbl = QLabel(value)
-        self._value_lbl.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        self._value_lbl.setStyleSheet(f"color: {self._color}; background: transparent;")
-        layout.addWidget(self._value_lbl)
-
-        self._label_lbl = QLabel(label)
-        self._label_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self._label_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
-        layout.addWidget(self._label_lbl)
-
-    def set_value(self, value: str):
-        self._value_lbl.setText(value)
-
-    def set_color(self, color: str):
-        self._color = color
-        self._value_lbl.setStyleSheet(f"color: {color}; background: transparent;")
-
-
+# ---------------------------------------------------------------------------
+# RealtimeGraph – sanntidsgrafikk
+# ---------------------------------------------------------------------------
 class RealtimeGraph(QWidget, ScaleMixin):
-    """Real-time line graph with gradient fill - optimized with throttled updates"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._load_data = []
-        self._temp_data = []
-        self._max_points = 60
-        self._pending_update = False
+        self._load: List[float] = []
+        self._temp: List[float] = []
+        self._max_pts = 60
+        self._pending = False
         self.scale_connect()
-        self.setMinimumHeight(S.px(160))
+        self.setMinimumHeight(S.px(130))
 
-        # Throttle updates to ~30fps max
-        self._update_timer = QTimer(self)
-        self._update_timer.setSingleShot(True)
-        self._update_timer.timeout.connect(self._do_update)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._do_draw)
 
-    def _do_update(self):
-        self._pending_update = False
+    def _do_draw(self):
+        self._pending = False
         self.update()
 
-    def update_chart(self, load: float, temp: float):
-        self._load_data.append(load if load is not None else 0)
-        self._temp_data.append(temp if temp is not None else 0)
-        if len(self._load_data) > self._max_points:
-            self._load_data.pop(0)
-            self._temp_data.pop(0)
-        if not self._pending_update:
-            self._pending_update = True
-            self._update_timer.start(33)  # ~30fps throttle
+    def push(self, load: float, temp: float):
+        self._load.append(load or 0)
+        self._temp.append(temp or 0)
+        if len(self._load) > self._max_pts:
+            self._load.pop(0)
+            self._temp.pop(0)
+        if not self._pending:
+            self._pending = True
+            self._timer.start(33)
 
-    def paintEvent(self, a0):
+    # keep old call-site name
+    def update_chart(self, load: float, temp: float):
+        self.push(load, temp)
+
+    def paintEvent(self, _):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
 
-        w = self.width()
-        h = self.height()
-
-        # Background
         painter.setBrush(QColor(COLORS['bg_card']))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, 0, w, h)
 
-        # Grid lines
         painter.setPen(QPen(QColor(COLORS['border']), 1, Qt.PenStyle.DotLine))
         for i in range(5):
-            y = h * i / 4
-            painter.drawLine(0, int(y), w, int(y))
+            y = int(h * i / 4)
+            painter.drawLine(0, y, w, y)
 
-        # Draw load area
-        if len(self._load_data) > 1:
-            step = w / (self._max_points - 1)
-            valid_data = [(i, val) for i, val in enumerate(self._load_data) if val is not None]
-            if valid_data:
-                points = [(i * step, h - (val / 100.0 * h)) for i, val in valid_data]
+        if len(self._load) > 1:
+            step = w / (self._max_pts - 1)
+            pts_load = [(i * step, h - (v / 100.0 * h)) for i, v in enumerate(self._load)]
 
-                # Fill
-                fill_pts = [(0, h)] + points + [(points[-1][0], h)]
-                gradient = QLinearGradient(0, 0, 0, h)
-                gradient.setColorAt(0, QColor(16, 185, 129, 100))
-                gradient.setColorAt(1, QColor(16, 185, 129, 5))
-                painter.setBrush(gradient)
-                painter.setPen(Qt.PenStyle.NoPen)
-                from PyQt6.QtCore import QPoint
-                qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
-                if len(qpoints) >= 3:
-                    painter.drawPolygon(*qpoints)
+            # Fill under load
+            fill = [(0, h)] + pts_load + [(pts_load[-1][0], h)]
+            grad = QLinearGradient(0, 0, 0, h)
+            grad.setColorAt(0, QColor(16, 185, 129, 90))
+            grad.setColorAt(1, QColor(16, 185, 129, 5))
+            painter.setBrush(grad)
+            painter.setPen(Qt.PenStyle.NoPen)
+            from PyQt6.QtCore import QPoint
+            painter.drawPolygon(*[QPoint(int(x), int(y)) for x, y in fill])
 
-                # Load line
-                painter.setPen(QPen(QColor(COLORS['accent_green']), 2))
-                for i in range(len(points) - 1):
-                    painter.drawLine(int(points[i][0]), int(points[i][1]),
-                                   int(points[i + 1][0]), int(points[i + 1][1]))
+            # Load line
+            painter.setPen(QPen(QColor(COLORS['accent_green']), 2))
+            for i in range(len(pts_load) - 1):
+                painter.drawLine(int(pts_load[i][0]), int(pts_load[i][1]),
+                                 int(pts_load[i+1][0]), int(pts_load[i+1][1]))
 
-            # Temp line
-            temp_points = []
-            for i, val in enumerate(self._temp_data):
-                if val is not None:
-                    x = i * step
-                    y = h - (min(val, 100) / 100.0 * h)
-                    temp_points.append((x, y))
+            # Temp line (normalised to 0-110°C → 0-100%)
+            pts_temp = [(i * step, h - (min(v, 110) / 110.0 * h))
+                        for i, v in enumerate(self._temp)]
+            painter.setPen(QPen(QColor(COLORS['accent_blue']), 2))
+            for i in range(len(pts_temp) - 1):
+                painter.drawLine(int(pts_temp[i][0]), int(pts_temp[i][1]),
+                                 int(pts_temp[i+1][0]), int(pts_temp[i+1][1]))
 
-            if temp_points and temp_points[-1][1] < h:
-                painter.setPen(QPen(QColor(COLORS['accent_blue']), 2))
-                for i in range(len(temp_points) - 1):
-                    painter.drawLine(int(temp_points[i][0]), int(temp_points[i][1]),
-                                   int(temp_points[i + 1][0]), int(temp_points[i + 1][1]))
-
-        # Legend
-        painter.setFont(QFont("Segoe UI", S.font_pt(9)))
+        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(COLORS['accent_green']))
-        painter.drawText(S.px(12), S.px(16), "● Load")
+        painter.drawText(S.px(10), S.px(14), "● Last")
         painter.setPen(QColor(COLORS['accent_blue']))
-        painter.drawText(S.px(80), S.px(16), "● Temp")
-
+        painter.drawText(S.px(70), S.px(14), "● Temp")
         painter.end()
 
 
-class GPUView(QWidget, ScaleMixin):
-    """GPU monitoring view with modern responsive design"""
-
-    def __init__(self, parent=None):
+# ---------------------------------------------------------------------------
+# InfoRow – en nøkkel/verdi-rad
+# ---------------------------------------------------------------------------
+class InfoRow(QWidget):
+    def __init__(self, label: str, parent=None):
         super().__init__(parent)
-        self._last_gpu_data = None
-        self.scale_connect()
-        sync_colors()  # Sync colors before setup
-        self._setup_ui()
-        theme_manager.theme_changed.connect(self._on_theme_changed)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, S.px(1), 0, S.px(1))
+        layout.setSpacing(0)
 
-    def on_scale_changed(self, factor: float):
-        self._setup_ui()
-        self.update()
-
-    def _on_theme_changed(self, theme_name: str):
-        """Re-apply styles when theme changes"""
-        try:
-            # Sync colors first
-            sync_colors()
-            # Full rebuild like overview_page does
-            self._setup_ui()
-            self.update()
-        except Exception as e:
-            print(f"GPU theme change error: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def _reapply_widget_styles(self):
-        """Re-apply styles to widgets that use COLORS"""
-        try:
-            self._status_dot.setStyleSheet(f"color: {COLORS.get('accent_green', '#0c997f')}; font-size: {S.font_pt(14)}px; background: transparent;")
-            self._gpu_name_label.setStyleSheet(f"color: {COLORS.get('accent_cyan', '#22d3ee')}; background: transparent;")
-        except Exception as e:
-            print(f"GPU style reapply error: {e}")
-
-    def _refresh_all_widgets(self):
-        """Refresh all styled widgets"""
-        try:
-            if hasattr(self, '_header'):
-                self._header.setStyleSheet(f"""
-                    QFrame {{
-                        background-color: {COLORS.get('bg_card', '#151d28')};
-                        border-radius: 10px;
-                        border: none;
-                    }}
-                """)
-        except Exception as e:
-            print(f"Widget refresh error: {e}")
-
-    def _setup_ui(self):
-        """Setup GPU view UI"""
-        # Main layout - no scroll area, fits in content area
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(S.px(20), S.px(16), S.px(20), S.px(16))
-        main_layout.setSpacing(S.px(16))
-        self.setLayout(main_layout)
-
-        # Header bar
-        header = self._create_header()
-        main_layout.addWidget(header)
-
-        # Main content area - responsive grid
-        content = QWidget()
-        content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(16)
-        content.setLayout(content_layout)
-
-        # Gauges section
-        gauges_section = self._create_gauges_section()
-        content_layout.addWidget(gauges_section)
-
-        # Info cards section
-        info_section = self._create_info_section()
-        content_layout.addWidget(info_section)
-
-        # Chart section
-        chart_section = self._create_chart_section()
-        content_layout.addWidget(chart_section, stretch=1)
-
-        main_layout.addWidget(content, stretch=1)
-
-    def _create_header(self):
-        """Header with title and GPU status"""
-        header = QFrame()
-        header.setMinimumHeight(S.px(60))
-        header.setMaximumHeight(S.px(72))
-        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        header.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_card']};
-                border-radius: {S.px(10)}px;
-                border: none;
-            }}
-        """)
-        layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(16), 0, S.px(16), 0)
-        header.setLayout(layout)
-
-        # Status indicator
-        self._status_dot = QLabel("●")
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: {S.font_pt(14)}px; background: transparent;")
-        layout.addWidget(self._status_dot)
-
-        # Title
-        title = QLabel("GPU Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
-        layout.addWidget(title)
-
-        # GPU name
-        self._gpu_name_label = QLabel("—")
-        self._gpu_name_label.setFont(QFont("Segoe UI", S.font_pt(11)))
-        self._gpu_name_label.setStyleSheet(f"color: {COLORS['accent_cyan']}; background: transparent;")
-        layout.addWidget(self._gpu_name_label)
+        self._key = QLabel(label)
+        self._key.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._key.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent;")
+        self._key.setFixedWidth(S.px(140))
+        layout.addWidget(self._key)
 
         layout.addStretch()
 
-        return header
+        self._val = QLabel("—")
+        self._val.setFont(QFont("Consolas", S.font_pt(9)))
+        self._val.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        self._val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._val)
 
-    def _create_gauges_section(self):
-        """Gauges in responsive grid"""
-        container = QWidget()
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(S.px(12))
-        container.setLayout(layout)
+        self._unit = QLabel("")
+        self._unit.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._unit.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        self._unit.setFixedWidth(S.px(52))
+        self._unit.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._unit)
 
-        # Make gauges stretch to fill available space
-        self._gauge_load = GPUGauge(title="GPU Load", unit="%", max_val=100,
-                                   warn_threshold=50, crit_threshold=80, size=100)
-        self._gauge_temp = GPUGauge(title="Temp", unit="°C", max_val=100,
-                                   warn_threshold=60, crit_threshold=80, size=100)
-        self._gauge_vram = GPUGauge(title="VRAM", unit="GB", max_val=16,
-                                   warn_threshold=70, crit_threshold=90, size=100)
-        self._gauge_power = GPUGauge(title="Power", unit="W", max_val=300,
-                                    warn_threshold=200, crit_threshold=280, size=100)
-        self._gauge_fan = GPUGauge(title="Fan", unit="%", max_val=100,
-                                   warn_threshold=50, crit_threshold=80, size=100)
+    def set_value(self, val: str, unit: str = ""):
+        self._val.setText(val if val else "N/A")
+        self._unit.setText(f"  {unit}" if unit else "")
 
-        for gauge in [self._gauge_load, self._gauge_temp, self._gauge_vram,
-                      self._gauge_power, self._gauge_fan]:
-            layout.addWidget(gauge, stretch=1)
 
-        return container
+# ---------------------------------------------------------------------------
+# SectionCard – kortbeholder med tittel og rader
+# ---------------------------------------------------------------------------
+class SectionCard(QFrame):
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(S.px(14), S.px(8), S.px(14), S.px(10))
+        outer.setSpacing(S.px(2))
 
-    def _create_info_section(self):
-        """Info tiles row"""
-        container = QWidget()
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(S.px(12))
-        container.setLayout(layout)
+        lbl = QLabel(title)
+        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        lbl.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent; border: none;")
+        outer.addWidget(lbl)
 
-        self._card_model = StatTile("GPU Model", "—", COLORS['accent_cyan'])
-        self._card_driver = StatTile("Driver", "—", COLORS['text_secondary'])
-        self._card_vram = StatTile("VRAM Used", "—", COLORS['accent_purple'])
-        self._card_vram_total = StatTile("VRAM Total", "—", COLORS['accent_purple'])
-        self._card_vendor = StatTile("Vendor", "—", COLORS['accent_green'])
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"background: {COLORS['border']}; border: none; max-height: 1px;")
+        sep.setMaximumHeight(1)
+        outer.addWidget(sep)
 
-        for card in [self._card_model, self._card_driver,
-                     self._card_vram, self._card_vram_total, self._card_vendor]:
-            layout.addWidget(card, stretch=1)
+        self._rows: Dict[str, InfoRow] = {}
+        self._layout = outer
 
-        return container
+    def add_row(self, row_id: str, label: str) -> InfoRow:
+        row = InfoRow(label)
+        self._rows[row_id] = row
+        self._layout.addWidget(row)
+        return row
 
-    def _create_chart_section(self):
-        """Chart with legend"""
+    def set_value(self, row_id: str, val: str, unit: str = ""):
+        r = self._rows.get(row_id)
+        if r:
+            r.set_value(val, unit)
+
+    def show_row(self, row_id: str, visible: bool):
+        r = self._rows.get(row_id)
+        if r:
+            r.setVisible(visible)
+
+
+# ---------------------------------------------------------------------------
+# GPUSingleView – komplett visning for én GPU
+# ---------------------------------------------------------------------------
+class GPUSingleView(QWidget, ScaleMixin):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.scale_connect()
+        self._build()
+
+    def on_scale_changed(self, _):
+        pass  # gauges repaint themselves
+
+    def _build(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(S.px(8))
+
+        # --- Målere ---
+        self._gauge_load  = GPUGauge("Load",  "%",   warn_threshold=70,  crit_threshold=90,  size=100)
+        self._gauge_temp  = GPUGauge("Temp",  "°C",  max_val=110, warn_threshold=70, crit_threshold=90, size=100)
+        self._gauge_vram  = GPUGauge("VRAM",  "%",   warn_threshold=70,  crit_threshold=90,  size=100)
+        self._gauge_power = GPUGauge("Power", "W",   max_val=300, warn_threshold=200, crit_threshold=280, size=100)
+        self._gauge_fan   = GPUGauge("Vifte", "%",   warn_threshold=60,  crit_threshold=85,  size=100)
+
+        gauge_row = QWidget()
+        gl = QHBoxLayout(gauge_row)
+        gl.setContentsMargins(0, 0, 0, 0)
+        gl.setSpacing(S.px(6))
+        for g in [self._gauge_load, self._gauge_temp, self._gauge_vram,
+                  self._gauge_power, self._gauge_fan]:
+            gl.addWidget(g, stretch=1)
+        root.addWidget(gauge_row)
+
+        # --- Rullbar detaljseksjon ---
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("background: transparent; border: none;")
+
+        inner = QWidget()
+        inner.setStyleSheet("background: transparent;")
+        dl = QVBoxLayout(inner)
+        dl.setContentsMargins(0, 0, S.px(2), 0)
+        dl.setSpacing(S.px(8))
+
+        # Klokker
+        self._s_clk = SectionCard("KLOKKEFREKVENSER")
+        self._r_core     = self._s_clk.add_row("core",     "Core (GPU):")
+        self._r_core_max = self._s_clk.add_row("core_max", "Core Maks:")
+        self._r_mem      = self._s_clk.add_row("mem",      "Memory:")
+        self._r_mem_max  = self._s_clk.add_row("mem_max",  "Memory Maks:")
+        dl.addWidget(self._s_clk)
+
+        # Temperatur
+        self._s_temp = SectionCard("TEMPERATUR")
+        self._r_t_edge = self._s_temp.add_row("edge",    "Edge (GPU):")
+        self._r_t_hot  = self._s_temp.add_row("hotspot", "Hotspot:")
+        self._r_t_mem  = self._s_temp.add_row("t_mem",   "Minne:")
+        dl.addWidget(self._s_temp)
+
+        # Status
+        self._s_stat = SectionCard("STATUS")
+        self._r_load     = self._s_stat.add_row("load",    "GPU Bruk:")
+        self._r_mem_use  = self._s_stat.add_row("mem_use", "Minne Bruk:")
+        self._r_fan      = self._s_stat.add_row("fan",     "Vifte:")
+        self._r_power    = self._s_stat.add_row("power",   "Strøm:")
+        self._r_volt     = self._s_stat.add_row("volt",    "GFX Spenning:")
+        dl.addWidget(self._s_stat)
+
+        # VRAM
+        self._s_vram = SectionCard("VIDEOMINNE")
+        self._r_v_used  = self._s_vram.add_row("used",  "Brukt:")
+        self._r_v_total = self._s_vram.add_row("total", "Totalt:")
+        self._r_v_free  = self._s_vram.add_row("free",  "Ledig:")
+        dl.addWidget(self._s_vram)
+
+        # System
+        self._s_sys = SectionCard("SYSTEMINFORMASJON")
+        self._r_pcie   = self._s_sys.add_row("pcie",   "PCIe:")
+        self._r_driver = self._s_sys.add_row("driver", "Driver:")
+        self._r_type   = self._s_sys.add_row("type",   "Type:")
+        self._r_vendor = self._s_sys.add_row("vendor", "Leverandør:")
+        dl.addWidget(self._s_sys)
+
+        # Ytelseskart
         chart_card = QFrame()
         chart_card.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLORS['bg_card']};
+                background: {COLORS['bg_card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        cl = QVBoxLayout(chart_card)
+        cl.setContentsMargins(S.px(10), S.px(8), S.px(10), S.px(8))
+        cl.setSpacing(S.px(4))
+        ct = QLabel("Ytelse over tid")
+        ct.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        ct.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent; border: none;")
+        cl.addWidget(ct)
+        self._chart = RealtimeGraph()
+        cl.addWidget(self._chart)
+        dl.addWidget(chart_card)
+
+        dl.addStretch()
+        scroll.setWidget(inner)
+        root.addWidget(scroll, stretch=1)
+
+    # ------------------------------------------------------------------
+    def update_gpu(self, gpu: dict):
+        """Oppdater alle widgets med GPU-data fra GPUInfo.to_dict()."""
+        load      = _flt(gpu, 'gpu_utilization_percent',  0.0)
+        mem_use   = _flt(gpu, 'memory_utilization_percent', 0.0)
+        temp_edge = _flt(gpu, 'temperature_celsius')
+        temp_hot  = _flt(gpu, 'hotspot_temp_celsius')
+        temp_mem  = _flt(gpu, 'memory_temp_celsius')
+        core_mhz  = _flt(gpu, 'core_clock_mhz')
+        core_max  = _flt(gpu, 'core_clock_boost_mhz')
+        mem_mhz   = _flt(gpu, 'memory_clock_mhz')
+        mem_max   = _flt(gpu, 'core_clock_base_mhz')  # may be 0
+        vram_tot  = _flt(gpu, 'vram_total_mb',  0.0)
+        vram_used = _flt(gpu, 'vram_used_mb',   0.0)
+        vram_free = _flt(gpu, 'vram_free_mb',   0.0)
+        vram_pct  = _flt(gpu, 'vram_percent',   0.0)
+        power     = _flt(gpu, 'power_draw_watts')
+        power_lim = _flt(gpu, 'power_limit_watts')
+        fan_pct   = _flt(gpu, 'fan_speed_percent')
+        fan_rpm   = _flt(gpu, 'fan_speed_rpm')
+        pci_str   = gpu.get('pci_bus', '') or ''
+        driver    = gpu.get('driver_version', 'Unknown') or 'Unknown'
+        gpu_type  = gpu.get('gpu_type', 'Unknown') or 'Unknown'
+        vendor    = gpu.get('vendor', 'Unknown') or 'Unknown'
+        raw       = gpu.get('raw_data') or {}
+        gfx_mv    = raw.get('gfx_mv')
+
+        # --- Gauges ---
+        self._gauge_load.set_value(load or 0)
+        self._gauge_temp.set_value(temp_edge or 0)
+
+        if not vram_pct and vram_tot > 0:
+            vram_pct = (vram_used / vram_tot) * 100.0
+        self._gauge_vram.set_value(vram_pct or 0)
+        self._gauge_vram.set_max_value(vram_tot if vram_tot >= 1024 else vram_tot)
+
+        if power_lim and power_lim > 0:
+            self._gauge_power.set_max_value(power_lim)
+        self._gauge_power.set_value(power or 0)
+
+        self._gauge_fan.set_value(fan_pct or 0)
+        self._gauge_fan.setVisible(fan_pct is not None or fan_rpm is not None)
+
+        # --- Klokker ---
+        has_core = core_mhz is not None and core_mhz > 0
+        has_mem  = mem_mhz  is not None and mem_mhz  > 0
+        self._s_clk.setVisible(has_core or has_mem)
+        if has_core or has_mem:
+            self._s_clk.set_value("core",     _fmt(core_mhz) if has_core else "N/A", "MHz")
+            self._s_clk.show_row("core_max",  bool(core_max and core_max > 0))
+            if core_max and core_max > 0:
+                self._s_clk.set_value("core_max", _fmt(core_max), "MHz")
+            self._s_clk.set_value("mem",      _fmt(mem_mhz)  if has_mem  else "N/A", "MHz")
+            self._s_clk.show_row("mem_max",   False)
+
+        # --- Temperatur ---
+        has_temp = any(t is not None for t in [temp_edge, temp_hot, temp_mem])
+        self._s_temp.setVisible(has_temp)
+        if has_temp:
+            self._s_temp.set_value("edge",    _fmt(temp_edge), "°C")
+            self._s_temp.show_row("hotspot",  temp_hot is not None)
+            if temp_hot is not None:
+                self._s_temp.set_value("hotspot", _fmt(temp_hot), "°C")
+            self._s_temp.show_row("t_mem",    temp_mem is not None)
+            if temp_mem is not None:
+                self._s_temp.set_value("t_mem",   _fmt(temp_mem), "°C")
+
+        # --- Status ---
+        self._s_stat.set_value("load",    _fmt(load),    "%")
+        self._s_stat.set_value("mem_use", _fmt(mem_use), "%")
+
+        has_fan = fan_pct is not None or fan_rpm is not None
+        self._s_stat.show_row("fan", has_fan)
+        if has_fan:
+            if fan_rpm is not None and fan_rpm > 0:
+                fan_str = f"{fan_rpm:.0f}"
+                fan_unit = f"RPM  ({_fmt(fan_pct)}%)" if fan_pct is not None else "RPM"
+            else:
+                fan_str  = _fmt(fan_pct)
+                fan_unit = "%"
+            self._s_stat.set_value("fan", fan_str, fan_unit)
+
+        has_pwr = power is not None
+        self._s_stat.show_row("power", has_pwr)
+        if has_pwr:
+            if power_lim and power_lim > 0:
+                self._s_stat.set_value("power", f"{power:.0f} / {power_lim:.0f}", "W")
+            else:
+                self._s_stat.set_value("power", _fmt(power), "W")
+
+        has_volt = gfx_mv is not None and gfx_mv != 0
+        self._s_stat.show_row("volt", has_volt)
+        if has_volt:
+            self._s_stat.set_value("volt", _fmt(gfx_mv), "mV")
+
+        # --- VRAM ---
+        has_vram = vram_tot is not None and vram_tot > 0
+        self._s_vram.setVisible(has_vram)
+        if has_vram:
+            def mb_gb(mb):
+                return f"{mb:.0f} MB  ({mb/1024:.1f} GB)"
+            self._s_vram.set_value("used",  mb_gb(vram_used))
+            self._s_vram.set_value("total", mb_gb(vram_tot))
+            self._s_vram.show_row("free", vram_free > 0)
+            if vram_free > 0:
+                self._s_vram.set_value("free", mb_gb(vram_free))
+
+        # --- System ---
+        self._s_sys.show_row("pcie", bool(pci_str))
+        if pci_str:
+            self._s_sys.set_value("pcie", pci_str)
+        self._s_sys.set_value("driver", driver if driver != "Unknown" else "N/A")
+        self._s_sys.set_value("type",   self._type_label(gpu_type, gpu.get('name', '')))
+        self._s_sys.set_value("vendor", vendor)
+
+        # --- Kart ---
+        self._chart.push(load or 0, temp_edge or 0)
+
+    @staticmethod
+    def _type_label(gpu_type: str, name: str) -> str:
+        name_l = (name or '').lower()
+        if gpu_type.lower() == 'integrated':
+            return "Integrated (iGPU)"
+        if any(x in name_l for x in ('laptop', 'mobile', 'max-q', ' m ')):
+            return "Mobile (dGPU)"
+        if gpu_type.lower() == 'dedicated':
+            return "Desktop (dGPU)"
+        return gpu_type or "Unknown"
+
+
+# ---------------------------------------------------------------------------
+# GPUView – hoved-widget med støtte for flere GPUer
+# ---------------------------------------------------------------------------
+class GPUView(QWidget, ScaleMixin):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._gpu_views:  List[GPUSingleView] = []
+        self._gpu_names:  List[str]           = []
+        self._pending_data: Optional[dict]    = None
+        self._update_sched = False
+
+        self.scale_connect()
+        sync_colors()
+        self._setup_ui()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
+    def _setup_ui(self):
+        # Remove old widgets
+        old = self.layout()
+        if old:
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.deleteLater()
+
+        self._gpu_views = []
+        self._gpu_names = []
+
+        root = QVBoxLayout()
+        root.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
+        root.setSpacing(S.px(10))
+        self.setLayout(root)
+
+        # Header
+        root.addWidget(self._make_header())
+
+        # Tabs (hidden bar when only 1 GPU)
+        self._tabs = QTabWidget()
+        self._tabs.setStyleSheet(self._tab_css())
+        root.addWidget(self._tabs, stretch=1)
+
+        # "Ingen GPU" fallback
+        self._no_gpu = QLabel(
+            "Ingen GPU funnet.\n"
+            "Kontroller at NVIDIA/AMD/Intel-drivere er installert."
+        )
+        self._no_gpu.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._no_gpu.setFont(QFont("Segoe UI", S.font_pt(11)))
+        self._no_gpu.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        self._no_gpu.setVisible(False)
+        root.addWidget(self._no_gpu)
+
+    def _make_header(self) -> QFrame:
+        hdr = QFrame()
+        hdr.setFixedHeight(S.px(52))
+        hdr.setStyleSheet(f"""
+            QFrame {{
+                background: {COLORS['bg_card']};
                 border-radius: 10px;
                 border: none;
             }}
         """)
-        layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(12), S.px(10), S.px(12), S.px(10))
-        layout.setSpacing(S.px(8))
-        chart_card.setLayout(layout)
+        hl = QHBoxLayout(hdr)
+        hl.setContentsMargins(S.px(14), 0, S.px(14), 0)
+        hl.setSpacing(S.px(8))
 
-        chart_title = QLabel("Performance")
-        chart_title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-        chart_title.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
-        layout.addWidget(chart_title)
+        self._status_dot = QLabel("●")
+        self._status_dot.setStyleSheet(
+            f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
+        )
+        hl.addWidget(self._status_dot)
 
-        self._chart = RealtimeGraph()
-        layout.addWidget(self._chart)
+        title = QLabel("GPU Monitor")
+        title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        hl.addWidget(title)
 
-        return chart_card
+        self._gpu_name_lbl = QLabel("—")
+        self._gpu_name_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._gpu_name_lbl.setStyleSheet(
+            f"color: {COLORS['accent_cyan']}; background: transparent;"
+        )
+        hl.addWidget(self._gpu_name_lbl)
 
+        hl.addStretch()
+
+        self._badge = QLabel("")
+        self._badge.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        self._badge.setStyleSheet(
+            f"color: {COLORS['accent_blue']}; background: transparent; "
+            f"border: 1px solid {COLORS['accent_blue']}; border-radius: 4px; padding: 1px 6px;"
+        )
+        self._badge.setVisible(False)
+        hl.addWidget(self._badge)
+
+        return hdr
+
+    def _tab_css(self) -> str:
+        return f"""
+            QTabWidget::pane  {{ border: none; background: transparent; }}
+            QTabBar::tab {{
+                background: {COLORS['bg_card']};
+                color: {COLORS['text_muted']};
+                padding: {S.px(5)}px {S.px(12)}px;
+                border-radius: {S.px(6)}px;
+                margin-right: {S.px(4)}px;
+                font-size: {S.font_pt(9)}px;
+                border: none;
+            }}
+            QTabBar::tab:selected {{
+                background: {COLORS['accent_green']};
+                color: {COLORS['bg_primary']};
+                font-weight: bold;
+            }}
+            QTabBar::tab:hover:!selected {{
+                background: {COLORS['bg_hover']};
+                color: {COLORS['text_primary']};
+            }}
+        """
+
+    # ------------------------------------------------------------------
+    # Dataoppdatering
+    # ------------------------------------------------------------------
     def update_data(self, data: dict):
-        """Update view with GPU data - throttled"""
-        if 'gpu' not in data:
-            return
-        self._pending_gpu_data = data
-        if not getattr(self, '_update_scheduled', False):
-            self._update_scheduled = True
-            QTimer.singleShot(16, self._do_update)
+        self._pending_data = data
+        if not self._update_sched:
+            self._update_sched = True
+            QTimer.singleShot(16, self._apply_update)
 
-    def _do_update(self):
-        """Perform GPU update"""
-        self._update_scheduled = False
-        data = getattr(self, '_pending_gpu_data', None)
+    def _apply_update(self):
+        self._update_sched = False
+        data = self._pending_data
         if not data:
             return
 
-        gpu = data['gpu']
-
-        if not gpu.get('available', False):
-            self._status_dot.setStyleSheet(f"color: {COLORS['accent_red']}; font-size: {S.font_pt(14)}px; background: transparent;")
+        gpu_data = data.get('gpu', {})
+        if not gpu_data:
             return
 
-        self._status_dot.setStyleSheet(f"color: {COLORS['accent_green']}; font-size: {S.font_pt(14)}px; background: transparent;")
+        available = gpu_data.get('available', False)
+        if not available:
+            self._set_status_bad()
+            self._show_no_gpu(True)
+            return
 
-        # GPU info is embedded in the gpu dict itself (name, vendor, vram_mb, driver_version)
-        gpu_name = gpu.get('name', '—')
-        gpu_vendor = gpu.get('vendor', 'Unknown')
-        gpu_vram = gpu.get('vram_mb', 0)
-        gpu_driver = gpu.get('driver_version', 'N/A')
+        self._set_status_ok()
 
-        self._gpu_name_label.setText(gpu_name)
-        self._card_model.set_value(gpu_name[:35] if gpu_name else 'Unknown')
-        self._card_driver.set_value(gpu_driver)
-        self._card_vram.set_value(f"{gpu_vram / 1024:.1f} GB" if gpu_vram else "—")
-        self._card_vendor.set_value(gpu_vendor)
+        # Hent liste over GPU-dicts (GPUInfo.to_dict() format)
+        gpus: List[dict] = gpu_data.get('gpus', [])
 
-        load = gpu.get('load', 0)
-        mem_used = gpu.get('memory_used', 0)
-        mem_total = gpu.get('memory_total', 1)
-        temp = gpu.get('temperature', 0) or 0
-        power = gpu.get('power', 0) or 0
-        fan = gpu.get('fan_speed', 0) or 0
+        # Fallback: flat-format (bakoverkompatibilitet)
+        if not gpus:
+            gpus = [self._flat_to_dict(gpu_data)]
 
-        self._gauge_load.set_value(load)
-        self._gauge_temp.set_value(temp)
-        self._gauge_vram.set_value(mem_used if mem_used else 0)
-        self._gauge_vram.set_max_value(mem_total if mem_total else 16)
+        if not gpus:
+            self._show_no_gpu(True)
+            return
 
-        # Set VRAM gauge to show total memory (16) at center with GB below
-        if mem_total and mem_total > 0:
-            self._gauge_vram.set_subtitle(f"/ {mem_total:.0f} GB")
+        self._show_no_gpu(False)
+
+        # Rebuild tabs hvis GPU-sammensetning endret seg
+        names = [g.get('name', f'GPU {i}') for i, g in enumerate(gpus)]
+        if names != self._gpu_names:
+            self._rebuild_tabs(gpus)
+            self._gpu_names = names
+
+        # Oppdater hver GPU-visning
+        for gpu, view in zip(gpus, self._gpu_views):
+            view.update_gpu(gpu)
+
+        # Oppdater header med aktiv fane
+        idx = self._tabs.currentIndex()
+        if 0 <= idx < len(gpus):
+            gpu = gpus[idx]
+            self._gpu_name_lbl.setText(gpu.get('name', '—'))
+            self._update_badge(gpu)
+
+    # ------------------------------------------------------------------
+    # Hjelper-metoder
+    # ------------------------------------------------------------------
+    def _rebuild_tabs(self, gpus: List[dict]):
+        self._tabs.clear()
+        self._gpu_views.clear()
+        for i, gpu in enumerate(gpus):
+            view = GPUSingleView()
+            self._gpu_views.append(view)
+            name   = gpu.get('name', f'GPU {i}')
+            vendor = (gpu.get('vendor') or '').upper()[:3]
+            label  = f"{vendor} {name[:18]}…" if len(name) > 18 else f"{vendor} {name}"
+            self._tabs.addTab(view, label.strip())
+        # Skjul fanelinjen for enkelt-GPU
+        self._tabs.tabBar().setVisible(len(gpus) > 1)
+
+    def _update_badge(self, gpu: dict):
+        gpu_type = (gpu.get('gpu_type') or '').lower()
+        name     = (gpu.get('name') or '').lower()
+        if gpu_type == 'integrated':
+            self._badge.setText("iGPU")
+            self._badge.setVisible(True)
+        elif any(x in name for x in ('laptop', 'mobile', 'max-q')):
+            self._badge.setText("Mobile")
+            self._badge.setVisible(True)
         else:
-            self._gauge_vram.set_subtitle("")
+            self._badge.setVisible(False)
 
-        # Update VRAM info cards
-        if mem_total and mem_total > 0:
-            self._card_vram.set_value(f"{mem_used:.1f} GB" if mem_used else "—")
-            self._card_vram_total.set_value(f"{mem_total:.1f} GB")
-        else:
-            self._card_vram.set_value("—")
-            self._card_vram_total.set_value("—")
+    @staticmethod
+    def _flat_to_dict(d: dict) -> dict:
+        """Gjør flat bakover-kompatibelt format om til GPUInfo.to_dict() format."""
+        mem_tot  = d.get('memory_total', 0) or 0
+        mem_used = d.get('memory_used',  0) or 0
+        mem_pct  = d.get('memory_percent') or (
+            (mem_used / mem_tot * 100) if mem_tot > 0 else 0
+        )
+        return {
+            'name':                     d.get('name', 'Unknown GPU'),
+            'vendor':                   d.get('vendor', 'Unknown'),
+            'gpu_type':                 d.get('gpu_type', 'Unknown'),
+            'gpu_utilization_percent':  d.get('load', 0) or 0,
+            'memory_utilization_percent': mem_pct,
+            'temperature_celsius':      d.get('temperature'),
+            'hotspot_temp_celsius':     d.get('hotspot_temp'),
+            'memory_temp_celsius':      d.get('memory_temp'),
+            'core_clock_mhz':           d.get('core_clock_mhz') or 0,
+            'core_clock_boost_mhz':     d.get('core_clock_boost_mhz') or 0,
+            'memory_clock_mhz':         d.get('memory_clock_mhz') or 0,
+            'vram_total_mb':            mem_tot,
+            'vram_used_mb':             mem_used,
+            'vram_free_mb':             max(0.0, mem_tot - mem_used),
+            'vram_percent':             mem_pct,
+            'power_draw_watts':         d.get('power'),
+            'power_limit_watts':        d.get('power_limit'),
+            'fan_speed_percent':        d.get('fan_speed'),
+            'fan_speed_rpm':            d.get('fan_speed_rpm'),
+            'pci_bus':                  d.get('pci_bus', ''),
+            'driver_version':           d.get('driver_version', 'Unknown'),
+            'is_available':             True,
+            'raw_data':                 {},
+        }
 
-        self._gauge_power.set_value(power)
-        self._gauge_fan.set_value(fan)
-        self._chart.update_chart(load, temp)
-        self._last_gpu_data = gpu
+    def _show_no_gpu(self, v: bool):
+        self._tabs.setVisible(not v)
+        self._no_gpu.setVisible(v)
 
+    def _set_status_ok(self):
+        self._status_dot.setStyleSheet(
+            f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
+        )
 
-from PyQt6.QtWidgets import QSizePolicy
+    def _set_status_bad(self):
+        self._status_dot.setStyleSheet(
+            f"color: {COLORS['accent_red']}; font-size: {S.font_pt(13)}px; background: transparent;"
+        )
+
+    def on_scale_changed(self, _):
+        self._setup_ui()
+
+    def _on_theme_changed(self, _):
+        sync_colors()
+        self._setup_ui()
