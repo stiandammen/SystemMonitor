@@ -83,37 +83,20 @@ class Card(QFrame, ScaleMixin):
     def _apply_theme(self):
         """Apply current theme styles with glassmorphism effect"""
         colors = theme_manager.colors
-
-        if theme_manager.current_theme == "heimdal":
-            self.setStyleSheet(f"""
-                Card, QFrame#Card {{
-                    background-color: rgba(30, 35, 64, 0.85);
-                    border: none;
-                    border-radius: {S.px(12)}px;
-                }}
-                Card QWidget, Card QLabel {{
-                    border: none;
-                }}
-                Card:hover, QFrame#Card:hover {{
-                    background-color: rgba(37, 42, 71, 0.85);
-                    border: none;
-                }}
-            """)
-        else:
-            self.setStyleSheet(f"""
-                Card, QFrame#Card {{
-                    background-color: {colors.BG_CARD};
-                    border: none;
-                    border-radius: {S.px(12)}px;
-                }}
-                Card QWidget, Card QLabel {{
-                    border: none;
-                }}
-                Card:hover, QFrame#Card:hover {{
-                    background-color: {colors.BG_HOVER};
-                    border: none;
-                }}
-            """)
+        self.setStyleSheet(f"""
+            Card, QFrame#Card {{
+                background-color: {colors.BG_CARD};
+                border: none;
+                border-radius: {S.px(12)}px;
+            }}
+            Card QWidget, Card QLabel {{
+                border: none;
+            }}
+            Card:hover, QFrame#Card:hover {{
+                background-color: {colors.BG_HOVER};
+                border: none;
+            }}
+        """)
 
     def set_content(self, widget: QWidget):
         """Set the content widget"""

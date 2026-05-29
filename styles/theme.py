@@ -1,8 +1,21 @@
 """
 Theme Management - Professional theme system with glassmorphism and premium dark themes
 """
+import re as _re
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QObject, pyqtSignal
+
+
+def css_color_to_hex(color: str) -> str:
+    """Convert a CSS rgba/rgb color string to #rrggbb for QColor compatibility.
+    Hex colors and named colors are returned unchanged.
+    """
+    if not color or color.startswith('#'):
+        return color or '#000000'
+    m = _re.match(r'rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)', color)
+    if m:
+        return f'#{int(m.group(1)):02x}{int(m.group(2)):02x}{int(m.group(3)):02x}'
+    return color
 
 
 # Premium Glassmorphism Dark Theme Colors
@@ -737,8 +750,9 @@ class ThemeManager(QObject):
         """Generate responsive global stylesheet based on current theme"""
         c = self._colors
         accent_dim = getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.15)')
-        glass_bg = getattr(c, 'GLASS_BG', 'rgba(13, 17, 23, 0.6)')
-        glass_border = getattr(c, 'GLASS_BORDER', 'rgba(48, 54, 61, 0.6)')
+        glass_bg = getattr(c, 'GLASS_BG', c.BG_INPUT)
+        glass_border = getattr(c, 'GLASS_BORDER', c.BORDER)
+        accent_bright = getattr(c, 'ACCENT_GREEN_BRIGHT', c.ACCENT_GREEN)
 
         return f"""
         QMainWindow {{
@@ -780,9 +794,9 @@ class ThemeManager(QObject):
         }}
 
         QPushButton:pressed {{
-            background-color: {getattr(c, 'ACCENT_GREEN_BRIGHT', '#34d399')};
+            background-color: {accent_bright};
             color: #ffffff;
-            border-color: {getattr(c, 'ACCENT_GREEN_BRIGHT', '#34d399')};
+            border-color: {accent_bright};
         }}
 
         QPushButton:disabled {{
@@ -845,7 +859,7 @@ class ThemeManager(QObject):
         }}
 
         QScrollBar::handle:vertical {{
-            background-color: {getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.3)')};
+            background-color: {c.ACCENT_GREEN_DIM};
             border-radius: 3px;
             min-height: 30px;
         }}
@@ -867,7 +881,7 @@ class ThemeManager(QObject):
         }}
 
         QScrollBar::handle:horizontal {{
-            background-color: {getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.3)')};
+            background-color: {c.ACCENT_GREEN_DIM};
             border-radius: 3px;
             min-width: 30px;
         }}
@@ -895,7 +909,7 @@ class ThemeManager(QObject):
         }}
 
         QTableWidget::item:hover {{
-            background-color: rgba(74, 108, 247, 0.08);
+            background-color: {c.BG_HOVER};
         }}
 
         QTableWidget::item:selected {{
@@ -951,7 +965,7 @@ class ThemeManager(QObject):
         }}
 
         QProgressBar::chunk {{
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c.ACCENT_GREEN}, stop:1 {c.ACCENT_PURPLE});
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c.ACCENT_GREEN}, stop:1 {accent_bright});
             border-radius: 4px;
         }}
 

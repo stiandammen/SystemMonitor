@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, QRectF, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
 from PyQt6.QtCore import pyqtSignal
 
-from styles.theme import theme_manager
+from styles.theme import theme_manager, css_color_to_hex
 from scaler import S, ScaleMixin
 
 
@@ -72,7 +72,7 @@ class GlassCard(QFrame):
         glass_gradient.setColorAt(0.3, QColor(255, 255, 255, int(8 * self._intensity)))
         glass_gradient.setColorAt(1, QColor(255, 255, 255, 0))
         painter.setBrush(glass_gradient)
-        painter.setPen(QPen(QColor(c.BORDER), 0))
+        painter.setPen(QPen(QColor(css_color_to_hex(c.BORDER)), 0))
         painter.drawRoundedRect(inner_rect, self._corner_radius, self._corner_radius)
 
         # --- Subtle inner border highlight (top-left light catch) ---

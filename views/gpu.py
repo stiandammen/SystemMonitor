@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QLinearGradient
 
-from styles.theme import theme_manager
+from styles.theme import theme_manager, css_color_to_hex
 from scaler import S, ScaleMixin
 
 
@@ -22,9 +22,11 @@ from scaler import S, ScaleMixin
 COLORS: Dict[str, str] = {
     'bg_primary':    '#0a0e14',
     'bg_card':       '#161f2a',
+    'bg_card_solid': '#161f2a',
     'bg_deeper':     '#0d1117',
     'bg_hover':      '#1e2936',
     'border':        '#2a3441',
+    'border_solid':  '#2a3441',
     'text_primary':  '#f0f4f8',
     'text_secondary':'#94a3b8',
     'text_muted':    '#64748b',
@@ -41,12 +43,17 @@ COLORS: Dict[str, str] = {
 def sync_colors() -> None:
     try:
         c = theme_manager.colors
+        bg_card = c.BG_CARD
+        bg_card_solid = getattr(c, 'BG_CARD_SOLID', None) or css_color_to_hex(bg_card)
+        border = c.BORDER
         COLORS.update({
             'bg_primary':    c.BG_PRIMARY,
-            'bg_card':       c.BG_CARD,
+            'bg_card':       bg_card,
+            'bg_card_solid': bg_card_solid,
             'bg_deeper':     c.BG_HOVER,
             'bg_hover':      c.BG_HOVER,
-            'border':        c.BORDER,
+            'border':        border,
+            'border_solid':  css_color_to_hex(border),
             'text_primary':  c.TEXT_PRIMARY,
             'text_secondary':c.TEXT_SECONDARY,
             'text_muted':    c.TEXT_MUTED,
@@ -174,7 +181,7 @@ class GPUGauge(QFrame, ScaleMixin):
         arc_r = sz - ar * 2
 
         # Track
-        painter.setPen(QPen(QColor(COLORS['border']), pw))
+        painter.setPen(QPen(QColor(COLORS['border_solid']), pw))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawArc(ar, ar, arc_r, arc_r, 135 * 16, -270 * 16)
 
@@ -263,11 +270,11 @@ class RealtimeGraph(QWidget, ScaleMixin):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
 
-        painter.setBrush(QColor(COLORS['bg_card']))
+        painter.setBrush(QColor(COLORS['bg_card_solid']))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, 0, w, h)
 
-        painter.setPen(QPen(QColor(COLORS['border']), 1, Qt.PenStyle.DotLine))
+        painter.setPen(QPen(QColor(COLORS['border_solid']), 1, Qt.PenStyle.DotLine))
         for i in range(5):
             y = int(h * i / 4)
             painter.drawLine(0, y, w, y)
@@ -343,6 +350,11 @@ class InfoRow(QWidget):
         self._val.setText(val if val else "N/A")
         self._unit.setText(f"  {unit}" if unit else "")
 
+    def apply_theme(self):
+        self._key.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent;")
+        self._val.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        self._unit.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+
 
 # ---------------------------------------------------------------------------
 # SectionCard – kortbeholder med tittel og rader
@@ -365,12 +377,14 @@ class SectionCard(QFrame):
         lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent; border: none;")
         outer.addWidget(lbl)
+        self._title_lbl = lbl
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet(f"background: {COLORS['border']}; border: none; max-height: 1px;")
         sep.setMaximumHeight(1)
         outer.addWidget(sep)
+        self._sep = sep
 
         self._rows: Dict[str, InfoRow] = {}
         self._layout = outer
@@ -391,6 +405,23 @@ class SectionCard(QFrame):
         if r:
             r.setVisible(visible)
 
+    def apply_theme(self):
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: none;
+                border-radius: 10px;
+            }}
+        """)
+        if hasattr(self, '_title_lbl'):
+            self._title_lbl.setStyleSheet(
+                f"color: {COLORS['accent_green']}; background: transparent; border: none;")
+        if hasattr(self, '_sep'):
+            self._sep.setStyleSheet(
+                f"background: {COLORS['border']}; border: none; max-height: 1px;")
+        for row in self._rows.values():
+            row.apply_theme()
+
 
 # ---------------------------------------------------------------------------
 # GPUSingleView – komplett visning for én GPU
@@ -403,6 +434,28 @@ class GPUSingleView(QWidget, ScaleMixin):
 
     def on_scale_changed(self, _):
         pass  # gauges repaint themselves
+
+    def apply_theme(self):
+        if hasattr(self, '_chart_card'):
+            self._chart_card.setStyleSheet(f"""
+                QFrame {{
+                    background: {COLORS['bg_card']};
+                    border: none;
+                    border-radius: 10px;
+                }}
+            """)
+        if hasattr(self, '_chart_title_lbl'):
+            self._chart_title_lbl.setStyleSheet(
+                f"color: {COLORS['text_secondary']}; background: transparent; border: none;")
+        for attr in ('_s_clk', '_s_temp', '_s_stat', '_s_vram', '_s_sys'):
+            s = getattr(self, attr, None)
+            if s is not None:
+                s.apply_theme()
+        for g in (self._gauge_load, self._gauge_temp, self._gauge_vram,
+                  self._gauge_power, self._gauge_fan):
+            g.update()
+        if hasattr(self, '_chart'):
+            self._chart.update()
 
     def _build(self):
         root = QVBoxLayout(self)
@@ -479,6 +532,7 @@ class GPUSingleView(QWidget, ScaleMixin):
 
         # Ytelseskart
         chart_card = QFrame()
+        self._chart_card = chart_card
         chart_card.setStyleSheet(f"""
             QFrame {{
                 background: {COLORS['bg_card']};
@@ -490,6 +544,7 @@ class GPUSingleView(QWidget, ScaleMixin):
         cl.setContentsMargins(S.px(10), S.px(8), S.px(10), S.px(8))
         cl.setSpacing(S.px(4))
         ct = QLabel("Ytelse over tid")
+        self._chart_title_lbl = ct
         ct.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         ct.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent; border: none;")
         cl.addWidget(ct)
@@ -664,6 +719,12 @@ class GPUInfoView(QWidget):
 
         root.addStretch()
 
+    def apply_theme(self):
+        for attr in ('_s_drv', '_s_hw'):
+            s = getattr(self, attr, None)
+            if s is not None:
+                s.apply_theme()
+
     def update_gpu(self, gpu: dict):
         driver   = gpu.get('driver_version', '') or ''
         drv_dt   = gpu.get('driver_date', '') or ''
@@ -780,6 +841,7 @@ class GPUView(QWidget, ScaleMixin):
 
     def _make_header(self) -> QFrame:
         hdr = QFrame()
+        self._hdr_frame = hdr
         hdr.setFixedHeight(S.px(52))
         hdr.setStyleSheet(f"""
             QFrame {{
@@ -799,6 +861,7 @@ class GPUView(QWidget, ScaleMixin):
         hl.addWidget(self._status_dot)
 
         title = QLabel("GPU Monitor")
+        self._hdr_title_lbl = title
         title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         hl.addWidget(title)
@@ -989,6 +1052,17 @@ class GPUView(QWidget, ScaleMixin):
 
     def _apply_theme(self):
         """Update colors on existing widgets without rebuilding the layout."""
+        if hasattr(self, '_hdr_frame'):
+            self._hdr_frame.setStyleSheet(f"""
+                QFrame {{
+                    background: {COLORS['bg_card']};
+                    border-radius: 10px;
+                    border: none;
+                }}
+            """)
+        if hasattr(self, '_hdr_title_lbl'):
+            self._hdr_title_lbl.setStyleSheet(
+                f"color: {COLORS['text_primary']}; background: transparent;")
         if hasattr(self, '_tabs'):
             self._tabs.setStyleSheet(self._tab_css())
         if hasattr(self, '_no_gpu'):
@@ -1008,8 +1082,9 @@ class GPUView(QWidget, ScaleMixin):
                 f"color: {COLORS['bg_primary']}; background: {COLORS['accent_blue']}; "
                 f"border: none; border-radius: 4px; padding: 1px 6px;"
             )
-        # Force repaint of all GPU views (gauges and graphs read from COLORS at paint time)
         for view in self._gpu_views:
-            view.update()
-        # Trigger repaint of this widget
+            if hasattr(view, 'apply_theme'):
+                view.apply_theme()
+            else:
+                view.update()
         self.update()

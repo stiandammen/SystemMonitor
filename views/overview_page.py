@@ -49,7 +49,7 @@ class GlassMetricCard(QFrame):
                     border-radius: {S.px(12)}px;
                 }}
                 QFrame:hover {{
-                    background-color: rgba(35, 40, 70, 0.9);
+                    background-color: {colors.BG_HOVER};
                 }}
             """)
         else:
@@ -60,7 +60,7 @@ class GlassMetricCard(QFrame):
                     border-radius: {S.px(14)}px;
                 }}
                 QFrame:hover {{
-                    background-color: rgba(35, 40, 70, 0.9);
+                    background-color: {colors.BG_HOVER};
                 }}
             """)
 
@@ -635,7 +635,6 @@ class OverviewPage(QWidget, ScaleMixin):
         self._data_collector = data_collector
         self._start_time = time.time()
         self._uptime_seconds = 0
-        self._last_net = None
         self._net_down_mbps = 0.0
         self._net_up_mbps = 0.0
         self._last_data = {}
@@ -663,6 +662,26 @@ class OverviewPage(QWidget, ScaleMixin):
     def _rebuild_styles(self):
         colors = theme_manager.colors
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
+        if hasattr(self, '_main_scroll'):
+            self._main_scroll.setStyleSheet(f"""
+                QScrollArea {{
+                    background-color: {colors.BG_PRIMARY};
+                    border: none;
+                }}
+                QScrollBar:vertical {{
+                    background-color: {colors.BG_SECONDARY};
+                    width: 6px;
+                    border-radius: 3px;
+                }}
+                QScrollBar::handle:vertical {{
+                    background-color: {colors.ACCENT_GREEN_DIM};
+                    border-radius: 3px;
+                    min-height: 30px;
+                }}
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                    height: 0px;
+                }}
+            """)
 
     def _setup_ui(self):
         colors = theme_manager.colors
@@ -678,6 +697,7 @@ class OverviewPage(QWidget, ScaleMixin):
         main_layout.addWidget(self._header)
 
         scroll = QScrollArea()
+        self._main_scroll = scroll
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"""
@@ -691,7 +711,7 @@ class OverviewPage(QWidget, ScaleMixin):
                 border-radius: 3px;
             }}
             QScrollBar::handle:vertical {{
-                background-color: rgba(74, 108, 247, 0.3);
+                background-color: {colors.ACCENT_GREEN_DIM};
                 border-radius: 3px;
                 min-height: 30px;
             }}
@@ -1058,31 +1078,20 @@ class OverviewPage(QWidget, ScaleMixin):
 
         if 'network' in data:
             net = data['network']
-            bytes_sent = net.get('bytes_sent', 0)
-            bytes_recv = net.get('bytes_recv', 0)
-
-            if self._last_net:
-                dt = 1.0
-                down_speed = (bytes_recv - self._last_net[0]) / dt / 1e6
-                up_speed = (bytes_sent - self._last_net[1]) / dt / 1e6
-
-                self._net_down_mbps = max(0, down_speed)
-                self._net_up_mbps = max(0, up_speed)
-
-                self._net_card.set_value(
-                    f"{self._net_down_mbps:.1f} / {self._net_up_mbps:.1f}",
-                    "Down / Up Mbps"
-                )
-                self._net_sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
-
-            self._last_net = (bytes_sent, bytes_recv)
+            self._net_down_mbps = max(0, net.get('download_speed', 0)) / 1e6
+            self._net_up_mbps   = max(0, net.get('upload_speed',   0)) / 1e6
+            self._net_card.set_value(
+                f"{self._net_down_mbps:.1f} / {self._net_up_mbps:.1f}",
+                "Down / Up Mbps"
+            )
+            self._net_sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
 
         if 'disk' in data:
             disk = data['disk']
-            read_speed = disk.get('read_speed', 0)
-            write_speed = disk.get('write_speed', 0)
+            read_mb  = max(0, disk.get('read_rate',  0)) / 1_048_576
+            write_mb = max(0, disk.get('write_rate', 0)) / 1_048_576
             self._disk_card.set_value(
-                f"{read_speed:.0f} / {write_speed:.0f}",
+                f"{read_mb:.1f} / {write_mb:.1f}",
                 "R/W MB/s"
             )
 
