@@ -1,9 +1,13 @@
 {
+    "python.defaultInterpreterPath": ".venv/Scripts/python.exe",
     "python.analysis.extraPaths": [],
     "python.analysis.autoImportCompletions": true,
-    "pyright.diagnostics.reportAttributeAccessIssue": false,
-    "python.analysis.diagnostics": {
-        "reportAttributeAccessIssue": false
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportArgumentType": "none",
+        "reportAttributeAccessIssue": "none",
+        "reportOptionalMemberAccess": "none",
+        "reportMissingModuleSource": "none"
     },
     "python-envs.defaultEnvManager": "ms-python.python:system"
 }

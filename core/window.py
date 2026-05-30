@@ -6,14 +6,121 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QStackedWidget, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer, QSize
-from PyQt6.QtGui import QFont, QPainter, QPen, QColor, QIcon, QCursor
+from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer, QSize, QRectF
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor, QIcon, QCursor, QBrush
 
 from widgets.glass_sidebar import GlassSidebar
 from widgets.responsive import OverlayWidget
 from styles.theme import theme_manager
 from scaler import S, ScaleMixin, LayoutMode
 from utils.logger import get_logger, LogCategory, log_info, log_debug
+
+
+class WinControlBtn(QWidget):
+    """
+    Window control button (minimize / maximize / restore / close) drawn
+    entirely with QPainter — no Unicode glyphs, identical on every OS/font.
+    """
+
+    clicked = __import__('PyQt6.QtCore', fromlist=['pyqtSignal']).pyqtSignal()
+
+    # kind: "min" | "max" | "restore" | "close"
+    def __init__(self, kind: str, parent=None):
+        super().__init__(parent)
+        self._kind = kind
+        self._hovered = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(S.px(36), S.px(28))
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+    def set_kind(self, kind: str):
+        self._kind = kind
+        self.update()
+
+    # ── events ────────────────────────────────────────────────────────────
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.pos()):
+            self.clicked.emit()
+            event.accept()
+
+    # ── painting ──────────────────────────────────────────────────────────
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        c = theme_manager.colors
+        w, h = self.width(), self.height()
+        r = S.px(6)
+
+        # Background
+        if self._hovered:
+            bg = QColor(c.ACCENT_RED if self._kind == "close" else c.BG_HOVER)
+            p.setBrush(QBrush(bg))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(0, 0, w, h, r, r)
+
+        # Icon colour
+        if self._hovered and self._kind == "close":
+            icon_color = QColor("#ffffff")
+        elif self._hovered:
+            icon_color = QColor(c.TEXT_PRIMARY)
+        else:
+            icon_color = QColor(c.TEXT_MUTED)
+
+        pen = QPen(icon_color)
+        pen.setWidthF(S.px(1.5))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+
+        cx, cy = w / 2, h / 2
+        sz = S.px(10)          # icon bounding box half-size
+        thin = S.px(9)
+
+        if self._kind == "min":
+            # Horizontal line, centred, sitting at 65 % height
+            y = cy + S.px(3)
+            p.drawLine(int(cx - thin), int(y), int(cx + thin), int(y))
+
+        elif self._kind == "max":
+            # Rectangle outline
+            rect = QRectF(cx - sz, cy - sz, sz * 2, sz * 2)
+            p.drawRect(rect)
+
+        elif self._kind == "restore":
+            # Back rectangle (offset top-right)
+            off = S.px(3)
+            back = QRectF(cx - sz + off, cy - sz - off, sz * 2 - off, sz * 2 - off)
+            p.drawRect(back)
+            # Front rectangle (offset bottom-left), filled to hide back
+            front_bg = QColor(c.ACCENT_RED if self._hovered else c.BG_CARD)
+            p.setBrush(QBrush(front_bg))
+            front = QRectF(cx - sz - off + S.px(1), cy - sz + off + S.px(1),
+                           sz * 2 - off, sz * 2 - off)
+            p.drawRect(front)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+
+        elif self._kind == "close":
+            # X
+            p.drawLine(int(cx - sz), int(cy - sz), int(cx + sz), int(cy + sz))
+            p.drawLine(int(cx + sz), int(cy - sz), int(cx - sz), int(cy + sz))
+
+        p.end()
 
 
 class TitleBar(QWidget, ScaleMixin):
@@ -74,50 +181,17 @@ class TitleBar(QWidget, ScaleMixin):
         self._create_buttons(layout)
 
     def _create_buttons(self, layout):
-        colors = theme_manager.colors
+        min_btn = WinControlBtn("min")
+        min_btn.clicked.connect(self._minimize_window)
+        layout.addWidget(min_btn)
 
-        for text, slot, style_key in [
-            ("─", self._minimize_window, "min"),
-            ("□", self._toggle_maximize, "max"),
-            ("✕", self._close_window, "close"),
-        ]:
-            btn = QPushButton()
-            btn.setFixedSize(S.px(36), S.px(28))
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setText(text)
-            btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._max_btn = WinControlBtn("max")
+        self._max_btn.clicked.connect(self._toggle_maximize)
+        layout.addWidget(self._max_btn)
 
-            if style_key == "close":
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: transparent;
-                        color: {colors.TEXT_MUTED};
-                        border: none;
-                        border-radius: {S.px(6)}px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {colors.ACCENT_RED};
-                        color: white;
-                    }}
-                """)
-            else:
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: transparent;
-                        color: {colors.TEXT_MUTED};
-                        border: none;
-                        border-radius: {S.px(6)}px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {colors.BG_HOVER};
-                        color: {colors.TEXT_PRIMARY};
-                    }}
-                """)
-
-            btn.clicked.connect(slot)
-            layout.addWidget(btn)
-            if style_key == "max":
-                self._max_btn = btn
+        close_btn = WinControlBtn("close")
+        close_btn.clicked.connect(self._close_window)
+        layout.addWidget(close_btn)
 
     def _minimize_window(self):
         if self._parent:
@@ -127,11 +201,11 @@ class TitleBar(QWidget, ScaleMixin):
         if self._parent:
             if self._maximized:
                 self._parent.showNormal()
-                self._max_btn.setText("□")
+                self._max_btn.set_kind("max")
                 self._maximized = False
             else:
                 self._parent.showMaximized()
-                self._max_btn.setText("❐")
+                self._max_btn.set_kind("restore")
                 self._maximized = True
 
     def _close_window(self):
@@ -148,7 +222,7 @@ class TitleBar(QWidget, ScaleMixin):
         if event.buttons() == Qt.MouseButton.LeftButton and self._drag_position:
             if self._maximized:
                 self._parent.showNormal()
-                self._max_btn.setText("□")
+                self._max_btn.set_kind("max")
                 self._maximized = False
                 self._drag_position = event.globalPos() - self._parent.frameGeometry().topLeft()
             self._parent.move(event.globalPos() - self._drag_position)
@@ -164,10 +238,10 @@ class TitleBar(QWidget, ScaleMixin):
         if event.type() == QEvent.Type.WindowStateChange:
             if self._parent:
                 if self._parent.isMaximized():
-                    self._max_btn.setText("❐")
+                    self._max_btn.set_kind("restore")
                     self._maximized = True
                 else:
-                    self._max_btn.setText("□")
+                    self._max_btn.set_kind("max")
                     self._maximized = False
         super().changeEvent(event)
 
@@ -236,24 +310,15 @@ class TopHeader(QWidget, ScaleMixin):
         spacer.setCursor(Qt.CursorShape.SizeAllCursor)
         layout.addWidget(spacer, stretch=1)
 
-        self._min_btn = QPushButton("─")
-        self._min_btn.setFixedSize(S.px(36), S.px(28))
-        self._min_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._min_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._min_btn = WinControlBtn("min")
         self._min_btn.clicked.connect(self._minimize_window)
         layout.addWidget(self._min_btn)
 
-        self._max_btn = QPushButton("□")
-        self._max_btn.setFixedSize(S.px(36), S.px(28))
-        self._max_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._max_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._max_btn = WinControlBtn("max")
         self._max_btn.clicked.connect(self._toggle_maximize)
         layout.addWidget(self._max_btn)
 
-        self._close_btn = QPushButton("✕")
-        self._close_btn.setFixedSize(S.px(36), S.px(28))
-        self._close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._close_btn.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        self._close_btn = WinControlBtn("close")
         self._close_btn.clicked.connect(self._close_window)
         layout.addWidget(self._close_btn)
 
@@ -283,49 +348,12 @@ class TopHeader(QWidget, ScaleMixin):
                 border-radius: {S.px(8)}px;
             """)
 
-        if hasattr(self, '_close_btn'):
-            self._close_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {colors.TEXT_MUTED};
-                    border: none;
-                    border-radius: {S.px(6)}px;
-                }}
-                QPushButton:hover {{
-                    background-color: {colors.ACCENT_RED};
-                    color: white;
-                }}
-            """)
-
-        for btn in [getattr(self, '_min_btn', None), getattr(self, '_max_btn', None)]:
-            if btn is None:
-                continue
-            if is_heimdal:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: #8A92B2;
-                        border: none;
-                        border-radius: 6px;
-                    }
-                    QPushButton:hover {
-                        background-color: #252A47;
-                        color: #E8ECFF;
-                    }
-                """)
-            else:
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: transparent;
-                        color: {colors.TEXT_MUTED};
-                        border: none;
-                        border-radius: {S.px(6)}px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {colors.BG_HOVER};
-                        color: {colors.TEXT_PRIMARY};
-                    }}
-                """)
+        # WinControlBtn reads theme_manager.colors directly in paintEvent — just repaint
+        for btn in [getattr(self, '_min_btn', None),
+                    getattr(self, '_max_btn', None),
+                    getattr(self, '_close_btn', None)]:
+            if btn is not None:
+                btn.update()
 
     def _minimize_window(self):
         if self._parent:
@@ -335,11 +363,11 @@ class TopHeader(QWidget, ScaleMixin):
         if self._parent:
             if self._maximized:
                 self._parent.showNormal()
-                self._max_btn.setText("□")
+                self._max_btn.set_kind("max")
                 self._maximized = False
             else:
                 self._parent.showMaximized()
-                self._max_btn.setText("❐")
+                self._max_btn.set_kind("restore")
                 self._maximized = True
 
     def _close_window(self):
@@ -356,7 +384,7 @@ class TopHeader(QWidget, ScaleMixin):
         if event.buttons() == Qt.MouseButton.LeftButton and self._drag_position:
             if self._maximized:
                 self._parent.showNormal()
-                self._max_btn.setText("□")
+                self._max_btn.set_kind("max")
                 self._maximized = False
                 self._drag_position = event.globalPos() - self._parent.frameGeometry().topLeft()
             self._parent.move(event.globalPos() - self._drag_position)
@@ -372,10 +400,10 @@ class TopHeader(QWidget, ScaleMixin):
         if event.type() == QEvent.Type.WindowStateChange:
             if self._parent:
                 if self._parent.isMaximized():
-                    self._max_btn.setText("❐")
+                    self._max_btn.set_kind("restore")
                     self._maximized = True
                 else:
-                    self._max_btn.setText("□")
+                    self._max_btn.set_kind("max")
                     self._maximized = False
         super().changeEvent(event)
 
@@ -425,18 +453,26 @@ class MainWindow(QMainWindow, ScaleMixin):
             }
 
             if view_name in view_classes:
-                self._view_cache[view_name] = view_classes[view_name]()
-                self._content.addWidget(self._view_cache[view_name])
+                view = view_classes[view_name]()
+                self._view_cache[view_name] = view
+                self._content.addWidget(view)
+                if view_name == 'settings' and hasattr(view, 'signals_changed'):
+                    view.signals_changed.connect(self._on_settings_changed)
 
         return self._view_cache[view_name]
+
+    def _on_settings_changed(self, key: str, value):
+        if key == 'ui_scale':
+            from scaler import S
+            S.set_user_scale(float(value))
 
     def on_scale_changed(self, factor: float):
         if self._in_drag_resize:
             self._pending_scale_update = True
             return
+        self._pending_scale_update = False
         log_debug(LogCategory.WINDOW, f"Scale changed: {factor}")
-        self._pending_scale_update = True
-        QTimer.singleShot(100, self._debounced_setup_ui)
+        self._apply_scale_to_frame()
 
     def on_layout_mode_changed(self, mode):
         if self._in_drag_resize:
@@ -447,12 +483,16 @@ class MainWindow(QMainWindow, ScaleMixin):
         else:
             if hasattr(self, '_sidebar') and self._sidebar._collapsed:
                 self._sidebar._toggle_collapse()
-        self._debounced_setup_ui()
 
-    def _debounced_setup_ui(self):
-        if not self._in_drag_resize:
-            self._setup_ui()
-            self.update()
+    def _apply_scale_to_frame(self):
+        """Update only the window frame elements — views rebuild themselves via ScaleMixin."""
+        self.setMinimumSize(S.px(700), S.px(500))
+        if hasattr(self, '_top_header'):
+            self._top_header._setup_ui()
+        if hasattr(self, '_resize_corner'):
+            self._resize_corner.setMinimumSize(S.px(16), S.px(16))
+            self._resize_corner.setMaximumSize(S.px(24), S.px(24))
+            self._update_resize_corner_position()
 
     def _on_theme_changed(self, theme_name: str):
         try:
@@ -618,10 +658,9 @@ class MainWindow(QMainWindow, ScaleMixin):
             self._drag_position = None
             was_resizing = self._in_drag_resize
             self._in_drag_resize = False
-            if hasattr(self, '_pending_scale_update') and self._pending_scale_update:
+            if self._pending_scale_update:
                 self._pending_scale_update = False
-                self._setup_ui()
-                self.update()
+                self._apply_scale_to_frame()
             event.accept()
 
     def resizeEvent(self, event):

@@ -108,7 +108,10 @@ class DataCollectorCoordinator(QObject):
     def _emit_data(self):
         """Emit aggregated data to UI (debounced)"""
         self._pending_update = False
-        self.data_ready.emit(self._aggregated_data.copy())
+        snapshot = self._aggregated_data.copy()
+        self.data_ready.emit(snapshot)
+        from core.signals import signal_bus
+        signal_bus.data_updated.emit(snapshot)
 
     def _on_system_info_update(self, data: dict):
         """Handle system info updates"""

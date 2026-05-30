@@ -48,7 +48,7 @@ class PremiumNavItem(QPushButton, ScaleMixin):
     clicked_with_name = pyqtSignal(str)
 
     def __init__(self, key: str, label: str, icon_name: str,
-                 accent: str = None, parent=None):
+                 accent: str | None = None, parent=None):
         super().__init__(parent)
         self._key = key
         self._label = label

@@ -13,6 +13,8 @@ from PyQt6.QtGui import QFont
 
 from config import settings
 from utils.autostart import AutostartManager
+from utils.exporters import DataExporter
+from core.signals import signal_bus
 from scaler import S, ScaleMixin
 from styles.theme import theme_manager
 from widgets.card import Card
@@ -29,6 +31,10 @@ class SettingsView(QWidget, ScaleMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._path_label = None
+        self._last_data: dict = {}
+        self._exporter = DataExporter()
+        self._exporter.export_completed.connect(self._on_export_result)
+        signal_bus.data_updated.connect(self._on_data_updated)
         self.scale_connect()
         theme_manager.theme_changed.connect(self._on_theme_changed)
         self._setup_ui()
@@ -480,8 +486,8 @@ class SettingsView(QWidget, ScaleMixin):
         c = _c()
         card = Card(title="Data & Export", icon="💾")
 
-        fmt_vals  = ["csv", "json", "excel"]
-        fmt_names = ["CSV", "JSON", "Excel"]
+        fmt_vals  = ["csv", "json", "txt"]
+        fmt_names = ["CSV", "JSON", "Plain text"]
         fmt_combo = self._combo(fmt_names, fmt_vals,
                                 settings.get('export_format', 'csv'))
         fmt_combo.currentIndexChanged.connect(
@@ -515,7 +521,16 @@ class SettingsView(QWidget, ScaleMixin):
             Qt.TextInteractionFlag.TextSelectableByMouse)
         self._path_label.setCursor(Qt.CursorShape.IBeamCursor)
         card.add_widget(self._row(
-            "Current path", "", self._path_label, last=True))
+            "Current path", "", self._path_label
+        ))
+
+        export_btn = self._btn("Export now", accent=True)
+        export_btn.clicked.connect(self._on_export_now)
+        card.add_widget(self._row(
+            "Export snapshot",
+            "Save a snapshot of current system metrics to the export folder",
+            export_btn, last=True
+        ))
         parent.addWidget(card)
 
     def _build_maintenance_section(self, parent: QVBoxLayout):
@@ -548,6 +563,9 @@ class SettingsView(QWidget, ScaleMixin):
             "You are running the latest version.\n\nVersion: 1.0.0\nNo updates available.",
             QMessageBox.StandardButton.Ok)
 
+    def _on_data_updated(self, data: dict):
+        self._last_data = data
+
     def _on_browse_export_directory(self):
         current = settings.get('export_directory',
                                str(Path.home() / 'Documents'))
@@ -558,6 +576,34 @@ class SettingsView(QWidget, ScaleMixin):
             self._on_setting_changed('export_directory', directory)
             if self._path_label:
                 self._path_label.setText(directory)
+
+    def _on_export_now(self):
+        if not self._last_data:
+            QMessageBox.warning(
+                self, "No Data",
+                "No monitoring data available yet.\nPlease wait a moment and try again.",
+                QMessageBox.StandardButton.Ok)
+            return
+
+        fmt = settings.get('export_format', 'csv')
+        export_dir = settings.get('export_directory', str(Path.home() / 'Documents'))
+
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"system_monitor_{timestamp}.{fmt}"
+        filepath = str(Path(export_dir) / filename)
+
+        self._exporter.export_snapshot(self._last_data, filepath, fmt)
+
+    def _on_export_result(self, success: bool, message: str):
+        if success:
+            QMessageBox.information(
+                self, "Export Successful", message,
+                QMessageBox.StandardButton.Ok)
+        else:
+            QMessageBox.critical(
+                self, "Export Failed", message,
+                QMessageBox.StandardButton.Ok)
 
     def _on_reset_clicked(self):
         reply = QMessageBox.question(

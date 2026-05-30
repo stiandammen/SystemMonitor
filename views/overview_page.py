@@ -24,7 +24,7 @@ from scaler import S, ScaleMixin, LayoutMode
 class GlassMetricCard(QFrame):
     """Premium glass metric card - responsive with minimum sizes"""
 
-    def __init__(self, title: str, icon: str, color: str = None, parent=None):
+    def __init__(self, title: str, icon: str, color: str | None = None, parent=None):
         super().__init__(parent)
         self._color = color or theme_manager.colors.ACCENT_GREEN
         self._title = title
@@ -115,7 +115,7 @@ class GlassMetricCard(QFrame):
 class GlassChartPanel(QFrame):
     """Premium glass chart panel with title and sparkline - responsive"""
 
-    def __init__(self, title: str, color: str = None, parent=None):
+    def __init__(self, title: str, color: str | None = None, parent=None):
         super().__init__(parent)
         self._title = title
         self._color = color or theme_manager.colors.ACCENT_GREEN
@@ -228,7 +228,7 @@ class GlassInfoPanel(QFrame):
         self._content.setSpacing(0)
         layout.addLayout(self._content)
 
-    def add_info_row(self, label: str, value: str, color: str = None):
+    def add_info_row(self, label: str, value: str, color: str | None = None):
         row = QFrame()
         row.setStyleSheet("background: transparent;")
 
@@ -635,6 +635,7 @@ class OverviewPage(QWidget, ScaleMixin):
         self._data_collector = data_collector
         self._start_time = time.time()
         self._uptime_seconds = 0
+        self._last_net = None
         self._net_down_mbps = 0.0
         self._net_up_mbps = 0.0
         self._last_data = {}
@@ -651,39 +652,33 @@ class OverviewPage(QWidget, ScaleMixin):
         self._data_collector = collector
 
     def _on_theme_changed(self, theme_name: str):
-        self._rebuild_styles()
+        QTimer.singleShot(0, self._rebuild_and_restore)
 
     def on_scale_changed(self, factor: float):
-        self._rebuild_styles()
+        QTimer.singleShot(0, self._rebuild_and_restore)
 
     def on_layout_mode_changed(self, mode):
-        self._rebuild_styles()
+        QTimer.singleShot(0, self._rebuild_and_restore)
 
-    def _rebuild_styles(self):
-        colors = theme_manager.colors
-        self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
-        if hasattr(self, '_main_scroll'):
-            self._main_scroll.setStyleSheet(f"""
-                QScrollArea {{
-                    background-color: {colors.BG_PRIMARY};
-                    border: none;
-                }}
-                QScrollBar:vertical {{
-                    background-color: {colors.BG_SECONDARY};
-                    width: 6px;
-                    border-radius: 3px;
-                }}
-                QScrollBar::handle:vertical {{
-                    background-color: {colors.ACCENT_GREEN_DIM};
-                    border-radius: 3px;
-                    min-height: 30px;
-                }}
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                    height: 0px;
-                }}
-            """)
+    def _rebuild_and_restore(self):
+        self._setup_ui()
+        if self._last_data:
+            self.update_data(self._last_data)
 
     def _setup_ui(self):
+        # Clear previous layout if this is a rebuild
+        old = self.layout()
+        if old:
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
+
         colors = theme_manager.colors
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1010,7 +1005,7 @@ class OverviewPage(QWidget, ScaleMixin):
                 self._system_info_cache['gpu_name'] = name
                 self._system_info_cache_time = now
                 return name
-        except:
+        except Exception:
             pass
         return "N/A"
 
@@ -1049,7 +1044,6 @@ class OverviewPage(QWidget, ScaleMixin):
     def update_data(self, data):
         """Called by MainWindow whenever new data arrives"""
         self._last_data = data
-        colors = theme_manager.colors
 
         if 'cpu' in data:
             cpu = data['cpu']
@@ -1078,20 +1072,31 @@ class OverviewPage(QWidget, ScaleMixin):
 
         if 'network' in data:
             net = data['network']
-            self._net_down_mbps = max(0, net.get('download_speed', 0)) / 1e6
-            self._net_up_mbps   = max(0, net.get('upload_speed',   0)) / 1e6
-            self._net_card.set_value(
-                f"{self._net_down_mbps:.1f} / {self._net_up_mbps:.1f}",
-                "Down / Up Mbps"
-            )
-            self._net_sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
+            bytes_sent = net.get('bytes_sent', 0)
+            bytes_recv = net.get('bytes_recv', 0)
+
+            if self._last_net:
+                dt = 1.0
+                down_speed = (bytes_recv - self._last_net[0]) / dt / 1e6
+                up_speed = (bytes_sent - self._last_net[1]) / dt / 1e6
+
+                self._net_down_mbps = max(0, down_speed)
+                self._net_up_mbps = max(0, up_speed)
+
+                self._net_card.set_value(
+                    f"{self._net_down_mbps:.1f} / {self._net_up_mbps:.1f}",
+                    "Down / Up Mbps"
+                )
+                self._net_sparkline.push_multi([self._net_down_mbps, self._net_up_mbps])
+
+            self._last_net = (bytes_sent, bytes_recv)
 
         if 'disk' in data:
             disk = data['disk']
-            read_mb  = max(0, disk.get('read_rate',  0)) / 1_048_576
-            write_mb = max(0, disk.get('write_rate', 0)) / 1_048_576
+            read_speed = disk.get('read_speed', 0)
+            write_speed = disk.get('write_speed', 0)
             self._disk_card.set_value(
-                f"{read_mb:.1f} / {write_mb:.1f}",
+                f"{read_speed:.0f} / {write_speed:.0f}",
                 "R/W MB/s"
             )
 

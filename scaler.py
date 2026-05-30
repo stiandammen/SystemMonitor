@@ -43,6 +43,8 @@ class _ScreenScaler:
         self.dpi_ratio     = 1.0
         self._screen: QScreen | None = None
         self._app: QApplication | None = None
+        self._base_scale   = 1.0
+        self._user_scale   = 1.0
         self._geometry_timer = QTimer()
         self._geometry_timer.setSingleShot(True)
         self._geometry_timer.timeout.connect(self._delayed_compute)
@@ -103,8 +105,10 @@ class _ScreenScaler:
         else:                     size_adj = 1.00
 
         raw = (dpi_scale * 0.55 + res_scale * 0.45) * size_adj
-        self.scale_factor = max(0.60, min(2.20, raw))
-        self.font_scale   = max(0.70, min(2.00, raw * 0.94))
+        self._base_scale = raw
+        effective = raw * self._user_scale
+        self.scale_factor = max(0.60, min(2.20, effective))
+        self.font_scale   = max(0.70, min(2.00, effective * 0.94))
 
         old_mode = self.layout_mode
         if self.screen_width < self.COMPACT_THRESHOLD:
@@ -142,6 +146,14 @@ class _ScreenScaler:
 
     def is_expanded(self) -> bool:
         return self.layout_mode == LayoutMode.EXPANDED
+
+    def set_user_scale(self, factor: float):
+        """Apply a user-defined scale multiplier on top of the auto-detected scale."""
+        self._user_scale = max(0.5, min(2.5, factor))
+        effective = self._base_scale * self._user_scale
+        self.scale_factor = max(0.60, min(2.20, effective))
+        self.font_scale = max(0.70, min(2.00, effective * 0.94))
+        _signals.scale_changed.emit(self.scale_factor)
 
     def grid_columns(self, max_cols: int = 3) -> int:
         if self.screen_width < 1200:

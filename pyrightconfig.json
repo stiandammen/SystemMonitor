@@ -1,13 +1,10 @@
 {
-    "typeChecking": "basic",
+    "typeCheckingMode": "basic",
+    "venvPath": ".",
+    "venv": ".venv",
+    "reportArgumentType": "none",
     "reportAttributeAccessIssue": false,
     "reportOptionalMemberAccess": false,
-    "executionEnvironments": [
-        {
-            "root": "D:/Prosjekter/SystemMonitor",
-            "extraPaths": [
-                "C:/Users/RSman/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
-            ]
-        }
-    ]
+    "reportMissingModuleSource": false,
+    "reportUndefinedVariable": "warning"
 }

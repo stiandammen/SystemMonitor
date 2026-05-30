@@ -72,6 +72,12 @@ def main():
         from scaler import init_scaler, S, LayoutMode
         init_scaler(app)
 
+        # Apply saved UI scale preference
+        from config import settings as app_settings
+        saved_scale = app_settings.get('ui_scale', 1.0)
+        if saved_scale and float(saved_scale) != 1.0:
+            S.set_user_scale(float(saved_scale))
+
         # Apply mode overrides from command line
         if args.compact:
             S.layout_mode = LayoutMode.COMPACT

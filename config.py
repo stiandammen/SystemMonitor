@@ -79,6 +79,7 @@ class SettingsManager:
         'theme': 'midnight',
         'accent_color': '#10b981',
         'sidebar_collapsed': False,
+        'ui_scale': 1.0,
 
         # Performance
         'update_interval': 500,
