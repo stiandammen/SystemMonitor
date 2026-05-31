@@ -115,7 +115,6 @@ class SettingsView(QWidget, ScaleMixin):
 
         self._build_general_section(content_layout)
         self._build_appearance_section(content_layout)
-        self._build_monitoring_section(content_layout)
         self._build_alerts_section(content_layout)
         self._build_data_section(content_layout)
         self._build_maintenance_section(content_layout)
@@ -430,38 +429,6 @@ class SettingsView(QWidget, ScaleMixin):
         ))
         parent.addWidget(card)
 
-    def _build_monitoring_section(self, parent: QVBoxLayout):
-        card = Card(title="Monitoring", icon="📊")
-
-        card.add_widget(self._row(
-            "Show GPU monitoring",
-            "Display graphics card utilization, temperature and memory usage",
-            self._make_toggle('show_gpu', True)
-        ))
-        card.add_widget(self._row(
-            "Show Network monitoring",
-            "Display interface traffic, bandwidth and connection statistics",
-            self._make_toggle('show_network', True)
-        ))
-
-        interval_vals  = [250, 500, 1000, 2000]
-        interval_names = [
-            "250 ms  —  Real-time",
-            "500 ms  —  Balanced",
-            "1000 ms  —  Power-saving",
-            "2000 ms  —  Low-power",
-        ]
-        interval_combo = self._combo(interval_names, interval_vals,
-                                     settings.get('update_interval', 500))
-        interval_combo.currentIndexChanged.connect(
-            lambda i: self._on_setting_changed('update_interval', interval_vals[i]))
-        card.add_widget(self._row(
-            "Update frequency",
-            "How often monitoring data is refreshed and charts are redrawn",
-            interval_combo, last=True
-        ))
-        parent.addWidget(card)
-
     def _build_alerts_section(self, parent: QVBoxLayout):
         card = Card(title="Alerts & Notifications", icon="🔔")
 
@@ -471,14 +438,24 @@ class SettingsView(QWidget, ScaleMixin):
             self._make_toggle('alerts_enabled', True)
         ))
 
-        threshold = settings.get('alert_cpu_threshold', 80)
-        ctrl, slider = self._slider_row(50, 100, threshold)
-        slider.valueChanged.connect(
+        cpu_thresh = settings.get('alert_cpu_threshold', 80)
+        ctrl_cpu, slider_cpu = self._slider_row(50, 100, cpu_thresh)
+        slider_cpu.valueChanged.connect(
             lambda v: self._on_setting_changed('alert_cpu_threshold', v))
         card.add_widget(self._row(
             "CPU alert threshold",
             "Send an alert when CPU usage exceeds this percentage",
-            ctrl, last=True
+            ctrl_cpu
+        ))
+
+        gpu_thresh = settings.get('alert_gpu_threshold', 85)
+        ctrl_gpu, slider_gpu = self._slider_row(50, 110, gpu_thresh)
+        slider_gpu.valueChanged.connect(
+            lambda v: self._on_setting_changed('alert_gpu_threshold', v))
+        card.add_widget(self._row(
+            "GPU temperature threshold",
+            "Send an alert when GPU temperature exceeds this value (°C)",
+            ctrl_gpu, last=True
         ))
         parent.addWidget(card)
 
@@ -556,6 +533,7 @@ class SettingsView(QWidget, ScaleMixin):
     def _on_setting_changed(self, key: str, value):
         settings.set(key, value)
         self.signals_changed.emit(key, value)
+        signal_bus.setting_changed.emit(key, value)
 
     def _on_check_for_updates(self):
         QMessageBox.information(

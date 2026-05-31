@@ -219,3 +219,8 @@ class AlertManager(QObject):
         """Enable or disable a rule"""
         if rule_id in self._rules:
             self._rules[rule_id].enabled = enabled
+
+    def set_globally_enabled(self, enabled: bool):
+        """Enable or disable all alert rules at once"""
+        for rule in self._rules.values():
+            rule.enabled = enabled

@@ -214,10 +214,5 @@ def scaled_stylesheet(template: str) -> str:
 
 
 def init_scaler(app: QApplication):
-    from PyQt6.QtCore import Qt
-    try:
-        app.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-    except Exception:
-        pass
     S.init(app)
     print(f"[Scaler init] {S.info()}")

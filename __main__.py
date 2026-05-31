@@ -3,9 +3,6 @@ System Monitor - Main Entry Point
 Responsive, professional enterprise-grade performance monitoring
 """
 import os
-os.environ["QT_ENABLE_HIGH_DPI_SCALING"] = "1"
-os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
-os.environ["QT_SCALE_FACTOR_ROUNDING_POLICY"] = "PassThrough"
 import sys
 import argparse
 import traceback
@@ -42,17 +39,14 @@ def main():
     try:
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import Qt
+        QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
         log_info(LogCategory.APP, "PyQt6 imported OK")
     except Exception as e:
         log_error(LogCategory.APP, f"Failed to import PyQt6: {e}\n{traceback.format_exc()}")
         return 1
 
     try:
-        # Enable High DPI scaling before QApplication
-        QApplication.setHighDpiScaleFactorRoundingPolicy(
-            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-        )
-
         app = QApplication(sys.argv)
         app.setApplicationName("SystemMonitor")
         app.setApplicationVersion("2.0")
@@ -96,6 +90,47 @@ def main():
         theme_manager = ThemeManager()
         app.setStyleSheet(theme_manager.get_stylesheet())
         log_info(LogCategory.APP, "Theme applied OK")
+
+        # System tray for alert notifications (cross-platform via Qt)
+        from PyQt6.QtWidgets import QSystemTrayIcon
+        from PyQt6.QtGui import QPixmap, QPainter, QColor, QIcon
+        from PyQt6.QtCore import QSize, Qt as _Qt
+
+        def _build_tray_icon():
+            px = QPixmap(QSize(16, 16))
+            px.fill(QColor(0, 0, 0, 0))
+            p = QPainter(px)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setBrush(QColor(16, 185, 129))
+            p.setPen(_Qt.PenStyle.NoPen)
+            p.drawEllipse(1, 1, 14, 14)
+            p.end()
+            return QIcon(px)
+
+        tray = QSystemTrayIcon(app)
+        tray.setIcon(_build_tray_icon())
+        tray.setToolTip("System Monitor")
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            tray.show()
+            log_info(LogCategory.APP, "System tray initialized")
+
+        from core.signals import signal_bus as _signal_bus
+
+        def _show_alert(alert_dict):
+            if not tray.isVisible():
+                return
+            level = alert_dict.get('level', 'warning')
+            icon_type = (QSystemTrayIcon.MessageIcon.Critical
+                         if level in ('critical', 'CRITICAL')
+                         else QSystemTrayIcon.MessageIcon.Warning)
+            tray.showMessage(
+                "System Monitor",
+                alert_dict.get('message', 'System threshold exceeded'),
+                icon_type,
+                6000,
+            )
+
+        _signal_bus.alert_triggered.connect(_show_alert)
 
         if args.overlay:
             # Start in overlay/widget mode

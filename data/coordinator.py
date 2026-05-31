@@ -40,6 +40,9 @@ class DataCollectorCoordinator(QObject):
 
         self._pending_update = False
 
+        self._alert_manager = None
+        self._alerts_ready = False
+
     def start(self):
         """Start all data collection threads"""
         log_info(LogCategory.COLLECTOR, "Starting DataCollectorCoordinator")
@@ -86,6 +89,8 @@ class DataCollectorCoordinator(QObject):
 
         log_info(LogCategory.COLLECTOR, f"Started {len(self._collectors)} collector threads")
 
+        self._init_alerts()
+
     def stop(self):
         """Stop all data collection threads"""
         log_info(LogCategory.COLLECTOR, "Stopping DataCollectorCoordinator")
@@ -95,6 +100,95 @@ class DataCollectorCoordinator(QObject):
             collector.wait(2000)  # Wait up to 2 seconds for thread to finish
 
         self._collectors.clear()
+
+    def _init_alerts(self):
+        """Initialize alert system and wire it to settings"""
+        try:
+            from data.alerts import AlertManager
+            from config import settings
+            from core.signals import signal_bus
+
+            self._alert_manager = AlertManager()
+
+            # Apply saved thresholds and enabled state
+            self._alert_manager.set_globally_enabled(settings.get('alerts_enabled', True))
+            self._alert_manager.update_rule_threshold(
+                'cpu_percent', float(settings.get('alert_cpu_threshold', 80)))
+            self._alert_manager.update_rule_threshold(
+                'gpu_temperature', float(settings.get('alert_gpu_threshold', 85)))
+
+            # Forward triggered alerts to the global signal bus
+            self._alert_manager.alert_triggered.connect(self._on_alert_triggered)
+
+            # React to settings changes from the UI
+            signal_bus.setting_changed.connect(self._on_setting_changed)
+
+            self._alerts_ready = True
+            log_info(LogCategory.COLLECTOR, "Alert system initialized")
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Alert system init failed: {e}")
+
+    def _on_alert_triggered(self, alert):
+        """Convert Alert object to dict and forward to signal bus"""
+        try:
+            from core.signals import signal_bus
+            level_val = (alert.rule.level.value
+                         if hasattr(alert.rule.level, 'value')
+                         else str(alert.rule.level))
+            signal_bus.alert_triggered.emit({
+                'id': alert.id,
+                'metric': alert.rule.metric,
+                'value': alert.value,
+                'threshold': alert.rule.threshold,
+                'level': level_val,
+                'message': alert.message,
+                'timestamp': alert.timestamp,
+            })
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Alert forward failed: {e}")
+
+    def _on_setting_changed(self, key: str, value):
+        """Update alert rules when relevant settings change"""
+        if self._alert_manager is None:
+            return
+        try:
+            if key == 'alerts_enabled':
+                self._alert_manager.set_globally_enabled(bool(value))
+            elif key == 'alert_cpu_threshold':
+                self._alert_manager.update_rule_threshold('cpu_percent', float(value))
+            elif key == 'alert_gpu_threshold':
+                self._alert_manager.update_rule_threshold('gpu_temperature', float(value))
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Setting update failed: {e}")
+
+    def _check_alerts(self, snapshot: dict):
+        """Evaluate current metrics against all alert rules"""
+        if not self._alerts_ready or self._alert_manager is None:
+            return
+        try:
+            cpu = snapshot.get('cpu', {})
+            if isinstance(cpu, dict):
+                if cpu.get('percent') is not None:
+                    self._alert_manager.check_metric('cpu_percent', float(cpu['percent']))
+                if cpu.get('temperature') is not None:
+                    self._alert_manager.check_metric('cpu_temperature', float(cpu['temperature']))
+
+            memory = snapshot.get('memory', {})
+            if isinstance(memory, dict) and memory.get('percent') is not None:
+                self._alert_manager.check_metric('memory_percent', float(memory['percent']))
+
+            gpu = snapshot.get('gpu', {})
+            if isinstance(gpu, dict) and gpu.get('temperature') is not None:
+                self._alert_manager.check_metric('gpu_temperature', float(gpu['temperature']))
+
+            disk = snapshot.get('disk', {})
+            if isinstance(disk, dict):
+                partitions = disk.get('partitions', [])
+                if partitions:
+                    max_pct = max(p.get('percent', 0) for p in partitions)
+                    self._alert_manager.check_metric('disk_percent', float(max_pct))
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Alert check error: {e}")
 
     def _on_collector_update(self, name: str, data: dict):
         """Handle updates from individual collectors"""
@@ -112,6 +206,7 @@ class DataCollectorCoordinator(QObject):
         self.data_ready.emit(snapshot)
         from core.signals import signal_bus
         signal_bus.data_updated.emit(snapshot)
+        self._check_alerts(snapshot)
 
     def _on_system_info_update(self, data: dict):
         """Handle system info updates"""
