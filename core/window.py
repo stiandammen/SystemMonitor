@@ -16,6 +16,11 @@ from scaler import S, ScaleMixin, LayoutMode
 from utils.logger import get_logger, LogCategory, log_info, log_debug
 
 
+def _cap(scaled: int, maximum: int) -> int:
+    """Return scaled value capped at maximum — prevents oversized chrome on 5K."""
+    return min(scaled, maximum)
+
+
 class WinControlBtn(QWidget):
     """
     Window control button (minimize / maximize / restore / close) drawn
@@ -30,7 +35,7 @@ class WinControlBtn(QWidget):
         self._kind = kind
         self._hovered = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(S.px(36), S.px(28))
+        self.setFixedSize(_cap(S.px(34), 40), _cap(S.px(26), 30))
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
     def set_kind(self, kind: str):
@@ -82,15 +87,15 @@ class WinControlBtn(QWidget):
             icon_color = QColor(c.TEXT_MUTED)
 
         pen = QPen(icon_color)
-        pen.setWidthF(S.px(1.5))
+        pen.setWidthF(_cap(S.px(2), 2))
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
 
         cx, cy = w / 2, h / 2
-        sz = S.px(10)          # icon bounding box half-size
-        thin = S.px(9)
+        sz = _cap(S.px(8), 9)    # icon bounding box half-size
+        thin = _cap(S.px(7), 8)
 
         if self._kind == "min":
             # Horizontal line, centred, sitting at 65 % height
@@ -272,22 +277,22 @@ class TopHeader(QWidget, ScaleMixin):
         self._apply_theme()
 
     def _setup_ui(self):
-        self.setMinimumHeight(S.px(48))
-        self.setMaximumHeight(S.px(60))
+        self.setMinimumHeight(_cap(S.px(36), 40))
+        self.setMaximumHeight(_cap(S.px(42), 46))
 
         if not self.layout():
             layout = QHBoxLayout()
-            layout.setContentsMargins(S.px(16), 0, S.px(8), 0)
-            layout.setSpacing(S.px(12))
+            layout.setContentsMargins(_cap(S.px(14), 16), 0, _cap(S.px(6), 8), 0)
+            layout.setSpacing(_cap(S.px(8), 10))
             self.setLayout(layout)
             self._build_contents(layout)
 
         self._apply_theme()
 
     def _build_contents(self, layout):
+        icon_sz = _cap(S.px(26), 30)
         self._icon_container = QFrame()
-        self._icon_container.setMinimumSize(S.px(32), S.px(32))
-        self._icon_container.setMaximumSize(S.px(40), S.px(40))
+        self._icon_container.setFixedSize(icon_sz, icon_sz)
         self._icon_container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         icon_layout = QVBoxLayout()
@@ -296,13 +301,13 @@ class TopHeader(QWidget, ScaleMixin):
         self._icon_container.setLayout(icon_layout)
 
         icon_label = QLabel("SM")
-        icon_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        icon_label.setFont(QFont("Segoe UI", _cap(S.font_pt(9), 10), QFont.Weight.Bold))
         icon_label.setStyleSheet("color: white;")
         icon_layout.addWidget(icon_label)
         layout.addWidget(self._icon_container)
 
         self._title_label = QLabel("System Monitor")
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.DemiBold))
+        self._title_label.setFont(QFont("Segoe UI", _cap(S.font_pt(10), 11), QFont.Weight.Medium))
         self._title_label.setCursor(Qt.CursorShape.SizeAllCursor)
         layout.addWidget(self._title_label)
 
@@ -345,7 +350,7 @@ class TopHeader(QWidget, ScaleMixin):
         if hasattr(self, '_icon_container'):
             self._icon_container.setStyleSheet(f"""
                 background-color: {colors.ACCENT_GREEN};
-                border-radius: {S.px(8)}px;
+                border-radius: {_cap(S.px(6), 7)}px;
             """)
 
         # WinControlBtn reads theme_manager.colors directly in paintEvent — just repaint
