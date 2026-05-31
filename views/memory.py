@@ -37,12 +37,22 @@ class MemoryKpiCard(QFrame, ScaleMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _on_theme_changed(self, theme_name: str):
-        self._setup_ui()
+        colors = theme_manager.colors
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {colors.BG_CARD};
+                border: none;
+                border-radius: {S.px(12)}px;
+            }}
+        """)
+        self._title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        self._unit_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
 
     def _setup_ui(self):
         colors = theme_manager.colors
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(S.px(90))
+        self.setMinimumHeight(S.px(115))
+        self.setMinimumWidth(S.px(130))
 
         self.setStyleSheet(f"""
             QFrame {{
@@ -54,7 +64,7 @@ class MemoryKpiCard(QFrame, ScaleMixin):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
-        layout.setSpacing(S.px(8))
+        layout.setSpacing(S.px(6))
         self.setLayout(layout)
 
         # Top row: icon + title
@@ -62,6 +72,7 @@ class MemoryKpiCard(QFrame, ScaleMixin):
         top_row.setSpacing(S.px(8))
 
         icon_label = QLabel()
+        icon_label.setFixedSize(S.px(16), S.px(16))
         try:
             icon = qta.icon(self._icon, color=self._accent, scale=1.0)
             icon_label.setPixmap(icon.pixmap(S.px(16), S.px(16)))
@@ -70,17 +81,17 @@ class MemoryKpiCard(QFrame, ScaleMixin):
         icon_label.setStyleSheet("background: transparent;")
         top_row.addWidget(icon_label)
 
-        title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(10)))
-        title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        top_row.addWidget(title_label)
+        self._title_label = QLabel(self._title)
+        self._title_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        top_row.addWidget(self._title_label)
         top_row.addStretch()
 
         layout.addLayout(top_row)
 
         # Value
         self._value_label = QLabel(self._value)
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Segoe UI", S.font_pt(20), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
         layout.addWidget(self._value_label)
 

@@ -9,9 +9,9 @@ import subprocess
 from collections import deque
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QProgressBar, QPushButton, QGridLayout, QSizePolicy, QSplitter
+    QScrollArea, QProgressBar, QGridLayout, QSizePolicy, QSplitter
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QLinearGradient, QGradient
 
 from widgets.donut_gauge import DonutGauge
@@ -258,16 +258,66 @@ class GlassInfoPanel(QFrame):
         self._content.addWidget(row)
 
 
+class _AnimatedBar(QProgressBar):
+    """Progress bar that smoothly fills to its target value via QPropertyAnimation."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimum(0)
+        self.setMaximum(100)
+        self.setValue(0)
+        self.setTextVisible(False)
+        self.setMinimumHeight(S.px(8))
+        self.setMaximumHeight(S.px(10))
+        self._anim = QPropertyAnimation(self, b"value", self)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+    def fill_from_zero(self, target: int):
+        self._anim.stop()
+        self._anim.setDuration(750)
+        self._anim.setStartValue(0)
+        self._anim.setEndValue(max(0, min(100, target)))
+        self._anim.start()
+
+    def update_value(self, target: int):
+        self._anim.stop()
+        self._anim.setDuration(300)
+        self._anim.setStartValue(self.value())
+        self._anim.setEndValue(max(0, min(100, target)))
+        self._anim.start()
+
+
 class GlassStoragePanel(QFrame):
-    """Premium glass storage panel - responsive"""
+    """Storage panel with animated bars and live drive info."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._last_partitions = []
+        self._drive_keys = []       # ordered list of device strings currently shown
+        self._drive_refs = {}       # device -> {bar, pct_lbl, used_lbl, free_lbl, letter, name}
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _on_theme_changed(self, theme_name: str):
-        self._setup_ui()
+        colors = theme_manager.colors
+        if theme_manager.current_theme == "heimdal":
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: rgba(30, 35, 64, 0.85);
+                    border: none;
+                    border-radius: {S.px(12)}px;
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {colors.BG_CARD};
+                    border: none;
+                    border-radius: {S.px(14)}px;
+                }}
+            """)
+        self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+        if self._last_partitions:
+            self._rebuild_drives(self._last_partitions, animate=False)
 
     def _setup_ui(self):
         colors = theme_manager.colors
@@ -279,9 +329,6 @@ class GlassStoragePanel(QFrame):
                     background-color: rgba(30, 35, 64, 0.85);
                     border: none;
                     border-radius: {S.px(12)}px;
-                }}
-                QFrame:hover {{
-                    border-color: rgba(74, 108, 247, 0.5);
                 }}
             """)
         else:
@@ -299,332 +346,197 @@ class GlassStoragePanel(QFrame):
         self.setLayout(layout)
 
         header = QHBoxLayout()
-        header.setSpacing(S.px(8))
-
-        title = QLabel("Storage Drives")
-        title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        header.addWidget(title)
+        self._title_label = QLabel("Storage Drives")
+        self._title_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+        header.addWidget(self._title_label)
         header.addStretch()
-
-        view_all_btn = QPushButton("View all →")
-        view_all_btn.setFont(QFont("Segoe UI", S.font_pt(9)))
-        view_all_btn.setMinimumHeight(S.px(24))
-        view_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        view_all_btn.clicked.connect(self._show_all_drives)
-        view_all_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {colors.BG_HOVER};
-                color: {colors.TEXT_SECONDARY};
-                border: none;
-                border-radius: {S.px(6)}px;
-                padding: 4px 12px;
-            }}
-            QPushButton:hover {{
-                background-color: {colors.ACCENT_ORANGE};
-                color: white;
-            }}
-        """)
-        header.addWidget(view_all_btn)
         layout.addLayout(header)
 
-        sep = QFrame()
-        sep.setFixedHeight(1)
-        sep.setStyleSheet("background-color: transparent;")
-        layout.addWidget(sep)
-
         self._storage_container = QVBoxLayout()
-        self._storage_container.setSpacing(S.px(6))
+        self._storage_container.setSpacing(S.px(8))
         layout.addLayout(self._storage_container)
 
-    def update_drives(self, partitions):
+    def _clear_drives(self):
         while self._storage_container.count():
             item = self._storage_container.takeAt(0)
             if item and item.widget():
                 item.widget().deleteLater()
+        self._drive_keys = []
+        self._drive_refs = {}
 
+    def _pct_color(self, pct: float) -> str:
         colors = theme_manager.colors
+        return (colors.ACCENT_GREEN if pct < 75
+                else colors.ACCENT_ORANGE if pct < 90
+                else colors.ACCENT_RED)
 
-        if not partitions:
+    def _add_drive_card(self, partition: dict, animate: bool):
+        colors = theme_manager.colors
+        device = partition.get('device', '')
+        mountpoint = partition.get('mountpoint', '')
+        total_gb = partition.get('total', 0) / (1024 ** 3)
+        used_gb = partition.get('used', 0) / (1024 ** 3)
+        free_gb = total_gb - used_gb
+        pct = partition.get('percent', 0)
+        pct_color = self._pct_color(pct)
+        label_text = device.replace("\\", "") if device else "?"
+
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {colors.BG_SECONDARY};
+                border: none;
+                border-radius: {S.px(10)}px;
+            }}
+        """)
+        row = QHBoxLayout()
+        row.setContentsMargins(S.px(14), S.px(12), S.px(14), S.px(12))
+        row.setSpacing(S.px(14))
+        card.setLayout(row)
+
+        # Drive letter badge
+        letter_lbl = QLabel(label_text)
+        letter_lbl.setFont(QFont("Segoe UI", S.font_pt(15), QFont.Weight.Bold))
+        letter_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        letter_lbl.setFixedWidth(S.px(44))
+        letter_lbl.setStyleSheet(
+            f"color: {pct_color}; background: transparent;"
+        )
+        row.addWidget(letter_lbl)
+
+        # Center: name + bar + stats
+        info = QVBoxLayout()
+        info.setSpacing(S.px(4))
+
+        name_lbl = QLabel(mountpoint if mountpoint else device)
+        name_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+        info.addWidget(name_lbl)
+
+        bar = _AnimatedBar()
+        bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {colors.BG_PRIMARY};
+                border: none;
+                border-radius: {S.px(4)}px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {pct_color};
+                border-radius: {S.px(4)}px;
+            }}
+        """)
+        info.addWidget(bar)
+
+        stats_row = QHBoxLayout()
+        used_lbl = QLabel(f"{used_gb:.1f} GB used")
+        used_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        used_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
+        stats_row.addWidget(used_lbl)
+        stats_row.addStretch()
+        free_lbl = QLabel(f"{free_gb:.1f} GB free")
+        free_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        free_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        stats_row.addWidget(free_lbl)
+        info.addLayout(stats_row)
+
+        row.addLayout(info, stretch=1)
+
+        # Right: percentage box
+        pct_box = QFrame()
+        pct_box.setStyleSheet(
+            f"background-color: {colors.BG_PRIMARY}; border-radius: {S.px(8)}px;"
+        )
+        pct_col = QVBoxLayout()
+        pct_col.setSpacing(1)
+        pct_col.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
+        pct_col.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pct_box.setLayout(pct_col)
+
+        pct_lbl = QLabel(f"{pct:.0f}%")
+        pct_lbl.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
+        pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
+        pct_col.addWidget(pct_lbl)
+
+        sub_lbl = QLabel("used")
+        sub_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        pct_col.addWidget(sub_lbl)
+
+        row.addWidget(pct_box)
+        self._storage_container.addWidget(card)
+
+        # Animate or set directly
+        if animate:
+            bar.fill_from_zero(int(pct))
+        else:
+            bar.setValue(int(pct))
+
+        self._drive_keys.append(device)
+        self._drive_refs[device] = {
+            'bar': bar, 'pct_lbl': pct_lbl,
+            'used_lbl': used_lbl, 'free_lbl': free_lbl,
+            'letter': letter_lbl, 'name': name_lbl,
+        }
+
+    def _update_drive_card(self, partition: dict):
+        device = partition.get('device', '')
+        refs = self._drive_refs.get(device)
+        if not refs:
+            return
+        colors = theme_manager.colors
+        total_gb = partition.get('total', 0) / (1024 ** 3)
+        used_gb = partition.get('used', 0) / (1024 ** 3)
+        free_gb = total_gb - used_gb
+        pct = partition.get('percent', 0)
+        pct_color = self._pct_color(pct)
+
+        refs['bar'].update_value(int(pct))
+        refs['bar'].setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {colors.BG_PRIMARY};
+                border: none;
+                border-radius: {S.px(4)}px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {pct_color};
+                border-radius: {S.px(4)}px;
+            }}
+        """)
+        refs['pct_lbl'].setText(f"{pct:.0f}%")
+        refs['pct_lbl'].setStyleSheet(f"color: {pct_color}; background: transparent;")
+        refs['used_lbl'].setText(f"{used_gb:.1f} GB used")
+        refs['free_lbl'].setText(f"{free_gb:.1f} GB free")
+        refs['letter'].setStyleSheet(f"color: {pct_color}; background: transparent;")
+
+    def _rebuild_drives(self, partitions: list, animate: bool):
+        self._clear_drives()
+        colors = theme_manager.colors
+        valid = [p for p in partitions if p.get('fstype')]
+        if not valid:
             placeholder = QLabel("No drives detected")
             placeholder.setFont(QFont("Segoe UI", S.font_pt(11)))
             placeholder.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._storage_container.addWidget(placeholder)
             return
+        for partition in valid:
+            self._add_drive_card(partition, animate=animate)
 
-        for partition in partitions:
-            if not partition.get('fstype'):
-                continue
+    def update_drives(self, partitions: list):
+        self._last_partitions = partitions
+        new_keys = [p.get('device', '') for p in partitions if p.get('fstype')]
 
-            drive_letter = partition.get('device', '')
-            mountpoint = partition.get('mountpoint', '')
-            total_gb = partition.get('total', 0) / (1024**3)
-            used_gb = partition.get('used', 0) / (1024**3)
-            pct = partition.get('percent', 0)
-
-            pct_color = colors.ACCENT_GREEN if pct < 75 else colors.ACCENT_ORANGE if pct < 90 else colors.ACCENT_RED
-
-            drive_card = QFrame()
-            drive_card.setStyleSheet(f"""
-                background-color: {colors.BG_SECONDARY};
-                border-radius: {S.px(8)}px;
-                padding: 4px;
-            """)
-
-            drive_layout = QHBoxLayout()
-            drive_layout.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
-            drive_layout.setSpacing(S.px(10))
-            drive_card.setLayout(drive_layout)
-
-            letter = QLabel(drive_letter.replace("\\", "") if drive_letter else "?")
-            letter.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-            letter.setStyleSheet(f"color: white; background: {pct_color}; padding: 3px 8px; border-radius: {S.px(5)}px;")
-            letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            letter.setMinimumWidth(S.px(30))
-            drive_layout.addWidget(letter)
-
-            info = QVBoxLayout()
-            info.setSpacing(2)
-
-            name_lbl = QLabel(mountpoint if mountpoint else "Local Disk")
-            name_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
-            name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-            info.addWidget(name_lbl)
-
-            bar = QProgressBar()
-            bar.setValue(int(pct))
-            bar.setMinimumHeight(5)
-            bar.setMaximumHeight(7)
-            bar.setTextVisible(False)
-            bar.setStyleSheet(f"""
-                QProgressBar {{
-                    background-color: {colors.BG_PRIMARY};
-                    border: none;
-                    border-radius: {S.px(3)}px;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {pct_color};
-                    border-radius: {S.px(3)}px;
-                }}
-            """)
-            info.addWidget(bar)
-            drive_layout.addLayout(info, stretch=1)
-
-            usage_lbl = QLabel(f"{used_gb:.0f}/{total_gb:.0f} GB")
-            usage_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-            usage_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-            usage_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            usage_lbl.setMinimumWidth(S.px(60))
-            drive_layout.addWidget(usage_lbl)
-
-            pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-            pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
-            pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-            pct_lbl.setMinimumWidth(S.px(35))
-            drive_layout.addWidget(pct_lbl)
-
-            self._storage_container.addWidget(drive_card)
-
-    def _show_all_drives(self):
-        from PyQt6.QtWidgets import QDialog
-
-        colors = theme_manager.colors
-        dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
-        dialog.setMinimumSize(S.px(550), S.px(400))
-        dialog.setStyleSheet(f"""
-            QDialog {{
-                background-color: {colors.BG_PRIMARY};
-                color: {colors.TEXT_PRIMARY};
-            }}
-        """)
-
-        drag_pos = [None]
-
-        def mousePressEvent(event):
-            if event.button() == Qt.MouseButton.LeftButton:
-                drag_pos[0] = event.globalPos() - dialog.frameGeometry().topLeft()
-                event.accept()
-
-        def mouseMoveEvent(event):
-            if event.buttons() == Qt.MouseButton.LeftButton and drag_pos[0]:
-                dialog.move(event.globalPos() - drag_pos[0])
-                event.accept()
-
-        def mouseReleaseEvent(event):
-            if event.button() == Qt.MouseButton.LeftButton:
-                drag_pos[0] = None
-                event.accept()
-
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(S.px(16))
-        main_layout.setContentsMargins(S.px(20), S.px(20), S.px(20), S.px(20))
-        dialog.setLayout(main_layout)
-
-        header = QFrame()
-        header.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: {S.px(8)}px;")
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(S.px(16), S.px(10), S.px(10), S.px(10))
-        header.setLayout(header_layout)
-        header.setCursor(Qt.CursorShape.SizeAllCursor)
-        header.mousePressEvent = mousePressEvent
-        header.mouseMoveEvent = mouseMoveEvent
-        header.mouseReleaseEvent = mouseReleaseEvent
-
-        title = QLabel("Storage Drives")
-        title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
-
-        close_btn = QPushButton("×")
-        close_btn.setFont(QFont("Segoe UI", 14))
-        close_btn.setFixedSize(S.px(28), S.px(28))
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {colors.TEXT_MUTED};
-                border: none;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {colors.BG_HOVER};
-                color: {colors.TEXT_PRIMARY};
-            }}
-        """)
-        close_btn.clicked.connect(dialog.accept)
-        header_layout.addWidget(close_btn)
-        main_layout.addWidget(header)
-
-        drives_layout = QVBoxLayout()
-        drives_layout.setSpacing(S.px(12))
-
-        for partition in psutil.disk_partitions():
-            if not partition.fstype:
-                continue
-            try:
-                usage = psutil.disk_usage(partition.mountpoint)
-            except PermissionError:
-                continue
-
-            drive_letter = partition.device
-            mountpoint = partition.mountpoint
-            total_gb = usage.total / (1024**3)
-            used_gb = usage.used / (1024**3)
-            free_gb = usage.free / (1024**3)
-            pct = usage.percent
-
-            pct_color = colors.ACCENT_GREEN if pct < 75 else colors.ACCENT_ORANGE if pct < 90 else colors.ACCENT_RED
-
-            drive_card = QFrame()
-            drive_card.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {colors.BG_CARD};
-                    border: none;
-                    border-radius: {S.px(10)}px;
-                }}
-            """)
-            drive_layout = QHBoxLayout()
-            drive_layout.setSpacing(S.px(16))
-            drive_layout.setContentsMargins(S.px(14), S.px(14), S.px(14), S.px(14))
-            drive_card.setLayout(drive_layout)
-
-            letter = QLabel(drive_letter.replace("\\", ""))
-            letter.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
-            letter.setStyleSheet(f"color: {pct_color}; background: transparent;")
-            letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            letter.setMinimumSize(S.px(40), S.px(40))
-            drive_layout.addWidget(letter)
-
-            info = QVBoxLayout()
-            info.setSpacing(S.px(6))
-
-            name = QLabel(mountpoint if mountpoint else drive_letter)
-            name.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-            name.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-            info.addWidget(name)
-
-            bar = QProgressBar()
-            bar.setValue(int(pct))
-            bar.setMinimumHeight(8)
-            bar.setMaximumHeight(10)
-            bar.setTextVisible(False)
-            bar.setStyleSheet(f"""
-                QProgressBar {{
-                    background-color: {colors.BG_PRIMARY};
-                    border: none;
-                    border-radius: {S.px(4)}px;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {pct_color};
-                    border-radius: {S.px(4)}px;
-                }}
-            """)
-            info.addWidget(bar)
-
-            stats = QHBoxLayout()
-            used_lbl = QLabel(f"{used_gb:.1f} GB used")
-            used_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-            used_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-            stats.addWidget(used_lbl)
-            stats.addStretch()
-            free_lbl = QLabel(f"{free_gb:.1f} GB free")
-            free_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-            free_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-            stats.addWidget(free_lbl)
-            info.addLayout(stats)
-
-            drive_layout.addLayout(info, stretch=1)
-
-            pct_box = QFrame()
-            pct_box.setStyleSheet(f"background-color: {colors.BG_SECONDARY}; border-radius: {S.px(8)}px;")
-            pct_layout = QVBoxLayout()
-            pct_layout.setSpacing(1)
-            pct_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
-            pct_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            pct_box.setLayout(pct_layout)
-
-            pct_lbl = QLabel(f"{pct:.0f}%")
-            pct_lbl.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
-            pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
-            pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            pct_layout.addWidget(pct_lbl)
-
-            used_lbl2 = QLabel("used")
-            used_lbl2.setFont(QFont("Segoe UI", S.font_pt(8)))
-            used_lbl2.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-            used_lbl2.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            pct_layout.addWidget(used_lbl2)
-
-            drive_layout.addWidget(pct_box)
-            drives_layout.addWidget(drive_card)
-
-        main_layout.addLayout(drives_layout)
-
-        close_btn = QPushButton("Close")
-        close_btn.setFont(QFont("Segoe UI", S.font_pt(10)))
-        close_btn.setMinimumHeight(S.px(32))
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {colors.ACCENT_BLUE};
-                color: white;
-                border: none;
-                border-radius: {S.px(6)}px;
-                padding: 6px 24px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #3185f0;
-            }}
-        """)
-        close_btn.clicked.connect(dialog.accept)
-        main_layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignRight)
-
-        dialog.exec()
+        if new_keys != self._drive_keys:
+            # Drive set changed – rebuild with entrance animation
+            self._rebuild_drives(partitions, animate=True)
+        else:
+            # Same drives – update in place with smooth transition
+            for partition in partitions:
+                if partition.get('fstype'):
+                    self._update_drive_card(partition)
 
 
 class OverviewPage(QWidget, ScaleMixin):
@@ -1107,5 +1019,7 @@ class OverviewPage(QWidget, ScaleMixin):
                 self._temp_card.set_value(f"{temp:.0f}°C", "GPU temp")
                 self._temp_card.push_sparkline(temp)
 
-        if 'partitions' in data:
-            self._storage_panel.update_drives(data['partitions'])
+        if 'disk' in data:
+            partitions = data['disk'].get('partitions', [])
+            if partitions:
+                self._storage_panel.update_drives(partitions)
