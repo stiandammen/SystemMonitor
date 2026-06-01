@@ -13,6 +13,7 @@ a = Analysis(
         ('views', 'views'),
         ('utils', 'utils'),
         ('widgets', 'widgets'),
+        ('assets', 'assets'),
     ],
     hiddenimports=[
         'core',
@@ -81,7 +82,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

@@ -94,7 +94,14 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(Select-Object FullName)",
-      "Bash(Sort-Object FullName)"
+      "Bash(Sort-Object FullName)",
+      "PowerShell(Set-Location -LiteralPath \"E:\\\\[python - prosjekter]\\\\SystemMonitor\"; & \".venv\\\\Scripts\\\\python.exe\" -c \"import PyQt6.QtCore; print\\('QtCore OK'\\)\" 2>&1 | Where-Object { $_ -notmatch 'pywin32_bootstrap|pywin32.pth|Remainder' })",
+      "PowerShell(Get-ChildItem -LiteralPath \"E:\\\\[python - prosjekter]\\\\SystemMonitor\\\\.venv\\\\Lib\\\\site-packages\\\\PyQt6\" -Name | Where-Object { $_ -match '\\\\.py$|__init__' })",
+      "PowerShell(Set-Location -LiteralPath \"E:\\\\[python - prosjekter]\\\\SystemMonitor\"; & \".venv\\\\Scripts\\\\pip.exe\" install --version 2>&1 | Where-Object { $_ -notmatch 'pywin32' })",
+      "PowerShell(python --version 2>&1; python -m pip --version 2>&1)",
+      "PowerShell(py *)",
+      "Skill(update-config)",
+      "PowerShell(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Force | Select-Object Name, @{n='Type';e={if\\($_.Attributes -match 'Directory'\\){'Folder'}else{'File'}}} | Format-Table -AutoSize)"
     ]
   }
 }
