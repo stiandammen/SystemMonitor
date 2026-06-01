@@ -4,4 +4,4 @@ qtawesome>=1.0.0
 wmi>=1.0.0
 GPUtil>=1.0.0
 nvidia-ml-py>=11.0.0
-pythonnet>=3.0.0
+
