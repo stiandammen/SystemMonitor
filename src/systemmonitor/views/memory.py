@@ -1,4 +1,4 @@
-﻿"""
+"""
 Memory View - Professional memory monitoring dashboard
 Enterprise-grade design with real-time graphs, donut charts, and process list
 """
@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient, QPainterPath, QPaintEvent, QShowEvent
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QFrame, QProgressBar, QSizePolicy, QMenu, QPushButton
+    QLabel, QFrame, QProgressBar, QSizePolicy, QMenu, QPushButton, QScrollArea
 )
 
 from systemmonitor.styles.theme import theme_manager
@@ -108,7 +108,7 @@ class MemoryKpiCard(QFrame, ScaleMixin):
 
 
 class MemoryWaveChart(QWidget, ScaleMixin):
-    """Animated liquid-fill memory chart â€” three fluid layers with sine wave boundaries and neon glow."""
+    """Animated liquid-fill memory chart – three fluid layers with sine wave boundaries and neon glow."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -275,96 +275,6 @@ class MemoryWaveChart(QWidget, ScaleMixin):
         p.drawText(int(cx - fm2.horizontalAdvance("Used") / 2), ty + S.px(15), "Used")
 
         p.end()
-
-
-class MemoryPressureGraph(QWidget, ScaleMixin):
-    """Real-time memory pressure graph"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._history = []
-        self._max_points = 60
-        self.scale_connect()
-        self.setMinimumHeight(S.px(120))
-
-    def add_value(self, value: float):
-        self._history.append(value)
-        if len(self._history) > self._max_points:
-            self._history.pop(0)
-        self.update()
-
-    def paintEvent(self, a0: QPaintEvent | None) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        colors = c()
-        w, h = self.width(), self.height()
-        if w <= 0 or h <= 0:
-            painter.end()
-            return
-
-        # Background
-        painter.setBrush(QColor(colors.BG_HOVER))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(0, 0, w, h)
-
-        # Zone backgrounds
-        zone_h = h / 4
-
-        def zone_color(hex_color, alpha):
-            c = QColor(hex_color)
-            c.setAlpha(alpha)
-            return c
-
-        painter.setBrush(zone_color(colors.ACCENT_RED, 25))
-        painter.drawRect(0, 0, w, int(zone_h * 0.4))
-        painter.setBrush(zone_color(colors.ACCENT_ORANGE, 18))
-        painter.drawRect(0, int(zone_h * 0.4), w, int(zone_h * 0.4))
-        painter.setBrush(zone_color(colors.ACCENT_YELLOW, 12))
-        painter.drawRect(0, int(zone_h * 0.8), w, int(zone_h * 0.6))
-        painter.setBrush(zone_color(colors.ACCENT_GREEN, 8))
-        painter.drawRect(0, int(zone_h * 1.4), w, int(zone_h * 2.6))
-
-        # Zone labels
-        painter.setFont(QFont("Segoe UI", S.font_pt(7)))
-        painter.setPen(QColor(colors.TEXT_MUTED))
-        painter.drawText(S.px(4), S.px(10), "90-100%")
-        painter.drawText(S.px(4), int(zone_h * 0.4 + S.px(10)), "70-90%")
-        painter.drawText(S.px(4), int(zone_h * 0.8 + S.px(10)), "40-70%")
-        painter.drawText(S.px(4), int(zone_h * 1.4 + S.px(10)), "0-40%")
-
-        # Grid lines
-        painter.setPen(QPen(QColor(colors.BORDER), 1, Qt.PenStyle.DotLine))
-        for i in range(4):
-            y = int(zone_h * (i + 1))
-            painter.drawLine(0, y, w, y)
-
-        # Draw line
-        if len(self._history) > 1:
-            step = w / (self._max_points - 1)
-            points = [(i * step, h - val / 100.0 * h) for i, val in enumerate(self._history)]
-
-            # Gradient fill for pressure
-            fill_pts = [(0, h)] + points + [(points[-1][0], h)]
-            gradient = QLinearGradient(0, 0, 0, h)
-            orange = QColor(colors.ACCENT_ORANGE)
-            orange.setAlpha(60)
-            orange_end = QColor(colors.ACCENT_ORANGE)
-            orange_end.setAlpha(5)
-            gradient.setColorAt(0, orange)
-            gradient.setColorAt(1, orange_end)
-            painter.setBrush(gradient)
-            painter.setPen(Qt.PenStyle.NoPen)
-            from PyQt6.QtCore import QPoint
-            qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
-            if len(qpoints) >= 3:
-                painter.drawPolygon(*qpoints)
-
-            # Line
-            painter.setPen(QPen(QColor(colors.ACCENT_ORANGE), 2))
-            for i in range(len(points) - 1):
-                painter.drawLine(int(points[i][0]), int(points[i][1]),
-                               int(points[i + 1][0]), int(points[i + 1][1]))
-
-        painter.end()
 
 
 class MemoryUsageGraph(QWidget, ScaleMixin):
@@ -556,42 +466,55 @@ class ProcessRow(QFrame, ScaleMixin):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
-        layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(10), S.px(6), S.px(10), S.px(6))
-        layout.setSpacing(S.px(10))
-        self.setLayout(layout)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(S.px(10), S.px(7), S.px(10), S.px(6))
+        outer.setSpacing(S.px(3))
+
+        # — Top row: rank  name  percent —
+        top = QHBoxLayout()
+        top.setSpacing(S.px(6))
+        top.setContentsMargins(0, 0, 0, 0)
 
         self._rank_lbl = QLabel()
-        self._rank_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        self._rank_lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
         self._rank_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        self._rank_lbl.setMinimumWidth(S.px(22))
-        layout.addWidget(self._rank_lbl)
+        self._rank_lbl.setFixedWidth(S.px(22))
+        top.addWidget(self._rank_lbl)
 
         self._name_lbl = QLabel()
-        self._name_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._name_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
         self._name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         self._name_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(self._name_lbl, stretch=1)
-
-        self._mem_lbl = QLabel()
-        self._mem_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self._mem_lbl.setStyleSheet(f"color: {colors.ACCENT_CYAN}; background: transparent;")
-        self._mem_lbl.setFixedWidth(S.px(70))
-        self._mem_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self._mem_lbl)
+        top.addWidget(self._name_lbl, stretch=1)
 
         self._pct_lbl = QLabel()
-        self._pct_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._pct_lbl.setFont(QFont("Consolas", S.font_pt(9), QFont.Weight.Bold))
         self._pct_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-        self._pct_lbl.setFixedWidth(S.px(40))
-        self._pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self._pct_lbl)
+        self._pct_lbl.setFixedWidth(S.px(42))
+        self._pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        top.addWidget(self._pct_lbl)
+
+        outer.addLayout(top)
+
+        # — Bottom row: bar  memory —
+        bot = QHBoxLayout()
+        bot.setSpacing(S.px(8))
+        bot.setContentsMargins(S.px(28), 0, 0, 0)
 
         self._bar = QProgressBar()
-        self._bar.setFixedWidth(S.px(80))
-        self._bar.setFixedHeight(S.px(6))
+        self._bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._bar.setFixedHeight(S.px(5))
         self._bar.setTextVisible(False)
-        layout.addWidget(self._bar)
+        bot.addWidget(self._bar, stretch=1)
+
+        self._mem_lbl = QLabel()
+        self._mem_lbl.setFont(QFont("Consolas", S.font_pt(8)))
+        self._mem_lbl.setStyleSheet(f"color: {colors.ACCENT_CYAN}; background: transparent;")
+        self._mem_lbl.setFixedWidth(S.px(64))
+        self._mem_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        bot.addWidget(self._mem_lbl)
+
+        outer.addLayout(bot)
 
     def _show_context_menu(self, pos):
         if self._pid is None:
@@ -638,27 +561,43 @@ class ProcessRow(QFrame, ScaleMixin):
     def update_values(self, name: str, memory_mb: float = 0, percent: float = 0, rank: int = 0, pid: int | None = None):
         self._rank = rank
         self._pid: int | None = pid
-        self._rank_lbl.setText(f"#{rank}")
-        self._name_lbl.setText(str(name)[:25] if name else "--")
-        self._name_lbl.setToolTip(f"PID: {pid}\n{name}" if pid and name else name)
-        self._mem_lbl.setText(f"{memory_mb:.0f} MB")
-        self._pct_lbl.setText(f"{percent:.1f}%")
-        self._bar.setValue(int(min(100, max(0, percent))))
         self._memory_mb = memory_mb
         self._percent = percent
 
-        bar_color = (c().ACCENT_RED if percent > 50 else
-                    c().ACCENT_ORANGE if percent > 25 else
-                    c().ACCENT_GREEN)
+        colors = c()
+        self._rank_lbl.setText(f"#{rank}")
+
+        display_name = str(name)[:30] if name else "--"
+        self._name_lbl.setText(display_name)
+        self._name_lbl.setToolTip(f"PID: {pid}  |  {name}" if pid and name else (name or ""))
+
+        self._mem_lbl.setText(f"{memory_mb:.0f} MB" if memory_mb >= 1 else "< 1 MB")
+        self._pct_lbl.setText(f"{percent:.1f}%")
+        self._bar.setValue(int(min(100, max(0, percent))))
+
+        if percent >= 15:
+            bar_color = colors.ACCENT_RED
+            pct_color = colors.ACCENT_RED
+        elif percent >= 5:
+            bar_color = colors.ACCENT_ORANGE
+            pct_color = colors.ACCENT_ORANGE
+        elif percent >= 1:
+            bar_color = colors.ACCENT_YELLOW
+            pct_color = colors.TEXT_SECONDARY
+        else:
+            bar_color = colors.ACCENT_GREEN
+            pct_color = colors.TEXT_MUTED
+
+        self._pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
         self._bar.setStyleSheet(f"""
             QProgressBar {{
-                background-color: {c().BG_PRIMARY};
+                background-color: {colors.BG_PRIMARY};
                 border: none;
-                border-radius: {S.px(3)}px;
+                border-radius: {S.px(2)}px;
             }}
             QProgressBar::chunk {{
                 background-color: {bar_color};
-                border-radius: {S.px(3)}px;
+                border-radius: {S.px(2)}px;
             }}
         """)
 
@@ -669,7 +608,6 @@ class MemoryView(QWidget, ScaleMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._memory_history = []
-        self._pressure_history = []
         self._process_rows = []
         self._max_history = 60
         self._current_memory_data = None
@@ -761,11 +699,6 @@ class MemoryView(QWidget, ScaleMixin):
         self._usage_indicator.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
         header_layout.addWidget(self._usage_indicator)
 
-        self._pressure_label = QLabel("Normal")
-        self._pressure_label.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self._pressure_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; padding: {S.px(3)}px {S.px(10)}px; background-color: {colors.BG_SECONDARY}; border-radius: {S.px(10)}px;")
-        header_layout.addWidget(self._pressure_label)
-
         main_layout.addWidget(header)
 
         # ===== KPI CARDS ROW =====
@@ -814,22 +747,21 @@ class MemoryView(QWidget, ScaleMixin):
 
         content_layout.addWidget(left_widget, stretch=2)
 
-        # RIGHT COLUMN - Process list + Pressure
+        # RIGHT COLUMN - Process list (full height)
         right_widget = QWidget()
         right_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(S.px(12))
+        right_layout.setSpacing(0)
         right_widget.setLayout(right_layout)
 
         # Process card
         process_card = Card(title="Top Processes", icon="ph.list-numbers")
 
-        # Header with view all button
+        # "View all" button
         proc_header = QHBoxLayout()
         proc_header.setSpacing(S.px(12))
-
-        self._view_all_btn = QPushButton("View all")
+        self._view_all_btn = QPushButton("Vis alle")
         self._view_all_btn.setFont(QFont("Segoe UI", S.font_pt(9)))
         self._view_all_btn.setMinimumHeight(S.px(24))
         self._view_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -852,66 +784,51 @@ class MemoryView(QWidget, ScaleMixin):
         proc_header.addWidget(self._view_all_btn)
         process_card.add_layout(proc_header)
 
-        # Column headers
-        col_header = QHBoxLayout()
-        col_header.setContentsMargins(0, S.px(4), 0, S.px(4))
-        col_header.setSpacing(S.px(10))
+        # Scroll area — rows har alltid fast høyde, scroll tar seg av resten
+        row_h     = S.px(46)
+        row_gap   = S.px(4)
+        n_rows    = 10
+        container_h = n_rows * row_h + (n_rows - 1) * row_gap
 
-        lbl = QLabel("#")
-        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-        lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(22)
-        col_header.addWidget(lbl)
-
-        lbl = QLabel("Process")
-        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-        lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        col_header.addWidget(lbl, stretch=1)
-
-        lbl = QLabel("Memory")
-        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-        lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(S.px(70))
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        col_header.addWidget(lbl)
-
-        lbl = QLabel("%")
-        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-        lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(S.px(40))
-        lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        col_header.addWidget(lbl)
-
-        lbl = QLabel("Usage")
-        lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-        lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        lbl.setFixedWidth(S.px(80))
-        col_header.addWidget(lbl)
-        process_card.add_layout(col_header)
-
-        # Process rows
         self._process_container = QWidget()
-        self._process_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        process_vlayout = QVBoxLayout()
+        self._process_container.setFixedHeight(container_h)
+        self._process_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        process_vlayout = QVBoxLayout(self._process_container)
         process_vlayout.setContentsMargins(0, 0, 0, 0)
-        process_vlayout.setSpacing(S.px(3))
-        self._process_container.setLayout(process_vlayout)
+        process_vlayout.setSpacing(row_gap)
 
-        for i in range(10):
+        self._process_rows = []
+        for i in range(n_rows):
             row = ProcessRow(name="--", memory_mb=0, percent=0, rank=i + 1)
-            row.setMinimumHeight(S.px(30))
+            row.setFixedHeight(row_h)
             self._process_rows.append(row)
             process_vlayout.addWidget(row)
 
-        process_card.add_widget(self._process_container)
-        right_layout.addWidget(process_card, stretch=2)
-
-        # Pressure card
-        pressure_card = Card(title="Memory Pressure", icon="ph.lightning")
-        self._pressure_graph = MemoryPressureGraph()
-        self._pressure_graph.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        pressure_card.add_widget(self._pressure_graph)
-        right_layout.addWidget(pressure_card, stretch=1)
+        scroll = QScrollArea()
+        scroll.setWidget(self._process_container)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background: transparent; border: none; }}
+            QWidget#qt_scrollarea_viewport {{ background: transparent; }}
+            QScrollBar:vertical {{
+                background: {colors.BG_SECONDARY};
+                width: {S.px(5)}px;
+                border-radius: {S.px(2)}px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {colors.BORDER};
+                border-radius: {S.px(2)}px;
+                min-height: {S.px(24)}px;
+            }}
+            QScrollBar::handle:vertical:hover {{ background: {colors.TEXT_MUTED}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+        """)
+        process_card.add_widget(scroll)
+        right_layout.addWidget(process_card, stretch=1)
 
         content_layout.addWidget(right_widget, stretch=1)
 
@@ -939,7 +856,7 @@ class MemoryView(QWidget, ScaleMixin):
             icon = qta.icon("mdi.shield-check", color=colors.ACCENT_GREEN, scale=1.5)
             health_icon.setPixmap(icon.pixmap(S.px(28), S.px(28)))
         except Exception:
-            health_icon.setText("âœ“")
+            health_icon.setText("✓")
         health_icon.setStyleSheet("background: transparent;")
         health_layout.addWidget(health_icon)
 
@@ -989,25 +906,6 @@ class MemoryView(QWidget, ScaleMixin):
         used_widget.setLayout(used_layout)
         status_layout.addWidget(used_widget)
 
-        # Pressure status
-        pressure_widget = QWidget()
-        pressure_layout = QVBoxLayout()
-        pressure_layout.setSpacing(2)
-        pressure_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        pressure_title = QLabel("Pressure")
-        pressure_title.setFont(QFont("Segoe UI", S.font_pt(9)))
-        pressure_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        pressure_layout.addWidget(pressure_title)
-
-        self._pressure_status = QLabel("Normal")
-        self._pressure_status.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        self._pressure_status.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
-        pressure_layout.addWidget(self._pressure_status)
-
-        pressure_widget.setLayout(pressure_layout)
-        status_layout.addWidget(pressure_widget)
-
         # Memory Type
         type_widget = QWidget()
         type_layout = QVBoxLayout()
@@ -1019,7 +917,7 @@ class MemoryView(QWidget, ScaleMixin):
         type_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         type_layout.addWidget(type_title)
 
-        self._ram_type_label = QLabel("â€”")
+        self._ram_type_label = QLabel("–")
         self._ram_type_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
         self._ram_type_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         type_layout.addWidget(self._ram_type_label)
@@ -1056,7 +954,6 @@ class MemoryView(QWidget, ScaleMixin):
         try:
             self._update_stats(self._current_memory_data)
             self._update_charts()
-            self._update_pressure()
             now = time.time()
             if now - self._last_proc_update >= 3:
                 self._last_proc_update = now
@@ -1103,6 +1000,16 @@ class MemoryView(QWidget, ScaleMixin):
         if ram_type and hasattr(self, '_ram_type_label'):
             self._ram_type_label.setText(ram_type)
 
+        # Health label (previously driven by pressure)
+        if used_pct >= 90:
+            h_text, h_color = "Critical", colors.ACCENT_RED
+        elif used_pct >= 70:
+            h_text, h_color = "Warning",  colors.ACCENT_ORANGE
+        else:
+            h_text, h_color = "Healthy",  colors.ACCENT_GREEN
+        self._health_label.setText(h_text)
+        self._health_label.setStyleSheet(f"color: {h_color}; background: transparent; font-weight: bold;")
+
     def _update_charts(self):
         if not self._current_memory_data:
             return
@@ -1121,36 +1028,6 @@ class MemoryView(QWidget, ScaleMixin):
         if len(self._memory_history) > self._max_history:
             self._memory_history.pop(0)
         self._usage_graph.add_value(used_pct)
-
-    def _update_pressure(self):
-        if not self._current_memory_data:
-            return
-        colors = c()
-        pressure = self._current_memory_data['percent']
-
-        self._pressure_history.append(pressure)
-        if len(self._pressure_history) > self._max_history:
-            self._pressure_history.pop(0)
-        self._pressure_graph.add_value(pressure)
-
-        if pressure >= 90:
-            status, status_color = "Critical", colors.ACCENT_RED
-        elif pressure >= 70:
-            status, status_color = "High", colors.ACCENT_ORANGE
-        elif pressure >= 40:
-            status, status_color = "Moderate", colors.ACCENT_YELLOW
-        else:
-            status, status_color = "Normal", colors.ACCENT_GREEN
-
-        self._pressure_status.setText(status)
-        self._pressure_status.setStyleSheet(f"color: {status_color}; background: transparent; font-weight: bold;")
-        self._pressure_label.setText(status)
-        self._pressure_label.setStyleSheet(f"color: {status_color}; padding: {S.px(3)}px {S.px(10)}px; background-color: {colors.BG_SECONDARY}; border-radius: {S.px(10)}px;")
-
-        # Update health indicator
-        self._health_label.setText("Healthy" if pressure < 70 else "Warning" if pressure < 90 else "Critical")
-        health_color = colors.ACCENT_GREEN if pressure < 70 else colors.ACCENT_ORANGE if pressure < 90 else colors.ACCENT_RED
-        self._health_label.setStyleSheet(f"color: {health_color}; background: transparent; font-weight: bold;")
 
     def _update_processes(self):
         """Refresh top-10 memory consuming processes (called every ~3 s)."""

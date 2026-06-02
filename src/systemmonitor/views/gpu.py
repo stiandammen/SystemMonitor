@@ -93,7 +93,7 @@ def _flt(d: dict, key: str, default=None):
 
 
 # ---------------------------------------------------------------------------
-# GPUGauge â€“ sirkulær måler
+# GPUGauge – sirkulær måler
 # ---------------------------------------------------------------------------
 class GPUGauge(QFrame, ScaleMixin):
     def __init__(self, title: str = "", unit: str = "%",
@@ -232,7 +232,7 @@ class GPUGauge(QFrame, ScaleMixin):
 
 
 # ---------------------------------------------------------------------------
-# RealtimeGraph â€“ sanntidsgrafikk
+# RealtimeGraph – sanntidsgrafikk
 # ---------------------------------------------------------------------------
 class RealtimeGraph(QWidget, ScaleMixin):
     def __init__(self, parent=None):
@@ -300,7 +300,7 @@ class RealtimeGraph(QWidget, ScaleMixin):
                 painter.drawLine(int(pts_load[i][0]), int(pts_load[i][1]),
                                  int(pts_load[i+1][0]), int(pts_load[i+1][1]))
 
-            # Temp line (normalised to 0-110°C â†’ 0-100%)
+            # Temp line (normalised to 0-110°C -> 0-100%)
             pts_temp = [(i * step, h - (min(v, 110) / 110.0 * h))
                         for i, v in enumerate(self._temp)]
             painter.setPen(QPen(QColor(COLORS['accent_blue']), 2))
@@ -310,9 +310,9 @@ class RealtimeGraph(QWidget, ScaleMixin):
 
         painter.setFont(QFont("Segoe UI", S.font_pt(8)))
         painter.setPen(QColor(COLORS['accent_green']))
-        painter.drawText(S.px(10), S.px(14), "â— Last")
+        painter.drawText(S.px(10), S.px(14), "● Last")
         painter.setPen(QColor(COLORS['accent_blue']))
-        painter.drawText(S.px(70), S.px(14), "â— Temp")
+        painter.drawText(S.px(70), S.px(14), "● Temp")
         painter.end()
 
 
@@ -334,7 +334,7 @@ class InfoRow(QWidget):
 
         layout.addStretch()
 
-        self._val = QLabel("â€”")
+        self._val = QLabel("–")
         self._val.setFont(QFont("Consolas", S.font_pt(9)))
         self._val.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         self._val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -875,7 +875,7 @@ class GPUView(QWidget, ScaleMixin):
         hl.setContentsMargins(S.px(14), 0, S.px(14), 0)
         hl.setSpacing(S.px(8))
 
-        self._status_dot = QLabel("â—")
+        self._status_dot = QLabel("●")
         self._status_dot.setStyleSheet(
             f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
         )
@@ -887,7 +887,7 @@ class GPUView(QWidget, ScaleMixin):
         title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         hl.addWidget(title)
 
-        self._gpu_name_lbl = QLabel("â€”")
+        self._gpu_name_lbl = QLabel("–")
         self._gpu_name_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
         self._gpu_name_lbl.setStyleSheet(
             f"color: {COLORS['accent_cyan']}; background: transparent;"
@@ -984,7 +984,7 @@ class GPUView(QWidget, ScaleMixin):
         idx = self._tabs.currentIndex()
         if 0 <= idx < len(gpus):
             gpu = gpus[idx]
-            self._gpu_name_lbl.setText(gpu.get('name', 'â€”'))
+            self._gpu_name_lbl.setText(gpu.get('name', '–'))
             self._update_badge(gpu)
 
     # ------------------------------------------------------------------
@@ -999,7 +999,7 @@ class GPUView(QWidget, ScaleMixin):
             self._gpu_views.append(view)
             name   = gpu.get('name', f'GPU {i}')
             vendor = (gpu.get('vendor') or '').upper()[:3]
-            label  = f"{vendor} {name[:18]}â€¦" if len(name) > 18 else f"{vendor} {name}"
+            label  = f"{vendor} {name[:18]}..." if len(name) > 18 else f"{vendor} {name}"
             self._tabs.addTab(view, label.strip())
         # Skjul fanelinjen for enkelt-GPU
         self._tabs.tabBar().setVisible(len(gpus) > 1)
