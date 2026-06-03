@@ -551,9 +551,11 @@ class MainWindow(QMainWindow, ScaleMixin):
         screen = self.screen()
         if screen:
             geom = screen.availableGeometry()
-            self.setGeometry(geom.x() + 50, geom.y() + 50,
-                           min(1400, geom.width() - 100),
-                           min(900, geom.height() - 100))
+            w = int(geom.width() * 0.85)
+            h = int(geom.height() * 0.85)
+            x = geom.x() + (geom.width() - w) // 2
+            y = geom.y() + (geom.height() - h) // 2
+            self.setGeometry(x, y, w, h)
         else:
             self.setGeometry(100, 100, 1400, 900)
 

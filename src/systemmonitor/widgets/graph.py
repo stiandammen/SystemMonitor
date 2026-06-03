@@ -1,7 +1,7 @@
 ﻿"""
 Graph Widget - Premium line/area charts for time-series data
 """
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QSizePolicy
 from PyQt6.QtGui import QPainter, QPen, QColor, QLinearGradient, QFont
 from PyQt6.QtCore import Qt, QRectF, QTimer, QPointF
 from typing import List, Tuple, Optional
@@ -25,8 +25,9 @@ class Graph(QWidget):
         self._max_value: Optional[float] = None
         self._pending_update = False
 
-        self.setFixedHeight(height)
+        self.setMinimumHeight(height)
         self.setMinimumWidth(200)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Throttle updates to ~30fps max
         self._update_timer = QTimer(self)

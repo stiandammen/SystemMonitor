@@ -47,12 +47,13 @@ class SortableTable(QTableWidget):
         
         # Header configuration
         header = self.horizontalHeader()
-        header.setStretchLastSection(True)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
-        
-        # Set column widths
+
+        # Override stretch for columns with an explicit fixed width
         for i, col in enumerate(self._columns):
             if 'width' in col:
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
                 self.setColumnWidth(i, col['width'])
         
         # Vertical header

@@ -311,7 +311,7 @@ class ResponsiveGridLayout:
     @staticmethod
     def columns_for_width(width: int, item_min_width: int = 280) -> int:
         cols = max(1, int(width // (item_min_width * S.scale_factor)))
-        return min(cols, 4)
+        return min(cols, 5)
 
     @staticmethod
     def arrange_widgets(container: QWidget, widgets: list, item_min_width: int = 280):

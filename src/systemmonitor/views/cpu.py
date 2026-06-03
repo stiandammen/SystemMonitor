@@ -148,8 +148,8 @@ class CPUView(QWidget, ScaleMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def on_scale_changed(self, factor: float):
-        self._setup_ui()
-        self.update()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
 
     def _on_theme_changed(self, theme_name: str):
         self.update()
@@ -210,6 +210,20 @@ class CPUView(QWidget, ScaleMixin):
 
     def _setup_ui(self):
         """Setup CPU view UI"""
+        # Tear down the old layout so setLayout() succeeds on rebuild
+        old = self.layout()
+        if old:
+            while old.count():
+                item = old.takeAt(0)
+                if item.widget():
+                    item.widget().hide()
+                    item.widget().deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
+
+        self._core_graphs.clear()
+
         colors = c()
 
         main_layout = QVBoxLayout()

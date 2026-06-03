@@ -206,11 +206,22 @@ class StorageView(QWidget, ScaleMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def on_scale_changed(self, factor: float):
-        self._setup_ui()
-        self.update()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
 
     def _setup_ui(self):
         """Build the storage monitoring UI"""
+        old = self.layout()
+        if old:
+            while old.count():
+                item = old.takeAt(0)
+                if item.widget():
+                    item.widget().hide()
+                    item.widget().deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
+
         colors = theme_manager.colors
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)

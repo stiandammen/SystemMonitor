@@ -218,13 +218,21 @@ class _ScreenScaler:
 
     # â”€â”€ grid helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    def grid_columns(self, max_cols: int = 4) -> int:
-        """Suggested column count for a grid layout at the current resolution."""
-        if   self.screen_width < 1200:        return min(1, max_cols)
-        elif self.screen_width < 1600:        return min(2, max_cols)
-        elif self.screen_width < 2200:        return min(3, max_cols)
-        elif self.screen_width < self._ULTRA_W: return min(4, max_cols)
-        else:                                 return max_cols
+    def grid_columns(self, max_cols: int = 5) -> int:
+        """Suggested column count based on primary screen width."""
+        return self.grid_columns_for(self.screen_width, max_cols)
+
+    def grid_columns_for(self, width: int, max_cols: int = 5) -> int:
+        """Suggested column count for a grid layout at the given pixel width.
+
+        Thresholds match the responsive design spec:
+        <800 → 1, <1200 → 2, <1600 → 3, <2200 → 4, ≥2200 → 5
+        """
+        if   width < 800:   return min(1, max_cols)
+        elif width < 1200:  return min(2, max_cols)
+        elif width < 1600:  return min(3, max_cols)
+        elif width < 2200:  return min(4, max_cols)
+        else:               return min(5, max_cols)
 
     # â”€â”€ user scale override â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

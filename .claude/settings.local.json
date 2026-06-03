@@ -101,7 +101,9 @@
       "PowerShell(python --version 2>&1; python -m pip --version 2>&1)",
       "PowerShell(py *)",
       "Skill(update-config)",
-      "PowerShell(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Force | Select-Object Name, @{n='Type';e={if\\($_.Attributes -match 'Directory'\\){'Folder'}else{'File'}}} | Format-Table -AutoSize)"
+      "PowerShell(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Force | Select-Object Name, @{n='Type';e={if\\($_.Attributes -match 'Directory'\\){'Folder'}else{'File'}}} | Format-Table -AutoSize)",
+      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\\\\\SystemMonitor\")",
+      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\\\\\SystemMonitor\\\\\\\\src\")"
     ]
   }
 }

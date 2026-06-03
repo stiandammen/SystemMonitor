@@ -619,8 +619,8 @@ class MemoryView(QWidget, ScaleMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def on_scale_changed(self, factor: float):
-        self._setup_ui()
-        self.update()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
 
     def showEvent(self, a0: QShowEvent | None) -> None:
         """Start update timer when view is shown"""
@@ -644,6 +644,17 @@ class MemoryView(QWidget, ScaleMixin):
         pass
 
     def _setup_ui(self):
+        old = self.layout()
+        if old:
+            while old.count():
+                item = old.takeAt(0)
+                if item.widget():
+                    item.widget().hide()
+                    item.widget().deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(old)
+            tmp.deleteLater()
+
         colors = c()
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)

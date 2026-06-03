@@ -64,7 +64,7 @@ def main():
         log_warning(LogCategory.APP, f"PyQt6 not installed; running in headless mode: {e}")
         # Proceed without GUI; define minimal stubs to avoid further errors
         headless = True
-        class QApplication:
+        class QApplication:  # type: ignore[no-redef]
             def __init__(self, *args, **kwargs):
                 pass
             def exec(self):
@@ -75,9 +75,9 @@ def main():
                 pass
             def setFont(self, font):
                 pass
-        class QMessageBox:
+        class QMessageBox:  # type: ignore[no-redef]
             pass
-        class Qt:
+        class Qt:  # type: ignore[no-redef]
             class HighDpiScaleFactorRoundingPolicy:
                 PassThrough = None
         # Continue execution without returning
@@ -97,7 +97,7 @@ def main():
             default_font = QFont()
             app.setFont(default_font)
         else:
-            from PyQt6.QtGui import QFont
+            from PyQt6.QtGui import QFont  # type: ignore[no-redef]
             default_font = QFont("Segoe UI", 10)
             default_font.setStyleHint(QFont.StyleHint.SansSerif)
             app.setFont(default_font)
@@ -153,7 +153,7 @@ def main():
             p.end()
             return QIcon(px)
 
-        tray = QSystemTrayIcon(app)
+        tray = QSystemTrayIcon()  # type: ignore[call-overload]
         tray.setIcon(_build_tray_icon())
         tray.setToolTip("System Monitor")
         if QSystemTrayIcon.isSystemTrayAvailable():

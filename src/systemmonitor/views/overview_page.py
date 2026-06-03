@@ -768,34 +768,48 @@ class OverviewPage(QWidget, ScaleMixin):
         cpu_card = GlassMetricCard("CPU Load", "ph.cpu", colors.ACCENT_GREEN)
         cpu_card.set_value("--", "Loading...")
         self._cpu_card = cpu_card
-        layout.addWidget(cpu_card, 0, 0)
 
         gpu_card = GlassMetricCard("GPU Load", "ph.monitor", colors.ACCENT_PURPLE)
         gpu_card.set_value("--", "Loading...")
         self._gpu_card = gpu_card
-        layout.addWidget(gpu_card, 0, 1)
 
         ram_card = GlassMetricCard("Memory", "ph.hard-drive", colors.ACCENT_BLUE)
         ram_card.set_value("--", "Loading...")
         self._ram_card = ram_card
-        layout.addWidget(ram_card, 0, 2)
 
         net_card = GlassMetricCard("Network", "ph.wifi-high", colors.ACCENT_CYAN)
         net_card.set_value("0.0 / 0.0", "Down / Up Mbps")
         self._net_card = net_card
-        layout.addWidget(net_card, 1, 0)
 
         disk_card = GlassMetricCard("Disk Activity", "mdi.harddisk", colors.ACCENT_ORANGE)
         disk_card.set_value("-- / --", "R/W MB/s")
         self._disk_card = disk_card
-        layout.addWidget(disk_card, 1, 1)
 
         temp_card = GlassMetricCard("Temperature", "ph.thermometer", colors.ACCENT_RED)
         temp_card.set_value("--°C", "GPU temp")
         self._temp_card = temp_card
-        layout.addWidget(temp_card, 1, 2)
+
+        self._metric_cards = [cpu_card, gpu_card, ram_card, net_card, disk_card, temp_card]
+        self._current_metric_cols = S.grid_columns_for(max(self.width(), 100))
+        self._arrange_metric_grid(layout, self._current_metric_cols)
 
         return row
+
+    def _arrange_metric_grid(self, layout: QGridLayout, cols: int):
+        while layout.count():
+            layout.takeAt(0)
+        for i, card in enumerate(self._metric_cards):
+            layout.addWidget(card, i // cols, i % cols)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        new_cols = S.grid_columns_for(self.width())
+        if new_cols != getattr(self, '_current_metric_cols', -1):
+            self._current_metric_cols = new_cols
+            if hasattr(self, '_metrics_row') and hasattr(self, '_metric_cards'):
+                layout = self._metrics_row.layout()
+                if isinstance(layout, QGridLayout):
+                    self._arrange_metric_grid(layout, new_cols)
 
     def _create_charts_section(self):
         colors = theme_manager.colors
@@ -843,17 +857,28 @@ class OverviewPage(QWidget, ScaleMixin):
     def _create_info_row(self):
         row = QFrame()
         row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        layout = QHBoxLayout()
-        layout.setSpacing(S.px(12))
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         row.setLayout(layout)
 
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(S.px(8))
+        splitter.setStyleSheet("QSplitter::handle { background: transparent; }")
+
         sysinfo_panel = self._create_sysinfo_panel()
-        layout.addWidget(sysinfo_panel, stretch=1)
+        sysinfo_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        splitter.addWidget(sysinfo_panel)
 
         storage_panel = GlassStoragePanel()
         self._storage_panel = storage_panel
-        layout.addWidget(storage_panel, stretch=1)
+        storage_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        splitter.addWidget(storage_panel)
 
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+
+        layout.addWidget(splitter)
         return row
 
     def _create_sysinfo_panel(self):
