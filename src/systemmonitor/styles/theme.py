@@ -160,56 +160,56 @@ class PremiumDarkTheme:
 
 
 class CyberpunkTheme:
-    """Neon cyberpunk theme — deep purple-black with hot pink primary accent"""
-    # Backgrounds — deep purple-black (distinct from Midnight's blue-black)
-    BG_PRIMARY = "#0d0015"
-    BG_SECONDARY = "#160025"
-    BG_CARD = "#1e1030"
-    BG_HOVER = "#2a1550"
-    BG_INPUT = "#0d0015"
-    BG_ACTIVE = "#ff2d6a"
+    """Neon cyberpunk theme — true black with neon magenta + electric cyan accents"""
+    # Backgrounds — near-black with subtle purple undertone
+    BG_PRIMARY = "#04000a"
+    BG_SECONDARY = "#080010"
+    BG_CARD = "#0f0020"
+    BG_HOVER = "#1a0038"
+    BG_INPUT = "#04000a"
+    BG_ACTIVE = "#ff0080"
 
-    # Text
-    TEXT_PRIMARY = "#f0e6ff"
-    TEXT_SECONDARY = "#b090d0"
-    TEXT_MUTED = "#7050a0"
-    TEXT_DISABLED = "#402060"
+    # Text — cold white with slight blue tinge, high contrast
+    TEXT_PRIMARY = "#eef5ff"
+    TEXT_SECONDARY = "#8ab4d4"
+    TEXT_MUTED = "#4a6080"
+    TEXT_DISABLED = "#2a3545"
 
-    # Primary accent — hot pink (iconic cyberpunk)
-    ACCENT_GREEN = "#ff2d6a"
-    ACCENT_GREEN_BRIGHT = "#ff5090"
-    ACCENT_GREEN_DIM = "rgba(255, 45, 106, 0.15)"
+    # Primary accent — neon magenta/hot pink
+    ACCENT_GREEN = "#ff0080"
+    ACCENT_GREEN_BRIGHT = "#ff40a8"
+    ACCENT_GREEN_DIM = "rgba(255, 0, 128, 0.15)"
 
-    # Secondary accents
-    ACCENT_BLUE = "#00d4ff"
-    ACCENT_ORANGE = "#ff6b35"
-    ACCENT_RED = "#ff0055"
-    ACCENT_YELLOW = "#ffdd00"
+    # Secondary accents — full neon palette
+    ACCENT_BLUE = "#00e5ff"
+    ACCENT_ORANGE = "#ff6600"
+    ACCENT_RED = "#ff0033"
+    ACCENT_YELLOW = "#f5ff00"
     ACCENT_CYAN = "#00ffff"
-    ACCENT_PURPLE = "#bd93f9"
-    ACCENT_PINK = "#ff2d6a"
+    ACCENT_PURPLE = "#cc00ff"
+    ACCENT_PINK = "#ff00ff"
 
     # Status colors
-    STATUS_RED = "#ff0055"
-    STATUS_ORANGE = "#ff6b35"
-    STATUS_YELLOW = "#ffdd00"
-    STATUS_GREEN = "#00ff9f"
+    STATUS_RED = "#ff0033"
+    STATUS_ORANGE = "#ff6600"
+    STATUS_YELLOW = "#f5ff00"
+    STATUS_GREEN = "#00ff88"
 
     # UI Elements
-    BORDER = "#2d0e4a"
-    BORDER_SUBTLE = "#1e0a33"
-    BORDER_FOCUS = "#ff2d6a"
-    GAUGE_BG = "#2a1050"
-    GAUGE_FILL = "#ff2d6a"
-    CHART_FILL = "rgba(255, 45, 106, 0.1)"
-    CHART_LINE = "#ff2d6a"
-    SHADOW = "rgba(0, 0, 0, 0.7)"
-    OVERLAY = "rgba(13, 0, 21, 0.95)"
+    BORDER = "#280050"
+    BORDER_SUBTLE = "#12002a"
+    BORDER_FOCUS = "#ff0080"
+    GAUGE_BG = "#100025"
+    GAUGE_FILL = "#ff0080"
+    CHART_FILL = "rgba(255, 0, 128, 0.12)"
+    CHART_LINE = "#ff0080"
+    SHADOW = "rgba(0, 0, 0, 0.9)"
+    OVERLAY = "rgba(4, 0, 10, 0.97)"
 
-    SUCCESS_BG = "#0a2015"
-    WARNING_BG = "#201a0a"
-    ERROR_BG = "#200005"
-    INFO_BG = "#0a0515"
+    SUCCESS_BG = "#001510"
+    WARNING_BG = "#150a00"
+    ERROR_BG = "#150003"
+    INFO_BG = "#00080f"
 
 
 
