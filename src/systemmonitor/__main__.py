@@ -132,8 +132,12 @@ def main():
     try:
         from systemmonitor.core.window import MainWindow
         from systemmonitor.styles.theme import theme_manager
+        from systemmonitor.config import settings as app_settings
         log_info(LogCategory.APP, "core modules imported OK")
 
+        # Apply saved theme (or fall back to cyber-cyan) before building the window
+        saved_theme = app_settings.get('theme', 'cyber-cyan')
+        theme_manager.set_theme(saved_theme)
         app.setStyleSheet(theme_manager.get_stylesheet())
         log_info(LogCategory.APP, "Theme applied OK")
 

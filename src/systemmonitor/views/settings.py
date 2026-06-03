@@ -407,15 +407,13 @@ class SettingsView(QWidget, ScaleMixin):
         card = Card(title="Appearance", icon="ph.palette")
 
         theme_keys  = [
-            "heimdal", "midnight", "premium", "cyberpunk", "nordic", "ember",
-            "cyber-cyan", "neon-purple", "inferno",
+            "cyber-cyan", "premium", "cyberpunk", "heimdal",
         ]
         theme_names = [
-            "Heimdal (Default)", "Midnight", "Premium", "Cyberpunk", "Nordic", "Ember",
-            "Cyber Cyan", "Neon Purple", "Inferno",
+            "Cyber Cyan (Default)", "Premium Dark", "Cyberpunk", "Heimdal",
         ]
         theme_combo = self._combo(theme_names, theme_keys,
-                                  settings.get('theme', 'heimdal'))
+                                  settings.get('theme', 'cyber-cyan'))
         theme_combo.currentIndexChanged.connect(
             lambda _: self._on_theme_selected(theme_combo.currentData()))
         card.add_widget(self._row(

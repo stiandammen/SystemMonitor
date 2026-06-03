@@ -86,40 +86,6 @@ PREMIUM_DARK = {
 }
 
 
-# Default colors (legacy compatibility)
-DEFAULT_COLORS = {
-    "BG_PRIMARY": "#101920",
-    "BG_SECONDARY": "#0d1218",
-    "BG_CARD": "#151d28",
-    "BG_HOVER": "#1c2838",
-    "BG_INPUT": "#101920",
-    "BG_ACTIVE": "#0c997f",
-    "TEXT_PRIMARY": "#ffffff",
-    "TEXT_SECONDARY": "#b0b0b0",
-    "TEXT_MUTED": "#707070",
-    "TEXT_DISABLED": "#505050",
-    "ACCENT_GREEN": "#0c997f",
-    "ACCENT_GREEN_BRIGHT": "#0fb89a",
-    "ACCENT_BLUE": "#3b82f6",
-    "ACCENT_ORANGE": "#f97316",
-    "ACCENT_RED": "#ef4444",
-    "ACCENT_YELLOW": "#fbbf24",
-    "ACCENT_CYAN": "#22d3ee",
-    "ACCENT_PURPLE": "#a855f7",
-    "ACCENT_PINK": "#ec4899",
-    "STATUS_RED": "#ef4444",
-    "STATUS_ORANGE": "#f97316",
-    "STATUS_YELLOW": "#fbbf24",
-    "STATUS_GREEN": "#22c55e",
-    "BORDER": "#2a3a4a",
-    "BORDER_SUBTLE": "#1a2530",
-    "BORDER_FOCUS": "#0c997f",
-    "GAUGE_BG": "#1c2838",
-    "GAUGE_FILL": "#0c997f",
-    "CHART_FILL": "#0a1a20",
-    "CHART_LINE": "#0c997f",
-}
-
 
 class PremiumDarkTheme:
     """Premium glassmorphism dark theme with green glow effects"""
@@ -191,109 +157,6 @@ class PremiumDarkTheme:
     INFO_BG = "rgba(88, 166, 255, 0.1)"
 
 
-class MidnightTheme:
-    """OLED-friendly dark theme with true black backgrounds and teal accent"""
-    # Backgrounds
-    BG_PRIMARY = "#101920"       # Dark blue-black background
-    BG_SECONDARY = "#0d1218"    # Darker for sidebar
-    BG_CARD = "#151d28"         # Elevated surfaces
-    BG_HOVER = "#1c2838"        # Hover states
-    BG_INPUT = "#101920"        # Input fields
-    BG_ACTIVE = "#0c997f"       # Active/selected
-
-    # Text - white primary for contrast
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#b0b0b0"
-    TEXT_MUTED = "#707070"
-    TEXT_DISABLED = "#505050"
-
-    # Accents
-    ACCENT_GREEN = "#0c997f"    # Primary teal accent
-    ACCENT_GREEN_BRIGHT = "#0fb89a"
-    ACCENT_GREEN_DIM = "rgba(12, 153, 127, 0.15)"
-    ACCENT_BLUE = "#3b82f6"
-    ACCENT_ORANGE = "#f97316"
-    ACCENT_RED = "#ef4444"
-    ACCENT_YELLOW = "#fbbf24"
-    ACCENT_CYAN = "#22d3ee"
-    ACCENT_PURPLE = "#a855f7"
-    ACCENT_PINK = "#ec4899"
-
-    # Status colors (for CPU temp, disk %, etc)
-    STATUS_RED = "#ef4444"
-    STATUS_ORANGE = "#f97316"
-    STATUS_YELLOW = "#fbbf24"
-    STATUS_GREEN = "#22c55e"
-
-    # UI Elements
-    BORDER = "#2a3a4a"
-    BORDER_SUBTLE = "#1a2530"
-    BORDER_FOCUS = "#0c997f"
-    GAUGE_BG = "#1c2838"
-    GAUGE_FILL = "#0c997f"
-    CHART_FILL = "#0a1a20"
-    CHART_LINE = "#0c997f"
-    SHADOW = "rgba(0, 0, 0, 0.5)"
-    OVERLAY = "rgba(0, 0, 0, 0.7)"
-
-    SUCCESS_BG = "#0a2015"
-    WARNING_BG = "#201a0a"
-    ERROR_BG = "#200a0a"
-    INFO_BG = "#0a1520"
-
-
-class CustomTheme:
-    """Custom user theme - loaded from settings"""
-    # These will be set dynamically
-    BG_PRIMARY = "#101920"
-    BG_SECONDARY = "#0d1218"
-    BG_CARD = "#151d28"
-    BG_HOVER = "#1c2838"
-    BG_INPUT = "#101920"
-    BG_ACTIVE = "#0c997f"
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#b0b0b0"
-    TEXT_MUTED = "#707070"
-    TEXT_DISABLED = "#505050"
-    ACCENT_GREEN = "#0c997f"
-    ACCENT_GREEN_BRIGHT = "#0fb89a"
-    ACCENT_GREEN_DIM = "rgba(12, 153, 127, 0.15)"
-    ACCENT_BLUE = "#3b82f6"
-    ACCENT_ORANGE = "#f97316"
-    ACCENT_RED = "#ef4444"
-    ACCENT_YELLOW = "#fbbf24"
-    ACCENT_CYAN = "#22d3ee"
-    ACCENT_PURPLE = "#a855f7"
-    ACCENT_PINK = "#ec4899"
-    STATUS_RED = "#ef4444"
-    STATUS_ORANGE = "#f97316"
-    STATUS_YELLOW = "#fbbf24"
-    STATUS_GREEN = "#22c55e"
-    BORDER = "#2a3a4a"
-    BORDER_SUBTLE = "#1a2530"
-    BORDER_FOCUS = "#0c997f"
-    GAUGE_BG = "#1c2838"
-    GAUGE_FILL = "#0c997f"
-    CHART_FILL = "#0a1a20"
-    CHART_LINE = "#0c997f"
-    SHADOW = "rgba(0, 0, 0, 0.5)"
-    OVERLAY = "rgba(0, 0, 0, 0.7)"
-    SUCCESS_BG = "#0a2015"
-    WARNING_BG = "#201a0a"
-    ERROR_BG = "#200a0a"
-    INFO_BG = "#0a1520"
-
-    @classmethod
-    def load_from_dict(cls, colors_dict):
-        """Load colors from dictionary"""
-        for key, value in colors_dict.items():
-            if hasattr(cls, key):
-                setattr(cls, key, value)
-
-    @classmethod
-    def save_to_dict(cls):
-        """Save colors to dictionary"""
-        return {key: getattr(cls, key) for key in DEFAULT_COLORS.keys()}
 
 
 class CyberpunkTheme:
@@ -348,107 +211,6 @@ class CyberpunkTheme:
     ERROR_BG = "#200005"
     INFO_BG = "#0a0515"
 
-
-class NordicTheme:
-    """Nordic inspired theme with soft muted blue accents"""
-    # Backgrounds - same base
-    BG_PRIMARY = "#101920"
-    BG_SECONDARY = "#0d1218"
-    BG_CARD = "#151d28"
-    BG_HOVER = "#1c2838"
-    BG_INPUT = "#101920"
-    BG_ACTIVE = "#5d8aa8"
-
-    # Text - pure white for stability
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#a0adb8"
-    TEXT_MUTED = "#6b7a86"
-    TEXT_DISABLED = "#4a5660"
-
-    # Accents - muted steel blue
-    ACCENT_GREEN = "#5d8aa8"
-    ACCENT_GREEN_BRIGHT = "#7aa8c8"
-    ACCENT_GREEN_DIM = "rgba(93, 138, 168, 0.15)"
-    ACCENT_BLUE = "#4a7a9a"
-    ACCENT_ORANGE = "#d08770"
-    ACCENT_RED = "#bf5656"
-    ACCENT_YELLOW = "#ebcb8b"
-    ACCENT_CYAN = "#8fbcbb"
-    ACCENT_PURPLE = "#b48ead"
-    ACCENT_PINK = "#d4789c"
-
-    # Status colors
-    STATUS_RED = "#bf5656"
-    STATUS_ORANGE = "#d08770"
-    STATUS_YELLOW = "#ebcb8b"
-    STATUS_GREEN = "#7cb342"
-
-    # UI Elements
-    BORDER = "#2a3a4a"
-    BORDER_SUBTLE = "#1a2530"
-    BORDER_FOCUS = "#5d8aa8"
-    GAUGE_BG = "#1c2838"
-    GAUGE_FILL = "#5d8aa8"
-    CHART_FILL = "#0a1a20"
-    CHART_LINE = "#5d8aa8"
-    SHADOW = "rgba(0, 0, 0, 0.5)"
-    OVERLAY = "rgba(16, 25, 32, 0.9)"
-
-    SUCCESS_BG = "#1e3328"
-    WARNING_BG = "#332822"
-    ERROR_BG = "#331a1a"
-    INFO_BG = "#1e2833"
-
-
-class EmberTheme:
-    """Warm ember theme with orange and amber accents"""
-    # Backgrounds - warm dark with blue tint
-    BG_PRIMARY = "#101920"
-    BG_SECONDARY = "#0d1218"
-    BG_CARD = "#151d28"
-    BG_HOVER = "#1c2838"
-    BG_INPUT = "#101920"
-    BG_ACTIVE = "#ffab00"
-
-    # Text - warm white
-    TEXT_PRIMARY = "#fff8f0"
-    TEXT_SECONDARY = "#e0c8b0"
-    TEXT_MUTED = "#9a8066"
-    TEXT_DISABLED = "#665544"
-
-    # Accents - warm amber and orange
-    ACCENT_GREEN = "#7cb342"
-    ACCENT_GREEN_BRIGHT = "#8bc34a"
-    ACCENT_GREEN_DIM = "rgba(124, 179, 66, 0.15)"
-    ACCENT_BLUE = "#5c9ece"
-    ACCENT_ORANGE = "#ff9100"
-    ACCENT_RED = "#ff5252"
-    ACCENT_YELLOW = "#ffd740"
-    ACCENT_CYAN = "#4dd0e1"
-    ACCENT_PURPLE = "#ce93d8"
-    ACCENT_PINK = "#f48fb1"
-
-    # Status colors
-    STATUS_RED = "#ff5252"
-    STATUS_ORANGE = "#ff9100"
-    STATUS_YELLOW = "#ffd740"
-    STATUS_GREEN = "#7cb342"
-
-    # UI Elements
-    BORDER = "#2a3a4a"
-    BORDER_SUBTLE = "#1a2530"
-    BORDER_FOCUS = "#ffab00"
-    GAUGE_BG = "#1c2838"
-    GAUGE_FILL = "#ffab00"
-    CHART_FILL = "#0a1a20"
-    CHART_LINE = "#ff9100"
-    SHADOW = "rgba(0, 0, 0, 0.5)"
-    OVERLAY = "rgba(16, 25, 32, 0.9)"
-
-    SUCCESS_BG = "#1a2d14"
-    WARNING_BG = "#2d2210"
-    ERROR_BG = "#2d1414"
-    INFO_BG = "#141a20"
 
 
 class HeimdalTheme:
@@ -562,86 +324,6 @@ class CyberCyanTheme:
     INFO_BG = "#0a1520"
 
 
-class NeonPurpleTheme:
-    """Neon-Purple: deep void black with vivid violet accent"""
-    BG_PRIMARY = "#0a0a0f"
-    BG_SECONDARY = "#12121d"
-    BG_CARD = "#1c1c2b"
-    BG_HOVER = "#24243a"
-    BG_INPUT = "#12121d"
-    BG_ACTIVE = "#a371f7"
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#b0b0b0"
-    TEXT_MUTED = "#707070"
-    TEXT_DISABLED = "#404040"
-    ACCENT_GREEN = "#a371f7"
-    ACCENT_GREEN_BRIGHT = "#b98cf9"
-    ACCENT_GREEN_DIM = "rgba(163, 113, 247, 0.15)"
-    ACCENT_BLUE = "#58a6ff"
-    ACCENT_ORANGE = "#f97316"
-    ACCENT_RED = "#ef4444"
-    ACCENT_YELLOW = "#fbbf24"
-    ACCENT_CYAN = "#22d3ee"
-    ACCENT_PURPLE = "#7b5cf0"
-    ACCENT_PINK = "#f0a3e3"
-    STATUS_RED = "#ef4444"
-    STATUS_ORANGE = "#f97316"
-    STATUS_YELLOW = "#fbbf24"
-    STATUS_GREEN = "#22c55e"
-    BORDER = "#2d2d44"
-    BORDER_SUBTLE = "#1e1e30"
-    BORDER_FOCUS = "#a371f7"
-    GAUGE_BG = "#1c1c2b"
-    GAUGE_FILL = "#a371f7"
-    CHART_FILL = "rgba(163, 113, 247, 0.1)"
-    CHART_LINE = "#a371f7"
-    SHADOW = "rgba(0, 0, 0, 0.5)"
-    OVERLAY = "rgba(10, 10, 15, 0.9)"
-    SUCCESS_BG = "#0a2015"
-    WARNING_BG = "#201a0a"
-    ERROR_BG = "#200a0a"
-    INFO_BG = "#0f0f20"
-
-
-class InfernoTheme:
-    """Inferno: scorched dark red with ember-red accent"""
-    BG_PRIMARY = "#0f0505"
-    BG_SECONDARY = "#1a0808"
-    BG_CARD = "#2d0f0f"
-    BG_HOVER = "#3a1515"
-    BG_INPUT = "#1a0808"
-    BG_ACTIVE = "#ff4d4d"
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#a0a0a0"
-    TEXT_MUTED = "#666666"
-    TEXT_DISABLED = "#444444"
-    ACCENT_GREEN = "#ff4d4d"
-    ACCENT_GREEN_BRIGHT = "#ff6b6b"
-    ACCENT_GREEN_DIM = "rgba(255, 77, 77, 0.15)"
-    ACCENT_BLUE = "#58a6ff"
-    ACCENT_ORANGE = "#ff9100"
-    ACCENT_RED = "#ff2020"
-    ACCENT_YELLOW = "#ffd740"
-    ACCENT_CYAN = "#22d3ee"
-    ACCENT_PURPLE = "#a371f7"
-    ACCENT_PINK = "#ff4fcf"
-    STATUS_RED = "#ff2020"
-    STATUS_ORANGE = "#ff9100"
-    STATUS_YELLOW = "#ffd740"
-    STATUS_GREEN = "#22c55e"
-    BORDER = "#4a1515"
-    BORDER_SUBTLE = "#3a1010"
-    BORDER_FOCUS = "#ff4d4d"
-    GAUGE_BG = "#3a1515"
-    GAUGE_FILL = "#ff4d4d"
-    CHART_FILL = "rgba(255, 77, 77, 0.1)"
-    CHART_LINE = "#ff4d4d"
-    SHADOW = "rgba(0, 0, 0, 0.6)"
-    OVERLAY = "rgba(15, 5, 5, 0.9)"
-    SUCCESS_BG = "#0a2015"
-    WARNING_BG = "#201a0a"
-    ERROR_BG = "#2d0505"
-    INFO_BG = "#0a1520"
 
 
 class ThemeManager(QObject):
@@ -651,29 +333,17 @@ class ThemeManager(QObject):
     _instance = None
 
     _themes = {
-        "premium": PremiumDarkTheme,
-        "midnight": MidnightTheme,
-        "custom": CustomTheme,
-        "cyberpunk": CyberpunkTheme,
-        "nordic": NordicTheme,
-        "ember": EmberTheme,
-        "heimdal": HeimdalTheme,
         "cyber-cyan": CyberCyanTheme,
-        "neon-purple": NeonPurpleTheme,
-        "inferno": InfernoTheme,
+        "premium": PremiumDarkTheme,
+        "cyberpunk": CyberpunkTheme,
+        "heimdal": HeimdalTheme,
     }
 
     _theme_names = {
-        "premium": "Premium Dark",
-        "midnight": "Midnight",
-        "custom": "Custom",
-        "cyberpunk": "Cyberpunk",
-        "nordic": "Nordic",
-        "ember": "Ember",
-        "heimdal": "Heimdal Security",
         "cyber-cyan": "Cyber Cyan",
-        "neon-purple": "Neon Purple",
-        "inferno": "Inferno",
+        "premium": "Premium Dark",
+        "cyberpunk": "Cyberpunk",
+        "heimdal": "Heimdal Security",
     }
 
     def __new__(cls):
@@ -687,8 +357,8 @@ class ThemeManager(QObject):
             return
         super().__init__()
         self._initialized = True
-        self._current_theme = "heimdal"
-        self._colors = HeimdalTheme()
+        self._current_theme = "cyber-cyan"
+        self._colors = CyberCyanTheme()
 
     @property
     def current_theme(self) -> str:
@@ -706,14 +376,10 @@ class ThemeManager(QObject):
         """Get human-readable theme name"""
         return self._theme_names.get(theme_key, theme_key.title())
 
-    def load_custom_theme(self, colors_dict):
-        """Load custom theme colors from dictionary"""
-        CustomTheme.load_from_dict(colors_dict)
-
     def set_theme(self, theme_name: str):
         """Switch between themes"""
         if theme_name not in self._themes:
-            theme_name = "midnight"
+            theme_name = "cyber-cyan"
 
         if theme_name == self._current_theme:
             return
@@ -735,15 +401,9 @@ class ThemeManager(QObject):
                 self._colors = self._themes[old_theme]()
                 self.theme_changed.emit(old_theme)
 
-    def reset_to_default(self):
-        """Reset custom theme to default colors"""
-        CustomTheme.load_from_dict(DEFAULT_COLORS)
-        # Always emit so UI can update even if not on custom theme
-        self.theme_changed.emit("custom")
-
     def toggle_theme(self):
-        """Toggle between dark and light"""
-        new_theme = "light" if self._current_theme == "midnight" else "midnight"
+        """Toggle between cyber-cyan and premium"""
+        new_theme = "premium" if self._current_theme == "cyber-cyan" else "cyber-cyan"
         self.set_theme(new_theme)
 
     def get_stylesheet(self) -> str:
