@@ -108,7 +108,11 @@
       "Bash(echo \"Launched PID: $!\")",
       "Bash(pkill -f \"systemmonitor\")",
       "Bash(PYTHONPATH=src py -3.14 -m systemmonitor)",
-      "Bash(echo \"PID: $!\")"
+      "Bash(echo \"PID: $!\")",
+      "Skill(fewer-permission-prompts)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs '-I{}' python3 -c ' *)",
+      "Bash(python3 *)"
     ]
   }
 }
