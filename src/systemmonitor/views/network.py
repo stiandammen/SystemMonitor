@@ -1012,19 +1012,21 @@ class NetworkView(QWidget, ScaleMixin):
         if not net:
             return
 
-        now = time.time()
-        sent = net.get("total_sent", 0) or net.get("bytes_sent", 0)
-        recv = net.get("total_recv", 0) or net.get("bytes_recv", 0)
+        # Use pre-calculated smoothed speeds from collector if available
+        # Units: Bytes/s
+        dn_bps_raw = net.get("download_speed", 0)
+        up_bps_raw = net.get("upload_speed", 0)
+        
+        # Standard network Mbps uses 1,000,000 bits per second
+        dn_mbps = (dn_bps_raw * 8) / 1_000_000
+        up_mbps = (up_bps_raw * 8) / 1_000_000
 
-        dt = max(now - self._last_ts, 0.001)
-        up_bps   = max((sent - self._last_sent) / dt, 0)
-        dn_bps   = max((recv - self._last_recv) / dt, 0)
-        up_mbps  = up_bps  / 1_048_576 * 8
-        dn_mbps  = dn_bps  / 1_048_576 * 8
+        sent = net.get("bytes_sent", 0)
+        recv = net.get("bytes_recv", 0)
 
         self._last_sent = sent
         self._last_recv = recv
-        self._last_ts   = now
+        self._last_ts   = time.time()
 
         # KPI
         self._kpi_down.set_value(f"{dn_mbps:.2f}", f"â†“ {self._fmt_bytes(recv)}")

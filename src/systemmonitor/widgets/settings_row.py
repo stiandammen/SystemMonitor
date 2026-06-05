@@ -244,11 +244,11 @@ class SettingsComboBox(QComboBox):
                 background-color: {c.BG_INPUT};
                 color: {c.TEXT_PRIMARY};
                 border: none;
-                border-radius: S.px(6)px;
-                padding: S.px(8)px S.px(12)px;
+                border-radius: {S.px(6)}px;
+                padding: {S.px(8)}px {S.px(12)}px;
                 font-family: "Segoe UI", "Segoe UI Variable", sans-serif;
-                font-size: S.px(13)px;
-                min-width: S.px(120)px;
+                font-size: {S.px(13)}px;
+                min-width: {S.px(120)}px;
             }}
             QComboBox:hover {{
                 background-color: {c.BG_HOVER};
@@ -258,22 +258,22 @@ class SettingsComboBox(QComboBox):
             }}
             QComboBox::drop-down {{
                 border: none;
-                width: S.px(24)px;
+                width: {S.px(24)}px;
             }}
             QComboBox::down-arrow {{
                 image: none;
-                border-left: S.px(4)px solid transparent;
-                border-right: S.px(4)px solid transparent;
-                border-top: S.px(5)px solid {c.TEXT_MUTED};
-                margin-right: S.px(8)px;
+                border-left: {S.px(4)}px solid transparent;
+                border-right: {S.px(4)}px solid transparent;
+                border-top: {S.px(5)}px solid {c.TEXT_MUTED};
+                margin-right: {S.px(8)}px;
             }}
             QComboBox QAbstractItemView {{
                 background-color: {c.BG_CARD};
                 color: {c.TEXT_PRIMARY};
                 border: none;
-                border-radius: S.px(6)px;
+                border-radius: {S.px(6)}px;
                 selection-background-color: {c.BG_HOVER};
-                padding: S.px(4)px;
+                padding: {S.px(4)}px;
             }}
         """)
 
@@ -311,31 +311,31 @@ class SettingsSlider(QSlider):
         c = theme_manager.colors
         self.setStyleSheet(f"""
             QSlider {{
-                min-height: S.px(36)px;
+                min-height: {S.px(36)}px;
             }}
             QSlider::groove:horizontal {{
                 border: none;
-                height: S.px(6)px;
+                height: {S.px(6)}px;
                 background-color: {c.BORDER};
-                border-radius: S.px(3)px;
-                margin: S.px(15)px S.px(8)px;
+                border-radius: {S.px(3)}px;
+                margin: {S.px(15)}px {S.px(8)}px;
             }}
             QSlider::sub-page:horizontal {{
                 background-color: {c.ACCENT_GREEN};
-                border-radius: S.px(3)px;
-                height: S.px(6)px;
+                border-radius: {S.px(3)}px;
+                height: {S.px(6)}px;
             }}
             QSlider::handle:horizontal {{
                 background-color: {c.TEXT_PRIMARY};
-                width: S.px(20)px;
-                height: S.px(20)px;
-                border-radius: S.px(10)px;
-                margin: S.px(-7)px 0;
-                border: S.px(2)px solid {c.ACCENT_GREEN};
+                width: {S.px(20)}px;
+                height: {S.px(20)}px;
+                border-radius: {S.px(10)}px;
+                margin: {S.px(-7)}px 0;
+                border: {S.px(2)}px solid {c.ACCENT_GREEN};
             }}
             QSlider::handle:horizontal:hover {{
                 background-color: {c.TEXT_PRIMARY};
-                border: S.px(2)px solid {c.ACCENT_GREEN};
+                border: {S.px(2)}px solid {c.ACCENT_GREEN};
             }}
         """)
         self._update_value_label_style()
@@ -347,9 +347,9 @@ class SettingsSlider(QSlider):
             QLabel {{
                 color: {c.TEXT_PRIMARY};
                 background-color: {c.BG_HOVER};
-                border: S.px(1)px solid {c.ACCENT_GREEN};
-                border-radius: S.px(6)px;
-                padding: S.px(4)px S.px(10)px;
+                border: {S.px(1)}px solid {c.ACCENT_GREEN};
+                border-radius: {S.px(6)}px;
+                padding: {S.px(4)}px {S.px(10)}px;
                 font-weight: bold;
             }}
         """)

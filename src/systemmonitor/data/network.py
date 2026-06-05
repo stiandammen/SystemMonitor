@@ -7,20 +7,54 @@ from systemmonitor.typing import Dict, Any, List, Optional
 
 
 class NetworkCollector:
-    """Collect network usage and connection information"""
+    """Collect network usage and connection information with realistic speed tracking"""
     
+    EMA_ALPHA = 0.3  # Smoothing factor
+
     def __init__(self):
         self._previous_io = None
         self._previous_time = 0
+        self._smoothed_download = 0.0
+        self._smoothed_upload = 0.0
+        self._active_interface = None
     
     def collect(self) -> Dict[str, Any]:
-        """Collect current network data"""
+        """Collect current network data with smoothing and interface detection"""
         try:
             import psutil
             import time
             
-            # Get IO counters
-            io_stats = self._get_io_stats()
+            # Get stats
+            io_dict = psutil.net_io_counters(pernic=True)
+            stats = psutil.net_if_stats()
+            total_io = psutil.net_io_counters()
+            current_time = time.time()
+            
+            # Find active interface
+            if not self._active_interface or int(current_time) % 30 == 0:
+                self._active_interface = self._find_active_interface(io_dict, stats)
+            
+            # Calculate rates
+            if self._previous_io is None:
+                self._previous_io = total_io
+                self._previous_time = current_time
+                download_rate = 0.0
+                upload_rate = 0.0
+            else:
+                time_delta = current_time - self._previous_time
+                if time_delta > 0:
+                    raw_download = (total_io.bytes_recv - self._previous_io.bytes_recv) / time_delta
+                    raw_upload = (total_io.bytes_sent - self._previous_io.bytes_sent) / time_delta
+                    
+                    # EMA Smoothing
+                    self._smoothed_download = (self.EMA_ALPHA * raw_download) + ((1 - self.EMA_ALPHA) * self._smoothed_download)
+                    self._smoothed_upload = (self.EMA_ALPHA * raw_upload) + ((1 - self.EMA_ALPHA) * self._smoothed_upload)
+                
+                download_rate = self._smoothed_download
+                upload_rate = self._smoothed_upload
+                
+                self._previous_io = total_io
+                self._previous_time = current_time
             
             # Get interface info
             interfaces = self._get_interfaces()
@@ -32,66 +66,36 @@ class NetworkCollector:
             addresses = self._get_addresses()
             
             return {
-                'download_speed': io_stats.get('download_rate', 0),
-                'upload_speed': io_stats.get('upload_rate', 0),
-                'total_sent': io_stats.get('bytes_sent', 0),
-                'total_recv': io_stats.get('bytes_recv', 0),
+                'download_speed': max(0, download_rate),
+                'upload_speed': max(0, upload_rate),
+                'total_sent': total_io.bytes_sent,
+                'total_recv': total_io.bytes_recv,
                 'interfaces': interfaces,
                 'connections_count': len(connections),
                 'addresses': addresses,
+                'active_interface': self._active_interface
             }
             
         except Exception as e:
             print(f"Network collect error: {e}")
             return self._get_fallback_data()
-    
-    def _get_io_stats(self) -> Dict[str, float]:
-        """Get network I/O with rate calculation"""
-        try:
-            import psutil
-            import time
             
-            current_io = psutil.net_io_counters()
-            current_time = time.time()
-            
-            if self._previous_io is None:
-                self._previous_io = current_io
-                self._previous_time = current_time
-                return {
-                    'bytes_sent': 0,
-                    'bytes_recv': 0,
-                    'upload_rate': 0,
-                    'download_rate': 0,
-                }
-            
-            # Calculate rates
-            time_delta = current_time - self._previous_time
-            if time_delta > 0:
-                upload_rate = (current_io.bytes_sent - self._previous_io.bytes_sent) / time_delta
-                download_rate = (current_io.bytes_recv - self._previous_io.bytes_recv) / time_delta
-            else:
-                upload_rate = 0
-                download_rate = 0
-            
-            # Update previous
-            self._previous_io = current_io
-            self._previous_time = current_time
-            
-            return {
-                'bytes_sent': current_io.bytes_sent,
-                'bytes_recv': current_io.bytes_recv,
-                'upload_rate': max(0, upload_rate),
-                'download_rate': max(0, download_rate),
-            }
-            
-        except Exception as e:
-            print(f"Network IO error: {e}")
-            return {
-                'bytes_sent': 0,
-                'bytes_recv': 0,
-                'upload_rate': 0,
-                'download_rate': 0,
-            }
+    def _find_active_interface(self, io_dict, stats_dict) -> str:
+        """Heuristic to find the likely primary physical interface"""
+        best_iface = None
+        max_traffic = -1
+        virtual_keywords = ['loopback', 'lo', 'virtual', 'docker', 'veth', 'br-', 'vmnet', 'vbox', 'pseudo', 'teredo', 'tunnel']
+        
+        for name, io in io_dict.items():
+            lname = name.lower()
+            if any(k in lname for k in virtual_keywords): continue
+            is_up = stats_dict.get(name).isup if name in stats_dict else False
+            if not is_up: continue
+            traffic = io.bytes_sent + io.bytes_recv
+            if traffic > max_traffic:
+                max_traffic = traffic
+                best_iface = name
+        return best_iface or "Total"
     
     def _get_interfaces(self) -> List[Dict[str, Any]]:
         """Get network interface information"""

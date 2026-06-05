@@ -6,6 +6,7 @@ import platform
 import time
 import ctypes
 import struct
+import random
 from systemmonitor.typing import Dict, Any, List, Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -15,11 +16,13 @@ from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_wa
 class StorageCollector(QThread):
     """
     Comprehensive storage data collector running in background thread.
-    Collects: per-disk info, SMART data, temperatures, IO rates
+    Optimized for low CPU impact and smooth UI updates.
     """
     data_updated = pyqtSignal(dict)
 
-    REFRESH_INTERVAL = 2.0  # 2 seconds for storage data
+    REFRESH_INTERVAL = 1.0  
+    PROCESS_SCAN_DIVIDER = 2  # Scan processes every 2 seconds (REFRESH * DIVIDER)
+    EMA_ALPHA = 0.3
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -27,14 +30,14 @@ class StorageCollector(QThread):
         self._data = {}
         self._previous_io = {}
         self._previous_time = {}
+        self._smoothed_io = {}
         self._last_emit_time = 0
-        self._min_emit_interval = 1.0
+        self._min_emit_interval = 0.5
         self._smart_cache = {}
         self._smart_cache_time = {}
-        self._smart_cache_ttl = 30.0  # Cache SMART for 30 seconds
-        self._temp_cache = {}
-        self._temp_cache_time = {}
-        self._temp_cache_ttl = 5.0  # Cache temp for 5 seconds
+        self._smart_cache_ttl = 30.0
+        self._process_io_history = {}
+        self._scan_counter = 0
 
     def run(self):
         """Main collection loop"""
@@ -44,7 +47,12 @@ class StorageCollector(QThread):
         while self._running and not self.isInterruptionRequested():
             try:
                 start_time = time.time()
-                collected = self._collect()
+                
+                # Update counters
+                self._scan_counter += 1
+                should_scan_procs = (self._scan_counter % self.PROCESS_SCAN_DIVIDER == 0)
+
+                collected = self._collect(scan_procs=should_scan_procs)
 
                 if collected:
                     self._data.update(collected)
@@ -62,13 +70,8 @@ class StorageCollector(QThread):
                 log_exception(LogCategory.DISK, "StorageCollector error", e)
                 time.sleep(2)
 
-    def stop(self):
-        """Stop data collection"""
-        self._running = False
-        self.requestInterruption()
-
-    def _collect(self) -> dict:
-        """Collect all storage data"""
+    def _collect(self, scan_procs: bool = False) -> dict:
+        """Collect all storage data with conditional process scanning"""
         try:
             import psutil
 
@@ -76,8 +79,16 @@ class StorageCollector(QThread):
                 'disks': [],
                 'total_read_rate': 0,
                 'total_write_rate': 0,
+                'total_read_iops': 0.0,
+                'total_write_iops': 0.0,
+                'total_read_latency_ms': 0.0,
+                'total_write_latency_ms': 0.0,
+                'total_busy_pct': 0.0,
                 'station_name': self._get_station_name(),
             }
+            
+            if scan_procs:
+                disks_data['top_processes'] = self._get_top_io_processes()
 
             # Collect per-disk information
             disks = self._get_disk_list()
@@ -85,29 +96,104 @@ class StorageCollector(QThread):
 
             for disk in disks:
                 device = disk['device']
+                io_rates = disk_io.get(device, {
+                    'read_rate': 0, 'write_rate': 0,
+                    'read_iops': 0, 'write_iops': 0,
+                    'read_latency_ms': 0, 'write_latency_ms': 0,
+                    'busy_pct': 0,
+                })
+                
+                if device not in self._smoothed_io:
+                    self._smoothed_io[device] = {'read': io_rates['read_rate'], 'write': io_rates['write_rate']}
+                else:
+                    self._smoothed_io[device]['read'] = (self.EMA_ALPHA * io_rates['read_rate']) + \
+                                                       ((1 - self.EMA_ALPHA) * self._smoothed_io[device]['read'])
+                    self._smoothed_io[device]['write'] = (self.EMA_ALPHA * io_rates['write_rate']) + \
+                                                        ((1 - self.EMA_ALPHA) * self._smoothed_io[device]['write'])
 
-                # Get per-disk IO rates
-                io_rates = disk_io.get(device, {'read_rate': 0, 'write_rate': 0})
-                disk['read_rate'] = io_rates['read_rate']
-                disk['write_rate'] = io_rates['write_rate']
-
-                # Get temperature (cached)
-                disk['temperature'] = self._get_disk_temperature(device)
-
-                # Get SMART data (cached)
-                disk['smart'] = self._get_smart_data(device)
+                disk['read_rate']        = max(0, self._smoothed_io[device]['read'])
+                disk['write_rate']       = max(0, self._smoothed_io[device]['write'])
+                disk['read_iops']        = io_rates.get('read_iops', 0)
+                disk['write_iops']       = io_rates.get('write_iops', 0)
+                disk['read_latency_ms']  = io_rates.get('read_latency_ms', 0)
+                disk['write_latency_ms'] = io_rates.get('write_latency_ms', 0)
+                disk['busy_pct']         = io_rates.get('busy_pct', 0)
 
                 disks_data['disks'].append(disk)
+                disks_data['total_read_rate']  += disk['read_rate']
+                disks_data['total_write_rate'] += disk['write_rate']
 
-                # Accumulate total IO rates
-                disks_data['total_read_rate'] += io_rates['read_rate']
-                disks_data['total_write_rate'] += io_rates['write_rate']
+            # ... Aggregate metrics ...
+            iops_r = iops_w = 0.0
+            lat_r_sum = lat_w_sum = 0.0
+            max_busy = 0.0
+            for rates in disk_io.values():
+                ir = rates.get('read_iops', 0)
+                iw = rates.get('write_iops', 0)
+                iops_r += ir
+                iops_w += iw
+                lat_r_sum += rates.get('read_latency_ms', 0) * ir
+                lat_w_sum += rates.get('write_latency_ms', 0) * iw
+                max_busy = max(max_busy, rates.get('busy_pct', 0))
+
+            disks_data['total_read_iops']       = iops_r
+            disks_data['total_write_iops']      = iops_w
+            disks_data['total_read_latency_ms'] = lat_r_sum / iops_r if iops_r > 0 else 0.0
+            disks_data['total_write_latency_ms'] = lat_w_sum / iops_w if iops_w > 0 else 0.0
+            disks_data['total_busy_pct']        = max_busy
 
             return disks_data
 
         except Exception as e:
             log_exception(LogCategory.DISK, "Storage collection failed", e)
             return {}
+
+    def _get_top_io_processes(self) -> List[Dict[str, Any]]:
+        """Identify processes with highest disk I/O activity - Optimized version"""
+        import psutil
+        processes = []
+        now = time.time()
+        
+        try:
+            # Use as_dict for bulk property fetching (more efficient)
+            for proc in psutil.process_iter(['pid', 'name', 'io_counters']):
+                try:
+                    pinfo = proc.info
+                    io = pinfo['io_counters']
+                    if not io: continue
+                    
+                    pid = pinfo['pid']
+                    if pid in self._process_io_history:
+                        prev = self._process_io_history[pid]
+                        dt = now - prev['time']
+                        if dt > 0.5:
+                            read_rate = (io.read_bytes - prev['read']) / dt
+                            write_rate = (io.write_bytes - prev['write']) / dt
+                            
+                            if read_rate > 5000 or write_rate > 5000: # Threshold 5KB/s
+                                processes.append({
+                                    'pid': pid,
+                                    'name': pinfo['name'],
+                                    'read_rate': max(0, read_rate),
+                                    'write_rate': max(0, write_rate)
+                                })
+                    
+                    self._process_io_history[pid] = {
+                        'read': io.read_bytes, 'write': io.write_bytes, 'time': now
+                    }
+                except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError, TypeError):
+                    continue
+            
+            # Efficient cleanup
+            if self._scan_counter % 10 == 0:
+                current_pids = set(psutil.pids())
+                self._process_io_history = {pid: data for pid, data in self._process_io_history.items() if pid in current_pids}
+                    
+            processes.sort(key=lambda x: x['read_rate'] + x['write_rate'], reverse=True)
+            return processes[:8]
+            
+        except Exception as e:
+            return []
 
     def _get_station_name(self) -> str:
         """Get the computer/station name"""
@@ -200,8 +286,6 @@ class StorageCollector(QThread):
                             'status': drive.Status or 'Unknown',
                             'read_rate': 0,
                             'write_rate': 0,
-                            'temperature': None,
-                            'smart': None,
                             'station_name': self._get_station_name(),
                         }
 
@@ -328,7 +412,7 @@ class StorageCollector(QThread):
         return device
 
     def _get_io_stats(self) -> Dict[str, Dict[str, float]]:
-        """Get per-disk IO statistics with rate calculation"""
+        """Get per-disk IO statistics with rate, IOPS, latency and busy% calculation"""
         import psutil
 
         result = {}
@@ -337,25 +421,49 @@ class StorageCollector(QThread):
             current_time = time.time()
 
             for device, io in current_io.items():
-                # Normalize device name
                 norm_device = self._normalize_device_name(device)
 
                 if norm_device not in self._previous_io:
                     self._previous_io[norm_device] = io
                     self._previous_time[norm_device] = current_time
-                    result[norm_device] = {'read_rate': 0, 'write_rate': 0}
+                    result[norm_device] = {
+                        'read_rate': 0, 'write_rate': 0,
+                        'read_iops': 0, 'write_iops': 0,
+                        'read_latency_ms': 0, 'write_latency_ms': 0,
+                        'busy_pct': 0,
+                    }
                     continue
 
+                prev = self._previous_io[norm_device]
                 time_delta = current_time - self._previous_time[norm_device]
-                if time_delta > 0 and self._previous_io[norm_device]:
-                    read_rate = (io.read_bytes - self._previous_io[norm_device].read_bytes) / time_delta
-                    write_rate = (io.write_bytes - self._previous_io[norm_device].write_bytes) / time_delta
+
+                if time_delta > 0 and prev:
+                    read_rate  = (io.read_bytes  - prev.read_bytes)  / time_delta
+                    write_rate = (io.write_bytes - prev.write_bytes) / time_delta
+
+                    delta_rc = max(0, io.read_count  - prev.read_count)
+                    delta_wc = max(0, io.write_count - prev.write_count)
+                    delta_rt = max(0, io.read_time   - prev.read_time)   # ms
+                    delta_wt = max(0, io.write_time  - prev.write_time)  # ms
+
+                    read_iops  = delta_rc / time_delta
+                    write_iops = delta_wc / time_delta
+                    read_lat   = (delta_rt / delta_rc) if delta_rc > 0 else 0.0
+                    write_lat  = (delta_wt / delta_wc) if delta_wc > 0 else 0.0
+                    busy_pct   = min(100.0, (delta_rt + delta_wt) / (time_delta * 1000) * 100)
                 else:
                     read_rate = write_rate = 0
+                    read_iops = write_iops = 0
+                    read_lat = write_lat = busy_pct = 0.0
 
                 result[norm_device] = {
-                    'read_rate': max(0, read_rate),
-                    'write_rate': max(0, write_rate),
+                    'read_rate':       max(0, read_rate),
+                    'write_rate':      max(0, write_rate),
+                    'read_iops':       max(0.0, read_iops),
+                    'write_iops':      max(0.0, write_iops),
+                    'read_latency_ms': max(0.0, read_lat),
+                    'write_latency_ms': max(0.0, write_lat),
+                    'busy_pct':        busy_pct,
                 }
 
                 self._previous_io[norm_device] = io
@@ -373,104 +481,6 @@ class StorageCollector(QThread):
             normalized = device.replace('\\\\.\\', '').strip()
             return normalized
         return device
-
-    def _get_disk_temperature(self, device: str) -> Optional[float]:
-        """Get disk temperature using available methods"""
-        current_time = time.time()
-
-        # Check cache
-        if device in self._temp_cache:
-            if current_time - self._temp_cache_time[device] < self._temp_cache_ttl:
-                return self._temp_cache[device]
-
-        temp = None
-
-        if platform.system() == 'Windows':
-            # Try WMI first
-            temp = self._get_wmi_temperature()
-
-            # Try HWiNFO/LibreHardwareMonitor shared memory
-            if temp is None:
-                temp = self._read_hwinfo_temperature()
-
-        if temp is not None:
-            self._temp_cache[device] = temp
-            self._temp_cache_time[device] = current_time
-
-        return temp
-
-    def _get_wmi_temperature(self) -> Optional[float]:
-        """Get temperature via WMI"""
-        try:
-            import wmi
-            w = wmi.WMI()
-
-            # Try MSAcpi_ThermalZoneTemperature first
-            for sensor in w.MSAcpi_ThermalZoneTemperature():
-                if sensor.CurrentReading and sensor.CurrentReading > 0:
-                    # Convert from tenths of Kelvin to Celsius
-                    temp_k = float(sensor.CurrentReading)
-                    temp_c = temp_k / 10 - 273.15
-                    if 0 < temp_c < 120:
-                        return temp_c
-
-        except Exception:
-            pass
-
-        return None
-
-    def _read_hwinfo_temperature(self) -> Optional[float]:
-        """Read temperature from HWiNFO/LibreHardwareMonitor shared memory"""
-        try:
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
-
-            HWINFO_NAMES = [
-                "HWiNFO32_Sens", "HWiNFO64_Sens",
-                "HWiNFO32_V2", "HWiNFO64_V2",
-                "HWiNFO32_V3", "HWiNFO64_V3",
-                "HWiNFO32_V4", "HWiNFO64_V4",
-                "LibreHardwareMonitor",
-                "LHM_Sensor",
-            ]
-
-            handle = None
-            for name in HWINFO_NAMES:
-                handle = kernel32.OpenFileMappingW(0x0004, False, name)
-                if handle:
-                    break
-
-            if not handle:
-                return None
-
-            try:
-                mapping = kernel32.MapViewOfFile(handle, 0x0004, 0, 0, 8192)
-            finally:
-                kernel32.CloseHandle(handle)
-
-            if not mapping:
-                return None
-
-            try:
-                # Try reading temperature at various offsets
-                for offset in [0x30, 0x34, 0x38, 0x40, 0x44, 0x48, 0x50, 0x60, 0x80, 0x100]:
-                    try:
-                        temp_raw = ctypes.c_float()
-                        ctypes.memmove(ctypes.addressof(temp_raw), mapping + offset, 4)
-                        temp = temp_raw.value
-                        # Valid storage temperature range: 0-100°C
-                        if 0 < temp < 100:
-                            return temp
-                    except Exception:
-                        continue
-            finally:
-                if mapping:
-                    kernel32.UnmapViewOfFile(mapping)
-
-        except Exception:
-            pass
-
-        return None
 
     def _get_smart_data(self, device: str) -> Optional[Dict[str, Any]]:
         """Get SMART data for disk"""

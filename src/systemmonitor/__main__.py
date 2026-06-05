@@ -7,7 +7,6 @@ import os
 import sys
 import argparse
 import traceback
-import ctypes
 
 # Handle PyInstaller packaged app paths
 if getattr(sys, 'frozen', False):
@@ -15,25 +14,21 @@ if getattr(sys, 'frozen', False):
 else:
     bundle_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Insert the parent directory of the package into sys.path to avoid shadowing stdlib modules like typing
+# Ensure src/ is at the front of sys.path so systemmonitor.* imports work
 parent_dir = os.path.abspath(os.path.join(bundle_dir, os.pardir))
-sys.path.insert(0, parent_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Remove the package directory itself (src/systemmonitor/) from sys.path — Python adds it
+# automatically when running __main__.py directly, which causes typing.py and enum.py
+# inside the package to shadow the stdlib modules of the same name.
+while bundle_dir in sys.path:
+    sys.path.remove(bundle_dir)
 
 # Setup logging
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception
 
 _log = get_logger()
-
-
-def is_admin():
-    """Check if the application is running with administrator privileges"""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin() != 0
-    except AttributeError:
-        # Non-Windows
-        return os.getuid() == 0 if hasattr(os, 'getuid') else False
-    except Exception:
-        return False
 
 
 def main():
@@ -48,39 +43,35 @@ def main():
     log_info(LogCategory.APP, f"Python: {sys.version}")
     log_info(LogCategory.APP, f"Frozen: {getattr(sys, 'frozen', False)}")
     log_info(LogCategory.APP, f"Bundle dir: {bundle_dir}")
-    log_info(LogCategory.APP, f"Admin privileges: {is_admin()}")
 
-    if not is_admin():
-        log_warning(LogCategory.APP, "Running without admin privileges - some hardware sensors may be unavailable")
+    # Headless stubs — defined first so Pylance sees one consistent type per name.
+    # The real PyQt6 classes are imported below and replace these when available.
+    class QApplication:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs): pass
+        def exec(self): return 0
+        def setApplicationName(self, n): pass
+        def setApplicationVersion(self, v): pass
+        def setFont(self, f): pass
+        @staticmethod
+        def setHighDpiScaleFactorRoundingPolicy(p): pass
+
+    class QMessageBox:  # type: ignore[no-redef]
+        pass
+
+    class Qt:  # type: ignore[no-redef]
+        class HighDpiScaleFactorRoundingPolicy:
+            PassThrough = None
 
     headless = False
     try:
-        from PyQt6.QtWidgets import QApplication, QMessageBox
-        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QApplication, QMessageBox  # type: ignore[no-redef]
+        from PyQt6.QtCore import Qt  # type: ignore[no-redef]
         QApplication.setHighDpiScaleFactorRoundingPolicy(
             Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
         log_info(LogCategory.APP, "PyQt6 imported OK")
     except ModuleNotFoundError as e:
         log_warning(LogCategory.APP, f"PyQt6 not installed; running in headless mode: {e}")
-        # Proceed without GUI; define minimal stubs to avoid further errors
         headless = True
-        class QApplication:  # type: ignore[no-redef]
-            def __init__(self, *args, **kwargs):
-                pass
-            def exec(self):
-                return 0
-            def setApplicationName(self, name):
-                pass
-            def setApplicationVersion(self, ver):
-                pass
-            def setFont(self, font):
-                pass
-        class QMessageBox:  # type: ignore[no-redef]
-            pass
-        class Qt:  # type: ignore[no-redef]
-            class HighDpiScaleFactorRoundingPolicy:
-                PassThrough = None
-        # Continue execution without returning
     except Exception as e:
         log_error(LogCategory.APP, f"Failed to import PyQt6: {e}\n{traceback.format_exc()}")
         return 1

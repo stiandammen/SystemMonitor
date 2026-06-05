@@ -460,48 +460,108 @@ class DiskCollectorThread(BaseCollector):
 
 
 class NetworkCollectorThread(BaseCollector):
-    """Network data collector - runs in background thread"""
+    """Network data collector - runs in background thread with realistic speed tracking"""
 
     REFRESH_INTERVAL = 0.5  # 500ms for network (high frequency data)
+    EMA_ALPHA = 0.3  # Smoothing factor (0.1 to 0.3 is usually good)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._previous_io = None
         self._previous_time = 0
+        self._smoothed_download = 0.0
+        self._smoothed_upload = 0.0
+        self._active_interface = None
 
     def _collect(self) -> dict:
-        """Collect network data"""
+        """Collect network data with realistic speed calculation and smoothing"""
         try:
             import psutil
+            import time
 
-            io = psutil.net_io_counters()
+            # Get stats per interface to find the most active one
+            io_dict = psutil.net_io_counters(pernic=True)
+            stats = psutil.net_if_stats()
             current_time = time.time()
 
+            # Find best interface if not set or periodically re-check
+            if not self._active_interface or int(current_time) % 30 == 0:
+                self._active_interface = self._find_active_interface(io_dict, stats)
+
+            # Get global or interface-specific counters
+            # Using total counters for fallback, but preferred interface if possible
+            total_io = psutil.net_io_counters()
+            
+            # If we found a likely physical active interface, we can use its specific counters
+            # for "realism", but users often want the sum of all physical traffic.
+            # For now, let's use the sum but try to exclude virtual ones if we wanted to be very advanced.
+            # Standard approach: use total but apply smoothing.
+            
             if self._previous_io is None:
-                self._previous_io = io
+                self._previous_io = total_io
                 self._previous_time = current_time
-                return {'download_speed': 0, 'upload_speed': 0, 'bytes_sent': io.bytes_sent, 'bytes_recv': io.bytes_recv}
+                return {
+                    'download_speed': 0, 
+                    'upload_speed': 0, 
+                    'bytes_sent': total_io.bytes_sent, 
+                    'bytes_recv': total_io.bytes_recv,
+                    'active_interface': self._active_interface
+                }
 
             time_delta = current_time - self._previous_time
-            if time_delta > 0 and self._previous_io:
-                download = (io.bytes_recv - self._previous_io.bytes_recv) / time_delta
-                upload = (io.bytes_sent - self._previous_io.bytes_sent) / time_delta
+            if time_delta > 0:
+                raw_download = (total_io.bytes_recv - self._previous_io.bytes_recv) / time_delta
+                raw_upload = (total_io.bytes_sent - self._previous_io.bytes_sent) / time_delta
+                
+                # Apply Exponential Moving Average (EMA) for smoothing
+                self._smoothed_download = (self.EMA_ALPHA * raw_download) + ((1 - self.EMA_ALPHA) * self._smoothed_download)
+                self._smoothed_upload = (self.EMA_ALPHA * raw_upload) + ((1 - self.EMA_ALPHA) * self._smoothed_upload)
             else:
-                download = upload = 0
+                raw_download = raw_upload = 0
 
-            self._previous_io = io
+            self._previous_io = total_io
             self._previous_time = current_time
 
             return {
-                'download_speed': max(0, download),
-                'upload_speed': max(0, upload),
-                'bytes_sent': io.bytes_sent,
-                'bytes_recv': io.bytes_recv,
+                'download_speed': max(0, self._smoothed_download),
+                'upload_speed': max(0, self._smoothed_upload),
+                'bytes_sent': total_io.bytes_sent,
+                'bytes_recv': total_io.bytes_recv,
+                'active_interface': self._active_interface,
+                'raw_download': max(0, raw_download),
+                'raw_upload': max(0, raw_upload)
             }
 
         except Exception as e:
             log_exception(LogCategory.NETWORK, "Network collection failed", e)
             return {}
+
+    def _find_active_interface(self, io_dict, stats_dict) -> str:
+        """Heuristic to find the likely primary physical interface"""
+        best_iface = None
+        max_traffic = -1
+        
+        # Keywords that often indicate virtual/internal interfaces
+        virtual_keywords = ['loopback', 'lo', 'virtual', 'docker', 'veth', 'br-', 'vmnet', 'vbox', 'pseudo', 'teredo', 'tunnel']
+        
+        for name, io in io_dict.items():
+            # Skip loopback and known virtuals
+            lname = name.lower()
+            if any(k in lname for k in virtual_keywords):
+                continue
+                
+            # Check if interface is UP
+            is_up = stats_dict.get(name).isup if name in stats_dict else False
+            if not is_up:
+                continue
+                
+            # Pick the one with the most total traffic (sent + recv)
+            traffic = io.bytes_sent + io.bytes_recv
+            if traffic > max_traffic:
+                max_traffic = traffic
+                best_iface = name
+                
+        return best_iface or "Total"
 
 
 class GPUCollectorThread(BaseCollector):

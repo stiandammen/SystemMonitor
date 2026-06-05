@@ -103,7 +103,12 @@
       "Skill(update-config)",
       "PowerShell(Get-ChildItem -Path \"E:\\\\[python - prosjekter]\\\\SystemMonitor\" -Force | Select-Object Name, @{n='Type';e={if\\($_.Attributes -match 'Directory'\\){'Folder'}else{'File'}}} | Format-Table -AutoSize)",
       "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\\\\\SystemMonitor\")",
-      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\\\\\SystemMonitor\\\\\\\\src\")"
+      "Bash(cd \"E:\\\\\\\\[python - prosjekter]\\\\\\\\SystemMonitor\\\\\\\\src\")",
+      "Bash(py src/systemmonitor/__main__.py)",
+      "Bash(echo \"Launched PID: $!\")",
+      "Bash(pkill -f \"systemmonitor\")",
+      "Bash(PYTHONPATH=src py -3.14 -m systemmonitor)",
+      "Bash(echo \"PID: $!\")"
     ]
   }
 }

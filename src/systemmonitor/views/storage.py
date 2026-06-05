@@ -1,29 +1,33 @@
 """
-Storage View - Professional comprehensive storage monitoring
-Enterprise-grade storage monitoring with live graphs, per-disk cards, and SMART status
+Storage View — Professional storage monitoring dashboard
+Clean dashboard layout with live metrics, animated KPI cards, and per-disk panels.
 """
-from systemmonitor.typing import Dict, List
+from systemmonitor.typing import Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QFrame, QGridLayout, QSizePolicy, QProgressBar
+    QFrame, QSizePolicy, QGraphicsOpacityEffect, QScrollArea
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import (
+    Qt, QTimer, QPropertyAnimation, QSequentialAnimationGroup, QEasingCurve
+)
+from PyQt6.QtGui import (
+    QFont, QResizeEvent, QPainter, QColor, QBrush
+)
 
 import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.scaler import S, ScaleMixin
-from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_debug, log_error, log_exception
+from systemmonitor.utils.logger import LogCategory, log_info, log_exception
 from systemmonitor.data.storage import StorageCollector
-from systemmonitor.widgets.card import Card
-from systemmonitor.widgets.storage_widgets import (
-    StorageDiskCard, StorageOverviewCard, StatTile, TemperatureBar
-)
+from systemmonitor.widgets.storage_widgets import StorageDiskCard, PerformanceHistoryGraph, ProcessIoTable
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# StorageHeader
+# ─────────────────────────────────────────────────────────────────────────────
 class StorageHeader(QWidget, ScaleMixin):
-    """Header widget for storage view with live indicator and stats summary"""
+    """Top header bar: pulsing LIVE dot · title · disk count chip."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -33,109 +37,167 @@ class StorageHeader(QWidget, ScaleMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_ui(self):
-        """Build header layout"""
+        if self.layout() is not None:
+            for child in self.findChildren(QWidget):
+                child.deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(self.layout())
+            tmp.deleteLater()
+
         colors = theme_manager.colors
-        self.setMinimumHeight(S.px(56))
-        self.setMaximumHeight(S.px(68))
+        self.setFixedHeight(S.px(60))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setStyleSheet(f"background-color: {colors.BG_CARD}; border: none; border-radius: {S.px(10)}px;")
+        self.setStyleSheet(
+            f"background-color: {colors.BG_CARD};"
+            f"border-radius: {S.px(12)}px;"
+        )
 
-        main_layout = QHBoxLayout()
-        main_layout.setContentsMargins(S.px(20), 0, S.px(20), 0)
-        main_layout.setSpacing(S.px(16))
-        self.setLayout(main_layout)
+        row = QHBoxLayout()
+        row.setContentsMargins(S.px(20), 0, S.px(20), 0)
+        row.setSpacing(S.px(14))
+        self.setLayout(row)
 
-        # Live indicator
-        live_layout = QHBoxLayout()
-        live_layout.setSpacing(S.px(8))
+        # ── LIVE dot + label ──────────────────────────────────────────────
+        live_row = QHBoxLayout()
+        live_row.setSpacing(S.px(7))
 
         self._live_dot = QFrame()
-        self._live_dot.setFixedSize(S.px(8), S.px(8))
-        self._live_dot.setStyleSheet(f"""
-            background-color: {colors.ACCENT_GREEN};
-            border-radius: {S.px(4)}px;
-        """)
-        live_layout.addWidget(self._live_dot)
+        self._live_dot.setFixedSize(S.px(9), S.px(9))
+        self._live_dot.setStyleSheet(
+            f"background-color: {colors.ACCENT_GREEN};"
+            f"border-radius: {S.px(4)}px;"
+        )
+        live_row.addWidget(self._live_dot)
 
-        live_label = QLabel("LIVE")
-        live_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-        live_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
-        live_layout.addWidget(live_label)
+        # Pulsing animation
+        self._pulse_fx = QGraphicsOpacityEffect(self._live_dot)
+        self._pulse_fx.setOpacity(1.0)
+        self._live_dot.setGraphicsEffect(self._pulse_fx)
 
-        main_layout.addLayout(live_layout)
+        fade_out = QPropertyAnimation(self._pulse_fx, b"opacity")
+        fade_out.setDuration(850)
+        fade_out.setStartValue(1.0)
+        fade_out.setEndValue(0.25)
+        fade_out.setEasingCurve(QEasingCurve.Type.InOutSine)
 
-        # Title
+        fade_in = QPropertyAnimation(self._pulse_fx, b"opacity")
+        fade_in.setDuration(850)
+        fade_in.setStartValue(0.25)
+        fade_in.setEndValue(1.0)
+        fade_in.setEasingCurve(QEasingCurve.Type.InOutSine)
+
+        self._pulse_anim = QSequentialAnimationGroup(self._live_dot)
+        self._pulse_anim.addAnimation(fade_out)
+        self._pulse_anim.addAnimation(fade_in)
+        self._pulse_anim.setLoopCount(-1)
+        self._pulse_anim.start()
+
+        live_lbl = QLabel("LIVE")
+        live_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        live_lbl.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        live_row.addWidget(live_lbl)
+        row.addLayout(live_row)
+
+        # Thin vertical separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFixedWidth(1)
+        sep.setFixedHeight(S.px(28))
+        sep.setStyleSheet(f"background-color: {colors.BORDER};")
+        row.addWidget(sep)
+
+        # ── Title ─────────────────────────────────────────────────────────
         title = QLabel("Storage Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", S.font_pt(17), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        main_layout.addWidget(title)
+        row.addWidget(title)
+        row.addStretch()
 
-        main_layout.addStretch()
+        # ── Disk count chip ───────────────────────────────────────────────
+        chip = QWidget()
+        chip.setStyleSheet(
+            f"background-color: {colors.BG_HOVER};"
+            f"border-radius: {S.px(8)}px;"
+        )
+        chip_row = QHBoxLayout(chip)
+        chip_row.setContentsMargins(S.px(10), S.px(4), S.px(10), S.px(4))
+        chip_row.setSpacing(S.px(6))
 
-        # Disk count indicator
-        disk_count_layout = QHBoxLayout()
-        disk_count_layout.setSpacing(S.px(8))
-
-        disk_icon = QLabel()
+        hdd_icon = QLabel()
         try:
-            icon = qta.icon('fa5s.hdd', color=colors.ACCENT_BLUE, scale=1.0)
-            disk_icon.setPixmap(icon.pixmap(S.px(16), S.px(16)))
+            ico = qta.icon("fa5s.hdd", color=colors.ACCENT_BLUE)
+            hdd_icon.setPixmap(ico.pixmap(S.px(14), S.px(14)))
         except Exception:
-            disk_icon.setText("")
-        disk_icon.setStyleSheet("background: transparent;")
-        disk_count_layout.addWidget(disk_icon)
+            hdd_icon.setText("")
+        hdd_icon.setStyleSheet("background: transparent;")
+        chip_row.addWidget(hdd_icon)
 
         self._disk_count_label = QLabel("--")
-        self._disk_count_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._disk_count_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         self._disk_count_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        disk_count_layout.addWidget(self._disk_count_label)
+        chip_row.addWidget(self._disk_count_label)
 
-        disks_text = QLabel("disks")
-        disks_text.setFont(QFont("Segoe UI", S.font_pt(10)))
-        disks_text.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        disk_count_layout.addWidget(disks_text)
+        unit = QLabel("disker")
+        unit.setFont(QFont("Segoe UI", S.font_pt(9)))
+        unit.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
+        chip_row.addWidget(unit)
 
-        main_layout.addLayout(disk_count_layout)
+        row.addWidget(chip)
 
     def set_disk_count(self, count: int):
-        """Update disk count display"""
         self._disk_count_label.setText(str(count))
 
     def set_live(self, live: bool):
-        """Set live indicator status"""
         colors = theme_manager.colors
         self._live_state = live
-        if live:
-            self._live_dot.setStyleSheet(f"background-color: {colors.ACCENT_GREEN}; border-radius: {S.px(4)}px;")
-        else:
-            self._live_dot.setStyleSheet(f"background-color: {colors.TEXT_MUTED}; border-radius: {S.px(4)}px;")
+        c = colors.ACCENT_GREEN if live else colors.TEXT_MUTED
+        self._live_dot.setStyleSheet(
+            f"background-color: {c}; border-radius: {S.px(4)}px;"
+        )
 
-    def _on_theme_changed(self, theme_name: str):
-        """Handle theme changes"""
+    def _on_theme_changed(self, _):
         self._setup_ui()
         self.set_live(self._live_state)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# StorageKpiCard — individual metric tile with animated top accent bar
+# ─────────────────────────────────────────────────────────────────────────────
 class StorageKpiCard(QFrame, ScaleMixin):
-    """Premium KPI stat card for storage metrics"""
-    def __init__(self, title: str, icon: str, accent: str, unit: str = "", parent=None):
+    """
+    Metric tile: top colored accent line, responsive font scaling, icon + value + unit.
+    """
+    _ACCENT_H = 3  # px of top accent line (scaled)
+
+    def __init__(self, title: str, icon_name: str, accent: str,
+                 unit: str = "", parent=None):
         super().__init__(parent)
         self._title = title
-        self._icon = icon
+        self._icon_name = icon_name
         self._accent = accent
         self._unit = unit
+        self._value_label: QLabel | None = None
+        self._unit_label: QLabel | None = None
+        self._title_label: QLabel | None = None
         self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
-    def _on_theme_changed(self, theme_name: str):
+    def _on_theme_changed(self, _):
         self._setup_ui()
 
     def _setup_ui(self):
+        if self.layout() is not None:
+            for child in self.findChildren(QWidget):
+                child.deleteLater()
+            tmp = QWidget()
+            tmp.setLayout(self.layout())
+            tmp.deleteLater()
+
         colors = theme_manager.colors
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(S.px(90))
-
+        self.setMinimumHeight(S.px(82))
+        self.setMinimumWidth(S.px(90))
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {colors.BG_CARD};
@@ -144,55 +206,101 @@ class StorageKpiCard(QFrame, ScaleMixin):
             }}
         """)
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(S.px(16), S.px(12), S.px(16), S.px(12))
-        layout.setSpacing(S.px(8))
-        self.setLayout(layout)
+        lay = QVBoxLayout()
+        ah = S.px(self._ACCENT_H)
+        lay.setContentsMargins(S.px(14), ah + S.px(10), S.px(14), S.px(10))
+        lay.setSpacing(S.px(3))
+        self.setLayout(lay)
 
-        # Top row: icon + title
-        top_row = QHBoxLayout()
-        top_row.setSpacing(S.px(8))
+        # Icon + title row
+        top = QHBoxLayout()
+        top.setSpacing(S.px(6))
 
-        icon_label = QLabel()
+        icon_lbl = QLabel()
         try:
-            icon = qta.icon(self._icon, color=self._accent, scale=1.0)
-            icon_label.setPixmap(icon.pixmap(S.px(16), S.px(16)))
+            ico = qta.icon(self._icon_name, color=self._accent)
+            icon_lbl.setPixmap(ico.pixmap(S.px(14), S.px(14)))
         except Exception:
-            icon_label.setText("")
-        icon_label.setStyleSheet("background: transparent;")
-        top_row.addWidget(icon_label)
+            icon_lbl.setText("")
+        icon_lbl.setStyleSheet("background: transparent;")
+        icon_lbl.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        top.addWidget(icon_lbl)
 
-        title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(10)))
-        title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        top_row.addWidget(title_label)
-        top_row.addStretch()
-
-        layout.addLayout(top_row)
+        self._title_label = QLabel(self._title)
+        self._title_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._title_label.setStyleSheet(
+            f"color: {colors.TEXT_MUTED}; background: transparent;"
+        )
+        self._title_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        top.addWidget(self._title_label, stretch=1)
+        lay.addLayout(top)
 
         # Value
         self._value_label = QLabel("--")
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(20), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
-        layout.addWidget(self._value_label)
+        self._value_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        lay.addWidget(self._value_label)
 
         # Unit
         self._unit_label = QLabel(self._unit)
-        self._unit_label.setFont(QFont("Segoe UI", S.font_pt(10)))
-        self._unit_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        layout.addWidget(self._unit_label)
+        self._unit_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._unit_label.setStyleSheet(
+            f"color: {colors.TEXT_MUTED}; background: transparent;"
+        )
+        lay.addWidget(self._unit_label)
+        lay.addStretch()
+
+    # ── top accent line drawn in paintEvent ──────────────────────────────
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        r = S.px(12)
+        ah = S.px(self._ACCENT_H)
+        painter.save()
+        painter.setClipRect(0, 0, self.width(), ah)
+        painter.setBrush(QColor(self._accent))
+        painter.drawRoundedRect(0, 0, self.width(), r * 2, r, r)
+        painter.restore()
+        painter.end()
+
+    # ── adaptive font scaling ─────────────────────────────────────────────
+    def resizeEvent(self, event: QResizeEvent):
+        super().resizeEvent(event)
+        w = event.size().width()
+        if w < 10:
+            return
+        for lbl, lo, hi, div in [
+            (self._value_label,  11, 22, 9),
+            (self._title_label,   8, 11, 16),
+            (self._unit_label,    7, 10, 18),
+        ]:
+            if lbl is None:
+                continue
+            pt = max(lo, min(hi, w // div))
+            f = lbl.font()
+            if f.pointSize() != pt:
+                f.setPointSize(pt)
+                lbl.setFont(f)
 
     def set_value(self, value: str, unit: str = ""):
-        self._value_label.setText(value)
-        if unit:
+        if self._value_label:
+            self._value_label.setText(value)
+        if unit and self._unit_label:
             self._unit_label.setText(unit)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# StorageView
+# ─────────────────────────────────────────────────────────────────────────────
 class StorageView(QWidget, ScaleMixin):
-    """
-    Comprehensive storage monitoring view.
-    Shows all disks with real-time metrics, graphs, and professional UI.
-    """
+    """Main storage monitoring page."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -200,17 +308,25 @@ class StorageView(QWidget, ScaleMixin):
         self._collector = None
         self._collector_started = False
         self._update_interval_ms = 1000
-
+        self._perf_latency: PerformanceHistoryGraph | None = None
+        self._perf_iops: PerformanceHistoryGraph | None = None
+        self._perf_bandwidth: PerformanceHistoryGraph | None = None
+        self._perf_load: PerformanceHistoryGraph | None = None
         self.scale_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def on_scale_changed(self, factor: float):
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._setup_ui)
 
     def _setup_ui(self):
-        """Build the storage monitoring UI"""
+        self._disk_cards.clear()
+
+        if hasattr(self, "_update_timer") and self._update_timer is not None:
+            self._update_timer.stop()
+            self._update_timer.deleteLater()
+            self._update_timer = None
+
         old = self.layout()
         if old:
             while old.count():
@@ -226,184 +342,204 @@ class StorageView(QWidget, ScaleMixin):
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Main layout
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
-        main_layout.setSpacing(S.px(12))
-        self.setLayout(main_layout)
+        main = QVBoxLayout()
+        main.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
+        main.setSpacing(S.px(12))
+        self.setLayout(main)
 
-        # ===== HEADER BAR =====
+        # Header
         self._header = StorageHeader()
-        main_layout.addWidget(self._header)
+        main.addWidget(self._header)
 
+        # KPI row
+        kpi_row = QHBoxLayout()
+        kpi_row.setSpacing(S.px(10))
 
-        # ===== MAIN CONTENT (2 columns) =====
-        content_container = QWidget()
-        content_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        content_layout = QHBoxLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(S.px(12))
-        content_container.setLayout(content_layout)
+        self._kpi_capacity = StorageKpiCard(
+            "Total kapasitet", "fa5s.hdd", colors.ACCENT_BLUE)
+        self._kpi_used = StorageKpiCard(
+            "Brukt", "mdi.database", colors.ACCENT_ORANGE)
+        self._kpi_free = StorageKpiCard(
+            "Ledig", "mdi.check-circle", colors.ACCENT_GREEN)
+        self._kpi_read = StorageKpiCard(
+            "Lesehastighet", "mdi.arrow-down-bold", colors.ACCENT_GREEN)
+        self._kpi_write = StorageKpiCard(
+            "Skrivehastighet", "mdi.arrow-up-bold", colors.ACCENT_BLUE)
 
-        # LEFT COLUMN - Overview + usage bars
-        left_widget = QWidget()
-        left_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(S.px(12))
-        left_widget.setLayout(left_layout)
+        for kpi in [self._kpi_capacity, self._kpi_used, self._kpi_free,
+                    self._kpi_read, self._kpi_write]:
+            kpi_row.addWidget(kpi)
 
-        # Overview card
-        overview_card = Card(title="Storage Overview", icon="ph.chart-pie")
-        self._overview_card = StorageOverviewCard()
-        self._overview_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        overview_card.add_widget(self._overview_card)
-        left_layout.addWidget(overview_card, stretch=1)
+        kpi_widget = QWidget()
+        kpi_widget.setLayout(kpi_row)
+        main.addWidget(kpi_widget)
 
-        # Top disks card
-        disks_card = Card(title="Top Disks by Usage", icon="ph.hard-drive")
-        self._top_disks_container = QVBoxLayout()
-        self._top_disks_container.setSpacing(S.px(6))
-        top_disks_widget = QWidget()
-        top_disks_widget.setLayout(self._top_disks_container)
-        disks_card.add_widget(top_disks_widget)
-        left_layout.addWidget(disks_card, stretch=1)
+        # ── Scroll area wraps disk cards + perf section ───────────────────────
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("background: transparent; border: none;")
 
-        content_layout.addWidget(left_widget, stretch=2)
+        inner = QWidget()
+        inner.setStyleSheet("background: transparent;")
+        inner_lay = QVBoxLayout(inner)
+        inner_lay.setContentsMargins(0, 0, S.px(2), 0)
+        inner_lay.setSpacing(S.px(12))
 
-        # RIGHT COLUMN - Disk cards stacked
-        right_widget = QWidget()
-        right_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        right_layout = QVBoxLayout()
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(S.px(12))
-        right_widget.setLayout(right_layout)
+        # Section divider — "FYSISKE DISKER"
+        section_row = QHBoxLayout()
+        section_row.setSpacing(0)
+        section_row.setContentsMargins(0, S.px(2), 0, 0)
 
-        # Physical disks header
-        section_title = QLabel("Physical Disks")
-        section_title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        section_title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        right_layout.addWidget(section_title)
+        accent_bar = QFrame()
+        accent_bar.setFixedSize(S.px(3), S.px(16))
+        accent_bar.setStyleSheet(
+            f"background-color: {colors.ACCENT_GREEN};"
+            f"border-radius: {S.px(2)}px;"
+        )
+        section_row.addWidget(accent_bar)
+        section_row.addSpacing(S.px(10))
 
-        # Disk cards scroll container
-        self._disk_cards_scroll = QWidget()
-        self._disk_cards_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        section_lbl = QLabel("FYSISKE DISKER")
+        section_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        section_lbl.setStyleSheet(
+            f"color: {colors.TEXT_MUTED}; background: transparent;"
+        )
+        section_row.addWidget(section_lbl)
+        section_row.addSpacing(S.px(12))
+
+        rule = QFrame()
+        rule.setFrameShape(QFrame.Shape.HLine)
+        rule.setFixedHeight(1)
+        rule.setStyleSheet(f"background-color: {colors.BORDER}; border: none;")
+        section_row.addWidget(rule, stretch=1)
+
+        inner_lay.addLayout(section_row)
+
+        # Disk card container — no stretch so cards stay compact
+        disk_container = QWidget()
+        disk_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
         self._disk_cards_inner = QVBoxLayout()
         self._disk_cards_inner.setSpacing(S.px(10))
         self._disk_cards_inner.setContentsMargins(0, 0, 0, 0)
-        self._disk_cards_scroll.setLayout(self._disk_cards_inner)
-        right_layout.addWidget(self._disk_cards_scroll, stretch=1)
+        disk_container.setLayout(self._disk_cards_inner)
+        inner_lay.addWidget(disk_container)
 
-        content_layout.addWidget(right_widget, stretch=1)
+        # ── PROGRAM-AKTIVITET section ──────────────────────────────────────────
+        proc_section_row = QHBoxLayout()
+        proc_section_row.setSpacing(0)
+        proc_section_row.setContentsMargins(0, S.px(6), 0, 0)
 
-        main_layout.addWidget(content_container, stretch=1)
+        proc_accent = QFrame()
+        proc_accent.setFixedSize(S.px(3), S.px(16))
+        proc_accent.setStyleSheet(
+            f"background-color: {colors.ACCENT_ORANGE};"
+            f"border-radius: {S.px(2)}px;"
+        )
+        proc_section_row.addWidget(proc_accent)
+        proc_section_row.addSpacing(S.px(10))
 
-        # ===== BOTTOM STATUS BAR =====
-        self._setup_status_bar(main_layout)
+        proc_section_lbl = QLabel("PROGRAM-AKTIVITET")
+        proc_section_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        proc_section_lbl.setStyleSheet(
+            f"color: {colors.TEXT_MUTED}; background: transparent;"
+        )
+        proc_section_row.addWidget(proc_section_lbl)
+        proc_section_row.addSpacing(S.px(12))
 
-        # Start update timer
+        proc_rule = QFrame()
+        proc_rule.setFrameShape(QFrame.Shape.HLine)
+        proc_rule.setFixedHeight(1)
+        proc_rule.setStyleSheet(f"background-color: {colors.BORDER}; border: none;")
+        proc_section_row.addWidget(proc_rule, stretch=1)
+        inner_lay.addLayout(proc_section_row)
+
+        self._proc_table = ProcessIoTable()
+        inner_lay.addWidget(self._proc_table)
+
+        # ── TOTAL YTELSE section ──────────────────────────────────────────────
+        perf_section_row = QHBoxLayout()
+        perf_section_row.setSpacing(0)
+        perf_section_row.setContentsMargins(0, S.px(6), 0, 0)
+
+        perf_accent = QFrame()
+        perf_accent.setFixedSize(S.px(3), S.px(16))
+        perf_accent.setStyleSheet(
+            f"background-color: {colors.ACCENT_BLUE};"
+            f"border-radius: {S.px(2)}px;"
+        )
+        perf_section_row.addWidget(perf_accent)
+        perf_section_row.addSpacing(S.px(10))
+
+        perf_section_lbl = QLabel("TOTAL YTELSE")
+        perf_section_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        perf_section_lbl.setStyleSheet(
+            f"color: {colors.TEXT_MUTED}; background: transparent;"
+        )
+        perf_section_row.addWidget(perf_section_lbl)
+        perf_section_row.addSpacing(S.px(12))
+
+        perf_rule = QFrame()
+        perf_rule.setFrameShape(QFrame.Shape.HLine)
+        perf_rule.setFixedHeight(1)
+        perf_rule.setStyleSheet(f"background-color: {colors.BORDER}; border: none;")
+        perf_section_row.addWidget(perf_rule, stretch=1)
+        inner_lay.addLayout(perf_section_row)
+
+        # Row 1: Latency + IOPS
+        perf_row1 = QHBoxLayout()
+        perf_row1.setSpacing(S.px(10))
+
+        self._perf_latency = PerformanceHistoryGraph("Disk Latency", unit='ms', max_points=90)
+        self._perf_latency.add_series("Skriv", colors.ACCENT_YELLOW, 'scatter')
+        self._perf_latency.add_series("Les", colors.ACCENT_ORANGE, 'scatter')
+        self._perf_latency.setMinimumHeight(S.px(190))
+        self._perf_latency.setMaximumHeight(S.px(220))
+        perf_row1.addWidget(self._perf_latency)
+
+        self._perf_iops = PerformanceHistoryGraph("Disk Operations", unit='iops', max_points=90)
+        self._perf_iops.add_series("Skriv", colors.TEXT_SECONDARY, 'line')
+        self._perf_iops.add_series("Les", colors.ACCENT_GREEN, 'line')
+        self._perf_iops.setMinimumHeight(S.px(190))
+        self._perf_iops.setMaximumHeight(S.px(220))
+        perf_row1.addWidget(self._perf_iops)
+
+        inner_lay.addLayout(perf_row1)
+
+        # Row 2: Bandwidth + Load
+        perf_row2 = QHBoxLayout()
+        perf_row2.setSpacing(S.px(10))
+
+        self._perf_bandwidth = PerformanceHistoryGraph("Disk Bandwidth", unit='B/s', max_points=90)
+        self._perf_bandwidth.add_series("Skriv", colors.ACCENT_BLUE, 'line')
+        self._perf_bandwidth.add_series("Les", colors.ACCENT_GREEN, 'line')
+        self._perf_bandwidth.setMinimumHeight(S.px(190))
+        self._perf_bandwidth.setMaximumHeight(S.px(220))
+        perf_row2.addWidget(self._perf_bandwidth)
+
+        self._perf_load = PerformanceHistoryGraph("Disk Load", unit='%', max_points=90)
+        self._perf_load.add_series("Belastning", colors.ACCENT_ORANGE, 'line')
+        self._perf_load.setMinimumHeight(S.px(190))
+        self._perf_load.setMaximumHeight(S.px(220))
+        perf_row2.addWidget(self._perf_load)
+
+        inner_lay.addLayout(perf_row2)
+        inner_lay.addStretch(1)
+
+        scroll.setWidget(inner)
+        main.addWidget(scroll, stretch=1)
+
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self._on_update_tick)
         self._update_timer.start(self._update_interval_ms)
 
-    def _setup_status_bar(self, parent_layout):
-        """Setup bottom status bar"""
-        colors = theme_manager.colors
-
-        status_card = Card(title="Storage Health", icon="mdi.shield-check")
-        status_layout = QHBoxLayout()
-        status_layout.setSpacing(S.px(32))
-
-        # Health indicator
-        health_widget = QWidget()
-        health_layout = QVBoxLayout()
-        health_layout.setSpacing(4)
-        health_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        health_icon = QLabel()
-        try:
-            icon = qta.icon("mdi.shield-check", color=colors.ACCENT_GREEN, scale=1.5)
-            health_icon.setPixmap(icon.pixmap(S.px(28), S.px(28)))
-        except Exception:
-            health_icon.setText("✓")
-        health_icon.setStyleSheet("background: transparent;")
-        health_layout.addWidget(health_icon)
-
-        self._health_label = QLabel("Healthy")
-        self._health_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-        self._health_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
-        health_layout.addWidget(self._health_label)
-
-        health_widget.setLayout(health_layout)
-        status_layout.addWidget(health_widget)
-
-        # Total capacity
-        cap_widget = QWidget()
-        cap_layout = QVBoxLayout()
-        cap_layout.setSpacing(2)
-        cap_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        cap_title = QLabel("Total Capacity")
-        cap_title.setFont(QFont("Segoe UI", S.font_pt(9)))
-        cap_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        cap_layout.addWidget(cap_title)
-
-        self._cap_label = QLabel("-- TB")
-        self._cap_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        self._cap_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        cap_layout.addWidget(self._cap_label)
-
-        cap_widget.setLayout(cap_layout)
-        status_layout.addWidget(cap_widget)
-
-        # Used space
-        used_widget = QWidget()
-        used_layout = QVBoxLayout()
-        used_layout.setSpacing(2)
-        used_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        used_title = QLabel("Used Space")
-        used_title.setFont(QFont("Segoe UI", S.font_pt(9)))
-        used_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        used_layout.addWidget(used_title)
-
-        self._used_label = QLabel("-- GB")
-        self._used_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        self._used_label.setStyleSheet(f"color: {colors.ACCENT_BLUE}; background: transparent;")
-        used_layout.addWidget(self._used_label)
-
-        used_widget.setLayout(used_layout)
-        status_layout.addWidget(used_widget)
-
-        # Temperature
-        temp_widget = QWidget()
-        temp_layout = QVBoxLayout()
-        temp_layout.setSpacing(2)
-        temp_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        temp_title = QLabel("Avg Temperature")
-        temp_title.setFont(QFont("Segoe UI", S.font_pt(9)))
-        temp_title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        temp_layout.addWidget(temp_title)
-
-        self._temp_label = QLabel("--°C")
-        self._temp_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
-        self._temp_label.setStyleSheet(f"color: {colors.ACCENT_ORANGE}; background: transparent;")
-        temp_layout.addWidget(self._temp_label)
-
-        temp_widget.setLayout(temp_layout)
-        status_layout.addWidget(temp_widget)
-
-        status_layout.addStretch()
-
-        status_card.add_layout(status_layout)
-        parent_layout.addWidget(status_card)
-
+    # ── collector ─────────────────────────────────────────────────────────
     def start_collector(self):
-        """Start the storage data collector"""
         if self._collector_started:
             return
-
         try:
             self._collector = StorageCollector()
             self._collector.data_updated.connect(self._on_collector_data)
@@ -414,188 +550,107 @@ class StorageView(QWidget, ScaleMixin):
             log_exception(LogCategory.DISK, "Failed to start storage collector", e)
 
     def _on_collector_data(self, data: dict):
-        """Handle incoming data from collector"""
         self._update_from_data(data)
 
     def _on_update_tick(self):
-        """Periodic update tick"""
         if not self._collector_started:
             self.start_collector()
 
+    # ── data update ───────────────────────────────────────────────────────
     def _update_from_data(self, data: dict):
-        """Update UI with new data"""
-        colors = theme_manager.colors
-        disks = data.get('disks', [])
-
-        # Update header disk count
+        disks = data.get("disks", [])
         self._header.set_disk_count(len(disks))
 
-        # Track which disks we have
-        current_devices = set()
-
+        current = set()
         for disk in disks:
-            device = disk.get('device', f'unknown_{id(disk)}')
-            current_devices.add(device)
-
-            # Update or create disk card
-            if device not in self._disk_cards:
+            dev = disk.get("device", f"unknown_{id(disk)}")
+            current.add(dev)
+            if dev not in self._disk_cards:
                 card = StorageDiskCard(disk)
-                self._disk_cards[device] = card
+                self._disk_cards[dev] = card
                 self._disk_cards_inner.addWidget(card)
             else:
-                self._disk_cards[device].update_disk_info(disk)
+                self._disk_cards[dev].update_disk_info(disk)
+            self._disk_cards[dev].update_speeds(
+                disk.get("read_rate", 0), disk.get("write_rate", 0)
+            )
 
-            # Update speeds
-            read_rate = disk.get('read_rate', 0)
-            write_rate = disk.get('write_rate', 0)
-            self._disk_cards[device].update_speeds(read_rate, write_rate)
+        for dev in list(self._disk_cards.keys()):
+            if dev not in current:
+                self._disk_cards.pop(dev).deleteLater()
 
-            # Update temperature
-            temp = disk.get('temperature')
-            if temp is not None:
-                self._disk_cards[device].update_temperature(temp)
+        # Update process activity table
+        top_procs = data.get("top_processes", [])
+        if hasattr(self, "_proc_table"):
+            self._proc_table.update_processes(top_procs)
 
-        # Remove old cards
-        for device in list(self._disk_cards.keys()):
-            if device not in current_devices:
-                card = self._disk_cards.pop(device)
-                card.deleteLater()
+        # KPI aggregates
+        total_size  = sum(d.get("total", 0) for d in disks)
+        total_used  = sum(d.get("used",  0) for d in disks)
+        total_free  = sum(d.get("free",  0) for d in disks)
+        total_read  = data.get("total_read_rate",  0)
+        total_write = data.get("total_write_rate", 0)
 
-        # Update aggregate stats
-        total_read = data.get('total_read_rate', 0)
-        total_write = data.get('total_write_rate', 0)
-        iops = data.get('iops', 0)
-        latency = data.get('latency', 0)
-
-        # Update overview card
-        total_size = sum(d.get('total', 0) for d in disks)
-        total_used = sum(d.get('used', 0) for d in disks)
-        total_free = sum(d.get('free', 0) for d in disks)
-        self._overview_card.set_storage_info(total_size, total_used, total_free, total_read, total_write)
-
-        # Update status bar
-        total_tb = total_size / (1024**4) if total_size > 0 else 0
-        self._cap_label.setText(f"{total_tb:.1f} TB" if total_tb >= 1 else f"{total_size / (1024**3):.0f} GB")
+        total_tb = total_size / (1024 ** 4)
+        if total_tb >= 1:
+            self._kpi_capacity.set_value(f"{total_tb:.1f}", "TB")
+        else:
+            self._kpi_capacity.set_value(
+                f"{total_size / (1024**3):.0f}", "GB")
 
         used_gb = total_used / (1024**3)
-        self._used_label.setText(f"{used_gb:.0f} GB" if used_gb >= 1 else f"{used_gb:.1f} GB")
+        self._kpi_used.set_value(
+            f"{used_gb:.0f}" if used_gb >= 1 else f"{used_gb:.1f}", "GB")
 
-        # Calculate average temperature
-        temps = [d.get('temperature', 0) for d in disks if d.get('temperature')]
-        avg_temp = sum(temps) / len(temps) if temps else 0
-        self._temp_label.setText(f"{avg_temp:.0f}°C")
+        free_gb = total_free / (1024**3)
+        self._kpi_free.set_value(
+            f"{free_gb:.0f}" if free_gb >= 1 else f"{free_gb:.1f}", "GB")
 
-        # Update top disks section
-        self._update_top_disks(disks)
-
+        self._kpi_read.set_value(*self._fmt_speed(total_read))
+        self._kpi_write.set_value(*self._fmt_speed(total_write))
         self._header.set_live(True)
 
-    def _update_top_disks(self, disks):
-        """Update top disks by usage"""
-        while self._top_disks_container.count():
-            item = self._top_disks_container.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        # Performance history graphs
+        if self._perf_latency is not None:
+            self._perf_latency.push(
+                Skriv=data.get('total_write_latency_ms', 0),
+                Les=data.get('total_read_latency_ms', 0),
+            )
+        if self._perf_iops is not None:
+            self._perf_iops.push(
+                Skriv=data.get('total_write_iops', 0),
+                Les=data.get('total_read_iops', 0),
+            )
+        if self._perf_bandwidth is not None:
+            self._perf_bandwidth.push(
+                Skriv=total_write,
+                Les=total_read,
+            )
+        if self._perf_load is not None:
+            self._perf_load.push(
+                Belastning=data.get('total_busy_pct', 0),
+            )
 
-        # Sort by usage percentage
-        sorted_disks = sorted(disks, key=lambda d: d.get('percent', 0), reverse=True)[:4]
+    @staticmethod
+    def _fmt_speed(bps: float):
+        if bps >= 1_073_741_824:
+            return f"{bps/1_073_741_824:.1f}", "GB/s"
+        if bps >= 1_048_576:
+            return f"{bps/1_048_576:.0f}", "MB/s"
+        if bps >= 1024:
+            return f"{bps/1024:.0f}", "KB/s"
+        return f"{bps:.0f}", "B/s"
 
-        for disk in sorted_disks:
-            device = disk.get('device', '')[:2]
-            mountpoint = disk.get('mountpoint', 'N/A')
-            percent = disk.get('percent', 0)
-            total_gb = disk.get('total', 0) / (1024**3)
-            used_gb = disk.get('used', 0) / (1024**3)
-
-            pct_color = theme_manager.colors.ACCENT_GREEN if percent < 75 else theme_manager.colors.ACCENT_ORANGE if percent < 90 else theme_manager.colors.ACCENT_RED
-
-            disk_row = QFrame()
-            disk_row.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {theme_manager.colors.BG_HOVER};
-                    border-radius: {S.px(8)}px;
-                    padding: {S.px(8)}px;
-                }}
-            """)
-
-            row_layout = QHBoxLayout()
-            row_layout.setContentsMargins(S.px(8), S.px(6), S.px(8), S.px(6))
-            row_layout.setSpacing(S.px(12))
-            disk_row.setLayout(row_layout)
-
-            # Drive letter
-            letter = QLabel(device)
-            letter.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-            letter.setStyleSheet(f"color: white; background: {pct_color}; padding: {S.px(2)}px {S.px(8)}px; border-radius: {S.px(4)}px;")
-            letter.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            letter.setMinimumWidth(S.px(32))
-            row_layout.addWidget(letter)
-
-            # Info
-            info = QVBoxLayout()
-            info.setSpacing(2)
-
-            name = QLabel(f"{mountpoint}" if mountpoint else device)
-            name.setFont(QFont("Segoe UI", S.font_pt(10)))
-            name.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; background: transparent;")
-            info.addWidget(name)
-
-            bar = QProgressBar()
-            bar.setValue(int(percent))
-            bar.setFixedHeight(S.px(4))
-            bar.setTextVisible(False)
-            bar.setStyleSheet(f"""
-                QProgressBar {{
-                    background-color: {theme_manager.colors.BG_PRIMARY};
-                    border: none;
-                    border-radius: {S.px(2)}px;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {pct_color};
-                    border-radius: {S.px(2)}px;
-                }}
-            """)
-            info.addWidget(bar)
-            row_layout.addLayout(info, stretch=1)
-
-            # Usage
-            usage = QLabel(f"{used_gb:.0f}/{total_gb:.0f} GB")
-            usage.setFont(QFont("Segoe UI", S.font_pt(9)))
-            usage.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; background: transparent;")
-            usage.setAlignment(Qt.AlignmentFlag.AlignRight)
-            row_layout.addWidget(usage)
-
-            # Percentage
-            pct = QLabel(f"{percent:.0f}%")
-            pct.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-            pct.setStyleSheet(f"color: {pct_color}; background: transparent;")
-            pct.setAlignment(Qt.AlignmentFlag.AlignRight)
-            pct.setMinimumWidth(S.px(30))
-            row_layout.addWidget(pct)
-
-            self._top_disks_container.addWidget(disk_row)
-
-        self._top_disks_container.addStretch()
-
-    def _set_live(self, live: bool):
-        """Set live indicator"""
-        if hasattr(self, '_header'):
-            self._header.set_live(live)
-
-
-    def _on_theme_changed(self, theme_name: str):
-        """Handle theme changes"""
+    def _on_theme_changed(self, _):
         for card in self._disk_cards.values():
-            card._on_theme_changed(theme_name)
+            card._on_theme_changed("")
 
     def update_data(self, data: dict):
-        """Update view with data from main coordinator"""
-        if 'disks' in data:
+        if "disks" in data:
             self._update_from_data(data)
 
     def shutdown(self):
-        """Cleanup when view is destroyed"""
-        if hasattr(self, '_update_timer'):
+        if hasattr(self, "_update_timer"):
             self._update_timer.stop()
         if self._collector:
             self._collector.stop()
