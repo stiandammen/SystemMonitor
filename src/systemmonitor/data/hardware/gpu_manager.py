@@ -38,48 +38,48 @@ class GPUManager:
             nvml_detector = NVMLDetector()
             if nvml_detector.is_available():
                 self._detectors.append(nvml_detector)
-                self.logger.info("âœ“ NVML detector initialized")
+                self.logger.info("✓ NVML detector initialized")
             else:
-                self.logger.warning("âœ— NVML detector not available")
+                self.logger.warning("✗ NVML detector not available")
                 # Fallback: nvidia-smi subprocess (no pynvml required)
                 smi_detector = NvidiaSMIDetector()
                 if smi_detector.is_available():
                     self._detectors.append(smi_detector)
-                    self.logger.info("âœ“ nvidia-smi fallback detector initialized")
+                    self.logger.info("✓ nvidia-smi fallback detector initialized")
                 else:
-                    self.logger.warning("âœ— nvidia-smi fallback not available")
+                    self.logger.warning("✗ nvidia-smi fallback not available")
 
             # Priority 2: WMI (broad compatibility, good for basic info and fallback)
             wmi_detector = WMIDetector()
             if wmi_detector.is_available():
                 self._detectors.append(wmi_detector)
-                self.logger.info("âœ“ WMI detector initialized")
+                self.logger.info("✓ WMI detector initialized")
             else:
-                self.logger.warning("âœ— WMI detector not available")
+                self.logger.warning("✗ WMI detector not available")
 
             # Priority 3: ADL2 (AMD - newer API with comprehensive sensor data)
             adl2_detector = ADL2Detector()
             if adl2_detector.is_available():
                 self._detectors.append(adl2_detector)
-                self.logger.info("âœ“ ADL2 detector initialized")
+                self.logger.info("✓ ADL2 detector initialized")
             else:
-                self.logger.warning("âœ— ADL2 detector not available")
+                self.logger.warning("✗ ADL2 detector not available")
 
             # Priority 4: ADL (AMD - older API, additional compatibility fallback)
             adl_detector = ADLDetector()
             if adl_detector.is_available():
                 self._detectors.append(adl_detector)
-                self.logger.info("âœ“ ADL detector initialized")
+                self.logger.info("✓ ADL detector initialized")
             else:
-                self.logger.warning("âœ— ADL detector not available")
+                self.logger.warning("✗ ADL detector not available")
 
             # Priority 5: Intel detector (WMI-based with Intel-specific enhancements)
             intel_detector = IntelDetector()
             if intel_detector.is_available():
                 self._detectors.append(intel_detector)
-                self.logger.info("âœ“ Intel detector initialized")
+                self.logger.info("✓ Intel detector initialized")
             else:
-                self.logger.warning("âœ— Intel detector not available")
+                self.logger.warning("✗ Intel detector not available")
 
             self.logger.info(f"Initialized {len(self._detectors)} GPU detection backends")
             self._initialized = True

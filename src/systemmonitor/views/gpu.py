@@ -317,7 +317,7 @@ class RealtimeGraph(QWidget, ScaleMixin):
 
 
 # ---------------------------------------------------------------------------
-# InfoRow â€“ en nøkkel/verdi-rad
+# InfoRow – en nøkkel/verdi-rad
 # ---------------------------------------------------------------------------
 class InfoRow(QWidget):
     def __init__(self, label: str, parent=None):

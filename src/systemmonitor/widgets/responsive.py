@@ -97,7 +97,7 @@ class CollapsiblePanel(QFrame, ScaleMixin):
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
-        self._toggle_icon = QLabel("â–¼" if self._is_expanded else "â–¶")
+        self._toggle_icon = QLabel("▼" if self._is_expanded else "▶")
         self._toggle_icon.setFont(QFont("Segoe UI", S.font_pt(10)))
         self._toggle_icon.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         header_layout.addWidget(self._toggle_icon)
@@ -132,14 +132,14 @@ class CollapsiblePanel(QFrame, ScaleMixin):
         self._is_expanded = True
         self._content_visible = True
         self._content_area.setVisible(True)
-        self._toggle_icon.setText("â–¼")
+        self._toggle_icon.setText("▼")
         self._animate_content_height(max_height=500)
 
     def collapse(self):
         if not self._is_expanded:
             return
         self._is_expanded = False
-        self._toggle_icon.setText("â–¶")
+        self._toggle_icon.setText("▶")
         self._animate_content_height(max_height=0, on_done=lambda: self._content_area.setVisible(False))
 
     def _animate_content_height(self, max_height: int, on_done=None):

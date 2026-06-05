@@ -31,6 +31,12 @@ class StorageCollector(QThread):
         self._previous_io = {}
         self._previous_time = {}
         self._smoothed_io = {}
+        # Global system IO tracking
+        self._prev_sys_io = None
+        self._prev_sys_time = 0
+        self._smoothed_sys_read = 0.0
+        self._smoothed_sys_write = 0.0
+        
         self._last_emit_time = 0
         self._min_emit_interval = 0.5
         self._smart_cache = {}
@@ -77,8 +83,8 @@ class StorageCollector(QThread):
 
             disks_data = {
                 'disks': [],
-                'total_read_rate': 0,
-                'total_write_rate': 0,
+                'total_read_rate': 0.0,
+                'total_write_rate': 0.0,
                 'total_read_iops': 0.0,
                 'total_write_iops': 0.0,
                 'total_read_latency_ms': 0.0,
@@ -87,6 +93,30 @@ class StorageCollector(QThread):
                 'station_name': self._get_station_name(),
             }
             
+            current_time = time.time()
+            
+            # --- GLOBAL SYSTEM IO (Robust method for top KPI cards) ---
+            sys_io = psutil.disk_io_counters(perdisk=False)
+            if self._prev_sys_io is None:
+                self._prev_sys_io = sys_io
+                self._prev_sys_time = current_time
+            else:
+                dt = current_time - self._prev_sys_time
+                if dt > 0:
+                    raw_sys_read = (sys_io.read_bytes - self._prev_sys_io.read_bytes) / dt
+                    raw_sys_write = (sys_io.write_bytes - self._prev_sys_io.write_bytes) / dt
+                    
+                    # Responsive smoothing for global cards
+                    alpha = 0.5 
+                    self._smoothed_sys_read = (alpha * raw_sys_read) + ((1 - alpha) * self._smoothed_sys_read)
+                    self._smoothed_sys_write = (alpha * raw_sys_write) + ((1 - alpha) * self._smoothed_sys_write)
+                    
+                    disks_data['total_read_rate'] = max(0, self._smoothed_sys_read)
+                    disks_data['total_write_rate'] = max(0, self._smoothed_sys_write)
+                
+                self._prev_sys_io = sys_io
+                self._prev_sys_time = current_time
+
             if scan_procs:
                 disks_data['top_processes'] = self._get_top_io_processes()
 
@@ -96,23 +126,25 @@ class StorageCollector(QThread):
 
             for disk in disks:
                 device = disk['device']
-                io_rates = disk_io.get(device, {
+                norm_device = self._normalize_device_name(device)
+                
+                io_rates = disk_io.get(norm_device, {
                     'read_rate': 0, 'write_rate': 0,
                     'read_iops': 0, 'write_iops': 0,
                     'read_latency_ms': 0, 'write_latency_ms': 0,
                     'busy_pct': 0,
                 })
                 
-                if device not in self._smoothed_io:
-                    self._smoothed_io[device] = {'read': io_rates['read_rate'], 'write': io_rates['write_rate']}
+                if norm_device not in self._smoothed_io:
+                    self._smoothed_io[norm_device] = {'read': io_rates['read_rate'], 'write': io_rates['write_rate']}
                 else:
-                    self._smoothed_io[device]['read'] = (self.EMA_ALPHA * io_rates['read_rate']) + \
-                                                       ((1 - self.EMA_ALPHA) * self._smoothed_io[device]['read'])
-                    self._smoothed_io[device]['write'] = (self.EMA_ALPHA * io_rates['write_rate']) + \
-                                                        ((1 - self.EMA_ALPHA) * self._smoothed_io[device]['write'])
+                    self._smoothed_io[norm_device]['read'] = (self.EMA_ALPHA * io_rates['read_rate']) + \
+                                                       ((1 - self.EMA_ALPHA) * self._smoothed_io[norm_device]['read'])
+                    self._smoothed_io[norm_device]['write'] = (self.EMA_ALPHA * io_rates['write_rate']) + \
+                                                        ((1 - self.EMA_ALPHA) * self._smoothed_io[norm_device]['write'])
 
-                disk['read_rate']        = max(0, self._smoothed_io[device]['read'])
-                disk['write_rate']       = max(0, self._smoothed_io[device]['write'])
+                disk['read_rate']        = max(0, self._smoothed_io[norm_device]['read'])
+                disk['write_rate']       = max(0, self._smoothed_io[norm_device]['write'])
                 disk['read_iops']        = io_rates.get('read_iops', 0)
                 disk['write_iops']       = io_rates.get('write_iops', 0)
                 disk['read_latency_ms']  = io_rates.get('read_latency_ms', 0)
@@ -120,10 +152,8 @@ class StorageCollector(QThread):
                 disk['busy_pct']         = io_rates.get('busy_pct', 0)
 
                 disks_data['disks'].append(disk)
-                disks_data['total_read_rate']  += disk['read_rate']
-                disks_data['total_write_rate'] += disk['write_rate']
 
-            # ... Aggregate metrics ...
+            # Aggregate performance metrics
             iops_r = iops_w = 0.0
             lat_r_sum = lat_w_sum = 0.0
             max_busy = 0.0
@@ -272,8 +302,11 @@ class StorageCollector(QThread):
                 # Get physical disk info from Win32_DiskDrive
                 for drive in w.Win32_DiskDrive():
                     try:
+                        # Use DeviceID (e.g. \\.\PHYSICALDRIVE0) or fallback to index-based name
+                        device_id = drive.DeviceID or f"\\\\.\\PHYSICALDRIVE{drive.Index}"
+                        
                         disk_info = {
-                            'device': f"\\\\.\\{drive.Index}",
+                            'device': device_id,
                             'name': drive.Name or 'Unknown',
                             'model': drive.Model or 'Unknown',
                             'vendor': drive.Manufacturer or 'Unknown',
@@ -474,13 +507,18 @@ class StorageCollector(QThread):
 
         return result
 
-    def _normalize_device_name(self, device: str) -> str:
-        """Normalize device name for consistent key matching"""
+    def _normalize_device_name(self, device: Any) -> str:
+        """Normalize device name for consistent key matching between WMI and psutil"""
+        if device is None: return ""
+        d_str = str(device).upper().strip()
         if platform.system() == 'Windows':
-            # Remove \\.\ prefix and trailing spaces
-            normalized = device.replace('\\\\.\\', '').strip()
+            # Remove \\.\ prefix
+            normalized = d_str.replace('\\\\.\\', '')
+            # Handle "0" -> "PHYSICALDRIVE0"
+            if normalized.isdigit():
+                return f"PHYSICALDRIVE{normalized}"
             return normalized
-        return device
+        return d_str
 
     def _get_smart_data(self, device: str) -> Optional[Dict[str, Any]]:
         """Get SMART data for disk"""

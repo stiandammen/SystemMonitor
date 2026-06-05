@@ -1,5 +1,5 @@
-﻿"""
-scaler.py  â€“  Auto-scaling and responsive layout system for PyQt6
+"""
+scaler.py  –  Auto-scaling and responsive layout system for PyQt6
 Supports 1080p through 5K with automatic screen-tier detection, DPI scaling,
 compact/wide/ultra layout modes, and per-user scale overrides.
 """
@@ -13,18 +13,18 @@ from PyQt6.QtGui import QScreen, QFont
 
 class LayoutMode(Enum):
     COMPACT  = auto()   # < 1600 px wide  (small/laptop)
-    EXPANDED = auto()   # 1600â€“2559 px    (FHD / standard)
-    WIDE     = auto()   # 2560â€“3839 px    (QHD / 2K)
+    EXPANDED = auto()   # 1600–2559 px    (FHD / standard)
+    WIDE     = auto()   # 2560–3839 px    (QHD / 2K)
     ULTRA    = auto()   # 3840 px+        (4K / 5K)
 
 
 class ScreenTier(Enum):
     """Human-readable resolution category, auto-detected from physical pixels."""
     SD      = "SD"       # < 1280 wide
-    HD      = "HD"       # 1280â€“1919
-    FHD     = "FHD"      # 1920â€“2559  (1080p)
-    QHD     = "QHD"      # 2560â€“3839  (1440p / 2K)
-    UHD_4K  = "4K"       # 3840â€“5119  (2160p)
+    HD      = "HD"       # 1280–1919
+    FHD     = "FHD"      # 1920–2559  (1080p)
+    QHD     = "QHD"      # 2560–3839  (1440p / 2K)
+    UHD_4K  = "4K"       # 3840–5119  (2160p)
     UHD_5K  = "5K"       # 5120+      (2880p)
 
 
@@ -70,7 +70,7 @@ class _ScreenScaler:
         self._geometry_timer.setSingleShot(True)
         self._geometry_timer.timeout.connect(self._delayed_compute)
 
-    # â”€â”€ initialisation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── initialisation ────────────────────────────────────────────────────
 
     def init(self, app: QApplication):
         self._app    = app
@@ -81,7 +81,7 @@ class _ScreenScaler:
             scr.geometryChanged.connect(self._on_geometry_changed)
             scr.logicalDotsPerInchChanged.connect(self._on_dpi_changed)
 
-    # â”€â”€ screen-change handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── screen-change handlers ────────────────────────────────────────────
 
     def _on_primary_changed(self, screen: QScreen):
         self._screen = screen
@@ -97,7 +97,7 @@ class _ScreenScaler:
     def _delayed_compute(self):
         self._compute()
 
-    # â”€â”€ core calculation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── core calculation ──────────────────────────────────────────────────
 
     def _compute(self):
         if self._screen is None:
@@ -164,7 +164,7 @@ class _ScreenScaler:
         if old_mode != self.layout_mode:
             _signals.layout_mode_changed.emit(self.layout_mode)
 
-    # â”€â”€ tier detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── tier detection ────────────────────────────────────────────────────
 
     @staticmethod
     def _detect_tier(width_px: int) -> ScreenTier:
@@ -175,7 +175,7 @@ class _ScreenScaler:
         elif width_px >= 1280: return ScreenTier.HD
         else:                  return ScreenTier.SD
 
-    # â”€â”€ public helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── public helpers ────────────────────────────────────────────────────
 
     def px(self, value: int | float) -> int:
         return max(1, round(value * self.scale_factor))
@@ -198,7 +198,7 @@ class _ScreenScaler:
     def spacing(self, value: int) -> int:
         return self.px(value)
 
-    # â”€â”€ layout-mode queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── layout-mode queries ───────────────────────────────────────────────
 
     def is_compact(self) -> bool:
         """True only on narrow screens (< 1600 px)."""
@@ -209,14 +209,14 @@ class _ScreenScaler:
         return self.layout_mode != LayoutMode.COMPACT
 
     def is_wide(self) -> bool:
-        """True for QHD / 2K screens (2560â€“3839 px)."""
+        """True for QHD / 2K screens (2560–3839 px)."""
         return self.layout_mode == LayoutMode.WIDE
 
     def is_ultra(self) -> bool:
         """True for 4K and 5K screens (3840 px+)."""
         return self.layout_mode == LayoutMode.ULTRA
 
-    # â”€â”€ grid helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── grid helpers ──────────────────────────────────────────────────────
 
     def grid_columns(self, max_cols: int = 5) -> int:
         """Suggested column count based on primary screen width."""
@@ -234,7 +234,7 @@ class _ScreenScaler:
         elif width < 2200:  return min(4, max_cols)
         else:               return min(5, max_cols)
 
-    # â”€â”€ user scale override â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── user scale override ───────────────────────────────────────────────
 
     def set_user_scale(self, factor: float):
         """Apply a user-defined scale multiplier on top of the auto-detected scale."""
@@ -244,7 +244,7 @@ class _ScreenScaler:
         self.font_scale   = max(0.70, min(2.80, effective * 0.94))
         _signals.scale_changed.emit(self.scale_factor)
 
-    # â”€â”€ info / debug â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── info / debug ──────────────────────────────────────────────────────
 
     def info(self) -> str:
         mode_names = {
@@ -276,12 +276,12 @@ class _ScreenScaler:
         }
 
 
-# â”€â”€ singleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── singleton ─────────────────────────────────────────────────────────────
 
 S = _ScreenScaler()
 
 
-# â”€â”€ mixin for QWidget subclasses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── mixin for QWidget subclasses ──────────────────────────────────────────
 
 class ScaleMixin:
     def scale_connect(self):
@@ -311,7 +311,7 @@ class ScaleMixin:
         pass
 
 
-# â”€â”€ stylesheet helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── stylesheet helper ─────────────────────────────────────────────────────
 
 def scaled_stylesheet(template: str) -> str:
     def replacer(m):
@@ -319,9 +319,8 @@ def scaled_stylesheet(template: str) -> str:
     return re.sub(r'\{px_(\d+)\}', replacer, template)
 
 
-# â”€â”€ initialiser called from __main__ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── initialiser called from __main__ ──────────────────────────────────────
 
 def init_scaler(app: QApplication):
     S.init(app)
     print(f"[Scaler init] {S.info()}")
-

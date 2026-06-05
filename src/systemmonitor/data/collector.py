@@ -282,28 +282,53 @@ class MemoryCollectorThread(BaseCollector):
 
 
 class DiskCollectorThread(BaseCollector):
-    """Disk data collector - runs in background thread"""
+    """Disk data collector - runs in background thread with robust tracking"""
 
-    REFRESH_INTERVAL = 1.0  # 1 second for disk (higher frequency for speed tracking)
+    REFRESH_INTERVAL = 1.0
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._previous_io = None
         self._previous_time = 0
-        self._io_per_disk = {}  # device -> previous_io tuple
-        self._disk_mapping = {}  # physical disk key -> drive letters
+        self._io_per_disk = {}
+        self._disk_mapping = {}
+        # Global robust metrics state
+        self._prev_sys_io = None
+        self._prev_sys_time = 0
+        self._smoothed_read = 0.0
+        self._smoothed_write = 0.0
 
     def _collect(self) -> dict:
-        """Collect disk data"""
+        """Collect disk data with global robust smoothing"""
         try:
             import psutil
+            import time
+            current_time = time.time()
+
+            # Global robust metrics calculation
+            sys_io = psutil.disk_io_counters(perdisk=False)
+            if self._prev_sys_io is None:
+                self._prev_sys_io = sys_io
+                self._prev_sys_time = current_time
+            else:
+                dt = current_time - self._prev_sys_time
+                if dt > 0:
+                    r_raw = (sys_io.read_bytes - self._prev_sys_io.read_bytes) / dt
+                    w_raw = (sys_io.write_bytes - self._prev_sys_io.write_bytes) / dt
+                    
+                    alpha = 0.3
+                    self._smoothed_read = (alpha * r_raw) + ((1 - alpha) * self._smoothed_read)
+                    self._smoothed_write = (alpha * w_raw) + ((1 - alpha) * self._smoothed_write)
+                
+                self._prev_sys_io = sys_io
+                self._prev_sys_time = current_time
 
             # Build mapping of physical disks to drive letters
             self._update_disk_mapping()
 
             # Get partition info
             partitions = []
-            partition_io = {}  # mountpoint -> {read_rate, write_rate}
+            partition_io = {}
 
             for part in psutil.disk_partitions(all=False):
                 if not part.fstype:
@@ -328,14 +353,13 @@ class DiskCollectorThread(BaseCollector):
                 except (PermissionError, OSError):
                     pass
 
-            # Get total IO rates
-            io_stats = self._get_total_io_stats()
-
             return {
                 'partitions': partitions,
-                'read_rate': io_stats.get('read_rate', 0),
-                'write_rate': io_stats.get('write_rate', 0),
-                'partition_io': partition_io,  # Per-partition IO rates
+                'read_rate': max(0, self._smoothed_read),
+                'write_rate': max(0, self._smoothed_write),
+                'partition_io': partition_io,
+                'total_read': sys_io.read_bytes,
+                'total_write': sys_io.write_bytes,
             }
 
         except Exception as e:

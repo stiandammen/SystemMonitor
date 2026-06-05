@@ -138,7 +138,7 @@ class SparklineWidget(QWidget, ScaleMixin):
             if len(coords) < 2:
                 continue
 
-            # â”€â”€ Fill area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # ── Fill area ──────────────────────────────────────────────────
             fill_pts = [(0.0, height)]
             fill_pts.extend(coords)
             fill_pts.append((coords[-1][0], height))
@@ -162,7 +162,7 @@ class SparklineWidget(QWidget, ScaleMixin):
                 painter.setBrush(gradient)
                 painter.drawPolygon(*qpoints)
 
-            # â”€â”€ Line â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # ── Line ───────────────────────────────────────────────────────
             line_color = "#4A6CF7" if theme_manager.current_theme == "heimdal" else color
             pen = QPen(QColor(line_color), 1.5)
             painter.setPen(pen)

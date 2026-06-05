@@ -170,7 +170,7 @@ class KpiCard(QFrame, ScaleMixin):
         hdr.addStretch()
         lay.addLayout(hdr)
 
-        # value row â€” number + unit on the left, sparkline on the right
+        # value row — number + unit on the left, sparkline on the right
         vrow = QHBoxLayout()
         vrow.setSpacing(S.px(5))
         vrow.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -343,8 +343,8 @@ class TrafficGraph(QWidget, ScaleMixin):
         ly = h - S.px(8)
 
         for color_str, sym, label in [
-            (c.ACCENT_CYAN, "â–¼", "Download"),
-            (c.ACCENT_PURPLE, "â–²", "Upload"),
+            (c.ACCENT_CYAN, "▼", "Download"),
+            (c.ACCENT_PURPLE, "▲", "Upload"),
         ]:
             p.setPen(QColor(color_str))
             p.drawText(lx, ly, f"{sym} {label}")
@@ -504,7 +504,7 @@ class ConnectionsTable(QTableWidget):
             for col, text in enumerate(values):
                 item = QTableWidgetItem(text)
                 item.setFont(QFont("Segoe UI", S.font_pt(9)))
-                if col == 5:  # state column â€” colour coded
+                if col == 5:  # state column — colour coded
                     color = state_colors.get(text.upper(), c.TEXT_SECONDARY)
                     item.setForeground(QColor(color))
                 self.setItem(r, col, item)
@@ -550,7 +550,7 @@ class _IfaceRow(QFrame, ScaleMixin):
         row.addWidget(lbl_name)
 
         # ip
-        lbl_ip = QLabel(ip or "â€”")
+        lbl_ip = QLabel(ip or "—")
         lbl_ip.setFont(QFont("Segoe UI", S.font_pt(9)))
         lbl_ip.setStyleSheet(f"color: {c.TEXT_SECONDARY}; background: transparent;")
         row.addWidget(lbl_ip)
@@ -817,7 +817,7 @@ class NetworkView(QWidget, ScaleMixin):
             hostname = socket.gethostname()
             ipv4 = socket.gethostbyname(hostname)
         except Exception:
-            hostname, ipv4 = "â€”", "â€”"
+            hostname, ipv4 = "—", "—"
 
         host_lbl = QLabel(f"{hostname}  ·  {ipv4}")
         host_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
@@ -958,9 +958,9 @@ class NetworkView(QWidget, ScaleMixin):
             return w, v
 
         health_row, self._health_lbl = _stat_row("Health", "Good", c.ACCENT_GREEN)
-        uptime_row,  self._uptime_lbl = _stat_row("Uptime",  "â€”",   c.TEXT_PRIMARY)
-        sent_row,    self._sent_lbl   = _stat_row("Total Sent", "â€”", c.ACCENT_PURPLE)
-        recv_row,    self._recv_lbl   = _stat_row("Total Recv", "â€”", c.ACCENT_CYAN)
+        uptime_row,  self._uptime_lbl = _stat_row("Uptime",  "—",   c.TEXT_PRIMARY)
+        sent_row,    self._sent_lbl   = _stat_row("Total Sent", "—", c.ACCENT_PURPLE)
+        recv_row,    self._recv_lbl   = _stat_row("Total Recv", "—", c.ACCENT_CYAN)
 
         for w in [health_row, uptime_row, sent_row, recv_row]:
             status_lay.addWidget(w)
@@ -1029,8 +1029,8 @@ class NetworkView(QWidget, ScaleMixin):
         self._last_ts   = time.time()
 
         # KPI
-        self._kpi_down.set_value(f"{dn_mbps:.2f}", f"â†“ {self._fmt_bytes(recv)}")
-        self._kpi_up.set_value(  f"{up_mbps:.2f}", f"â†‘ {self._fmt_bytes(sent)}")
+        self._kpi_down.set_value(f"{dn_mbps:.2f}", f"↓ {self._fmt_bytes(recv)}")
+        self._kpi_up.set_value(  f"{up_mbps:.2f}", f"↑ {self._fmt_bytes(sent)}")
 
         # Graph
         self._traffic_graph.push(up_mbps, dn_mbps)
@@ -1045,12 +1045,12 @@ class NetworkView(QWidget, ScaleMixin):
             for conn in psutil.net_connections(kind="inet"):
                 try:
                     rows.append({
-                        "local_ip":    conn.laddr.ip   if conn.laddr else "â€”",
-                        "local_port":  conn.laddr.port if conn.laddr else "â€”",
-                        "remote_ip":   conn.raddr.ip   if conn.raddr else "â€”",
-                        "remote_port": conn.raddr.port if conn.raddr else "â€”",
+                        "local_ip":    conn.laddr.ip   if conn.laddr else "—",
+                        "local_port":  conn.laddr.port if conn.laddr else "—",
+                        "remote_ip":   conn.raddr.ip   if conn.raddr else "—",
+                        "remote_port": conn.raddr.port if conn.raddr else "—",
                         "proto":       "TCP" if conn.type == socket.SOCK_STREAM else "UDP",
-                        "state":       conn.status or "â€”",
+                        "state":       conn.status or "—",
                     })
                 except (OSError, ValueError):
                     pass
@@ -1118,7 +1118,7 @@ class NetworkView(QWidget, ScaleMixin):
 
         up_count = 0
         for name, stat in list(stats.items())[:8]:
-            ip = "â€”"
+            ip = "—"
             for addr in addrs.get(name, []):
                 if addr.family == socket.AF_INET:
                     ip = addr.address

@@ -231,7 +231,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._expanded_width = S.px(220)
         self._collapsed_width = S.px(58)
 
-        # Update container width only â€” nav items handle themselves via ScaleMixin
+        # Update container width only — nav items handle themselves via ScaleMixin
         current_width = self._collapsed_width if self._collapsed else self._expanded_width
         self.setMinimumWidth(self._collapsed_width)
         self.setMaximumWidth(self._expanded_width + S.px(40))

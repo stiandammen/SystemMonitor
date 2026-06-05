@@ -1,4 +1,4 @@
-﻿"""
+"""
 Main Window - Application main window
 Professional enterprise-grade design with responsive layout and overlay mode
 """
@@ -17,14 +17,14 @@ from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_de
 
 
 def _cap(scaled: int, maximum: int) -> int:
-    """Return scaled value capped at maximum â€” prevents oversized chrome on 5K."""
+    """Return scaled value capped at maximum — prevents oversized chrome on 5K."""
     return min(scaled, maximum)
 
 
 class WinControlBtn(QWidget):
     """
     Window control button (minimize / maximize / restore / close) drawn
-    entirely with QPainter â€” no Unicode glyphs, identical on every OS/font.
+    entirely with QPainter — no Unicode glyphs, identical on every OS/font.
     """
 
     clicked = __import__('PyQt6.QtCore', fromlist=['pyqtSignal']).pyqtSignal()
@@ -42,7 +42,7 @@ class WinControlBtn(QWidget):
         self._kind = kind
         self.update()
 
-    # â”€â”€ events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── events ────────────────────────────────────────────────────────────
 
     def enterEvent(self, event):
         self._hovered = True
@@ -61,7 +61,7 @@ class WinControlBtn(QWidget):
             self.clicked.emit()
             event.accept()
 
-    # â”€â”€ painting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── painting ──────────────────────────────────────────────────────────
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -359,7 +359,7 @@ class TopHeader(QWidget, ScaleMixin):
                 border-radius: {_cap(S.px(6), 7)}px;
             """)
 
-        # WinControlBtn reads theme_manager.colors directly in paintEvent â€” just repaint
+        # WinControlBtn reads theme_manager.colors directly in paintEvent — just repaint
         for btn in [getattr(self, '_min_btn', None),
                     getattr(self, '_max_btn', None),
                     getattr(self, '_close_btn', None)]:
@@ -496,7 +496,7 @@ class MainWindow(QMainWindow, ScaleMixin):
                 self._sidebar._toggle_collapse()
 
     def _apply_scale_to_frame(self):
-        """Update only the window frame elements â€” views rebuild themselves via ScaleMixin."""
+        """Update only the window frame elements — views rebuild themselves via ScaleMixin."""
         self.setMinimumSize(S.px(700), S.px(500))
         if hasattr(self, '_top_header'):
             self._top_header._setup_ui()

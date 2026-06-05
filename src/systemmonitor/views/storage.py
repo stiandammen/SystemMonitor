@@ -633,10 +633,10 @@ class StorageView(QWidget, ScaleMixin):
 
     @staticmethod
     def _fmt_speed(bps: float):
-        if bps >= 1_073_741_824:
+        if bps >= 1_073_741_824: # 1 GB/s
             return f"{bps/1_073_741_824:.1f}", "GB/s"
-        if bps >= 1_048_576:
-            return f"{bps/1_048_576:.0f}", "MB/s"
+        if bps >= 104_857: # Over 100 KB/s, show as MB/s with decimal
+            return f"{bps/1_048_576:.1f}", "MB/s"
         if bps >= 1024:
             return f"{bps/1024:.0f}", "KB/s"
         return f"{bps:.0f}", "B/s"

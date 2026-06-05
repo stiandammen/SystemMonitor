@@ -542,10 +542,10 @@ class GlassStoragePanel(QFrame):
         new_keys = [p.get('device', '') for p in partitions if p.get('fstype')]
 
         if new_keys != self._drive_keys:
-            # Drive set changed â€“ rebuild with entrance animation
+            # Drive set changed – rebuild with entrance animation
             self._rebuild_drives(partitions, animate=True)
         else:
-            # Same drives â€“ update in place with smooth transition
+            # Same drives – update in place with smooth transition
             for partition in partitions:
                 if partition.get('fstype'):
                     self._update_drive_card(partition)

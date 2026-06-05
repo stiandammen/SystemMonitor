@@ -1,5 +1,5 @@
 ﻿"""
-Settings View â€” Professional rebuild
+Settings View — Professional rebuild
 Card-based sections, scroll support, consistent with the rest of the GUI theme.
 """
 from systemmonitor.pathlib import Path
@@ -43,7 +43,7 @@ class SettingsView(QWidget, ScaleMixin):
     def _on_theme_changed(self, _):
         # Defer rebuild so any active widget event (e.g. combo click) finishes first.
         # Rebuilding the layout synchronously inside theme_changed destroys the combo
-        # box while Qt is still processing its currentIndexChanged event â†’ crash.
+        # box while Qt is still processing its currentIndexChanged event → crash.
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._setup_ui)
 
@@ -51,7 +51,7 @@ class SettingsView(QWidget, ScaleMixin):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._setup_ui)
 
-    # â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Build ──────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
         if self.layout():
@@ -121,7 +121,7 @@ class SettingsView(QWidget, ScaleMixin):
         self._build_maintenance_section(content_layout)
         content_layout.addStretch()
 
-    # â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Header ─────────────────────────────────────────────────────────────
 
     def _build_header(self) -> QFrame:
         c = _c()
@@ -168,7 +168,7 @@ class SettingsView(QWidget, ScaleMixin):
         layout.addWidget(badge)
         return header
 
-    # â”€â”€ Row builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Row builder ────────────────────────────────────────────────────────
 
     def _row(self, label: str, desc: str, control: QWidget,
              last: bool = False) -> QFrame:
@@ -194,7 +194,7 @@ class SettingsView(QWidget, ScaleMixin):
         layout.setSpacing(S.px(24))
         row.setLayout(layout)
 
-        # Left â€” label + optional description
+        # Left — label + optional description
         left = QWidget()
         left.setStyleSheet("background: transparent;")
         ll = QVBoxLayout()
@@ -218,7 +218,7 @@ class SettingsView(QWidget, ScaleMixin):
         layout.addWidget(control)
         return row
 
-    # â”€â”€ Control factories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Control factories ──────────────────────────────────────────────────
 
     def _combo(self, display_items: list, data_items: list,
                current_value) -> QComboBox:
@@ -372,7 +372,7 @@ class SettingsView(QWidget, ScaleMixin):
         toggle.toggled.connect(lambda v: self._on_setting_changed(key, v))
         return toggle
 
-    # â”€â”€ Sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Sections ───────────────────────────────────────────────────────────
 
     def _build_general_section(self, parent: QVBoxLayout):
         card = Card(title="General", icon="ph.gear")
@@ -523,12 +523,12 @@ class SettingsView(QWidget, ScaleMixin):
         reset_btn.clicked.connect(self._on_reset_clicked)
         card.add_widget(self._row(
             "Reset settings",
-            "Restore all preferences to factory defaults â€” this cannot be undone",
+            "Restore all preferences to factory defaults — this cannot be undone",
             reset_btn, last=True
         ))
         parent.addWidget(card)
 
-    # â”€â”€ Event handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Event handlers ─────────────────────────────────────────────────────
 
     def _on_theme_selected(self, theme: str):
         settings.set('theme', theme)

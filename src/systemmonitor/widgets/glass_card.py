@@ -216,13 +216,13 @@ class PremiumMetricCard(QFrame, ScaleMixin):
         if hasattr(self, '_trend_label') and trend is not None:
             self._trend_label.setVisible(True)
             if trend > 0:
-                self._trend_label.setText(f"â†‘ {trend:.1f}%")
+                self._trend_label.setText(f"↑ {trend:.1f}%")
                 self._trend_label.setStyleSheet("color: #00E096; background: transparent;")
             elif trend < 0:
-                self._trend_label.setText(f"â†“ {abs(trend):.1f}%")
+                self._trend_label.setText(f"↓ {abs(trend):.1f}%")
                 self._trend_label.setStyleSheet("color: #FF4757; background: transparent;")
             else:
-                self._trend_label.setText("â†’ 0%")
+                self._trend_label.setText("→ 0%")
                 self._trend_label.setStyleSheet("color: #8A92B2; background: transparent;")
         else:
             if hasattr(self, '_trend_label'):

@@ -182,7 +182,7 @@ class ADLDetector(GPUDetector):
                 self.ADL_Adapter_Name_Get.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char)]
                 self.ADL_Adapter_Name_Get.restype = ctypes.c_int
             else:
-                self.logger.debug("ADL_Adapter_Name_Get not exported by this DLL â€” will use fallback names")
+                self.logger.debug("ADL_Adapter_Name_Get not exported by this DLL — will use fallback names")
 
             # ADL_Adapter_Active_Get
             self.ADL_Adapter_Active_Get = getattr(
