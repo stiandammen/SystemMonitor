@@ -590,18 +590,23 @@ class OverviewPage(QWidget, ScaleMixin):
             self.update_data(self._last_data)
 
     def _setup_ui(self):
-        # Clear previous layout if this is a rebuild
-        old = self.layout()
-        if old:
-            while old.count():
-                item = old.takeAt(0)
-                w = item.widget()
-                if w:
-                    w.hide()
-                    w.deleteLater()
-            tmp = QWidget()
-            tmp.setLayout(old)
-            tmp.deleteLater()
+        self._is_rebuilding = True
+        try:
+            # Clear previous layout if this is a rebuild
+            old = self.layout()
+            if old:
+                while old.count():
+                    item = old.takeAt(0)
+                    w = item.widget()
+                    if w:
+                        w.hide()
+                        w.deleteLater()
+                tmp = QWidget()
+                tmp.setLayout(old)
+                tmp.deleteLater()
+        except Exception:
+            # Ignore errors during cleanup
+            pass
 
         colors = theme_manager.colors
         self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")

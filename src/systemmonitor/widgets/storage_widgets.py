@@ -876,12 +876,16 @@ class ProcessIoTable(QFrame, ScaleMixin):
 
     def _setup_ui(self):
         if self.layout() is not None:
-            for child in self.findChildren(QWidget): 
-                if child not in self._rows: child.deleteLater()
-        
+            for child in self.findChildren(QWidget):
+                if child not in self._rows:
+                    child.deleteLater()
+                    # Clear reference to empty label if it was deleted
+                    if child is self._empty_label:
+                        self._empty_label = None
+
         colors = c()
         self.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: {S.px(10)}px;")
-        
+
         main = self.layout() or QVBoxLayout(self)
         if main.count() == 0:
             main.setContentsMargins(S.px(12), S.px(12), S.px(12), S.px(12))
@@ -901,31 +905,33 @@ class ProcessIoTable(QFrame, ScaleMixin):
             self._rows_container = QVBoxLayout()
             self._rows_container.setSpacing(S.px(4))
             main.addLayout(self._rows_container)
-            
+
             self._empty_label = QLabel("Ingen betydelig aktivitet detektert")
             self._empty_label.setFont(QFont("Segoe UI", S.font_pt(9)))
             self._empty_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; border: none;")
             self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._empty_label.hide()
             self._rows_container.addWidget(self._empty_label)
-            
+
             main.addStretch()
 
     def update_processes(self, processes: List[Dict]):
         """Update the list of top I/O processes with row reuse"""
         if not processes:
             for r in self._rows: r.hide()
-            if self._empty_label: self._empty_label.show()
+            if self._empty_label:
+                self._empty_label.show()
             return
-        
-        if self._empty_label: self._empty_label.hide()
-        
+
+        if self._empty_label:
+            self._empty_label.hide()
+
         # Ensure we have enough row widgets
         while len(self._rows) < len(processes):
             new_row = ProcessIoRow()
             self._rows.append(new_row)
             self._rows_container.insertWidget(len(self._rows) - 1, new_row)
-            
+
         # Update and show/hide rows
         for i, row_widget in enumerate(self._rows):
             if i < len(processes):

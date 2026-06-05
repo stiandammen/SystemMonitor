@@ -327,6 +327,15 @@ class StorageView(QWidget, ScaleMixin):
             self._update_timer.deleteLater()
             self._update_timer = None
 
+        # Stop the collector to prevent data updates during teardown
+        if self._collector_started:
+            self._collector.stop()
+            if self._collector.isRunning():
+                self._collector.requestInterruption()
+                self._collector.wait(500)
+            self._collector_started = False
+            self._collector = None
+
         old = self.layout()
         if old:
             while old.count():
@@ -652,8 +661,10 @@ class StorageView(QWidget, ScaleMixin):
     def shutdown(self):
         if hasattr(self, "_update_timer"):
             self._update_timer.stop()
-        if self._collector:
+        if self._collector_started:
             self._collector.stop()
             if self._collector.isRunning():
                 self._collector.requestInterruption()
                 self._collector.wait(500)
+            self._collector_started = False
+            self._collector = None
