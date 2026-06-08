@@ -85,28 +85,3 @@ class DataExporter(QObject):
             else:
                 items.append((new_key, value))
         return dict(items)
-
-    def export_processes(self, processes: List[Dict[str, Any]], filepath: str, format_type: str):
-        fmt = format_type.lower()
-        if fmt == 'csv':
-            if processes:
-                with Path(filepath).open('w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=processes[0].keys())
-                    writer.writeheader()
-                    writer.writerows(processes)
-        elif fmt == 'json':
-            export = {'timestamp': datetime.now().isoformat(), 'processes': processes}
-            with Path(filepath).open('w', encoding='utf-8') as f:
-                json.dump(export, f, indent=2, default=str)
-        elif fmt == 'txt':
-            with Path(filepath).open('w', encoding='utf-8') as f:
-                f.write('Process List Export\n')
-                f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"Total Processes: {len(processes)}\n")
-                f.write('=' * 80 + '\n\n')
-                for proc in processes:
-                    for k, v in proc.items():
-                        f.write(f"{k}: {v}\n")
-                    f.write('-' * 40 + '\n')
-        else:
-            raise ValueError(f"Unsupported format: {format_type}")

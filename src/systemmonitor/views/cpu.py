@@ -9,132 +9,23 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QFrame, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QTimer, QSize
-from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush, QLinearGradient
+from PyQt6.QtCore import QTimer, QSize
+from PyQt6.QtGui import QFont
 import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager
+from systemmonitor.i18n import tr, language_manager, I18nMixin
 from systemmonitor.scaler import S, ScaleMixin
 from systemmonitor.utils.logger import get_logger, LogCategory, log_debug
+from systemmonitor.widgets.cpu_graph import CpuGraphWidget
+from systemmonitor.widgets.sensor_widgets import SensorsPanel
 
 
 def c():
     return theme_manager.colors
 
 
-class CpuGraphWidget(QWidget, ScaleMixin):
-    """Individual CPU core graph that adapts to container size - optimized with throttled repaints"""
-
-    def __init__(self, core_index: int = 0, parent=None):
-        super().__init__(parent)
-        self._core_index = core_index
-        self._history = []
-        self._max_points = 50
-        self._display_value = 0.0
-        self._pending_update = False
-
-        self.scale_connect()
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumSize(S.px(100), S.px(80))
-
-        self._update_timer = QTimer(self)
-        self._update_timer.setSingleShot(True)
-        self._update_timer.timeout.connect(self._do_update)
-
-    def _do_update(self):
-        self._pending_update = False
-        self.update()
-
-    def set_value(self, value: float):
-        """Set current CPU value with smooth animation"""
-        self._display_value += (value - self._display_value) * 0.3
-
-        if not self._history or len(self._history) > 0:
-            self._history.append(value)
-            if len(self._history) > self._max_points:
-                self._history.pop(0)
-
-        if not self._pending_update:
-            self._pending_update = True
-            self._update_timer.start(33)
-
-    def paintEvent(self, a0):
-        """Paint the graph"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        colors = c()
-        w = self.width()
-        h = self.height()
-
-        if w <= 0 or h <= 0:
-            painter.end()
-            return
-
-        pad = S.px(8)
-        graph_w = w - pad * 2
-        graph_h = h - pad * 2 - S.px(20)
-
-        painter.setBrush(QColor(colors.BG_CARD))
-        painter.setPen(QPen(QColor(colors.BORDER), 0))  # No border
-        painter.drawRoundedRect(0, 0, int(w), int(h), S.px(8), S.px(8))
-
-        if not self._history:
-            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
-            painter.setPen(QColor(colors.TEXT_MUTED))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Loading...")
-            painter.end()
-            return
-
-        points = []
-        step = graph_w / max(len(self._history) - 1, 1)
-        for i, val in enumerate(self._history):
-            x = pad + step * i
-            y = pad + graph_h - (val / 100.0 * graph_h)
-            points.append((x, y))
-
-        current = self._history[-1] if self._history else 0
-        if current > 80:
-            line_color = QColor(colors.ACCENT_RED)
-        elif current > 60:
-            line_color = QColor(colors.ACCENT_ORANGE)
-        elif current > 40:
-            line_color = QColor(colors.ACCENT_YELLOW)
-        else:
-            line_color = QColor(colors.ACCENT_BLUE)
-
-        if len(points) > 1:
-            fill_pts = [(points[0][0], pad + graph_h)] + points + [(points[-1][0], pad + graph_h)]
-
-            gradient = QLinearGradient(0, pad, 0, pad + graph_h)
-            gradient.setColorAt(0, line_color.lighter(150))
-            gradient.setColorAt(1, QColor(colors.BG_CARD))
-
-            painter.setBrush(gradient)
-            painter.setPen(Qt.PenStyle.NoPen)
-
-            from PyQt6.QtCore import QPoint
-            qpoints = [QPoint(int(x), int(y)) for x, y in fill_pts]
-            if len(qpoints) >= 3:
-                painter.drawPolygon(*qpoints)
-
-            painter.setPen(QPen(line_color, S.fpx(1.5), Qt.PenStyle.SolidLine))
-            for i in range(len(points) - 1):
-                painter.drawLine(int(points[i][0]), int(points[i][1]),
-                               int(points[i + 1][0]), int(points[i + 1][1]))
-
-        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
-        painter.setPen(QColor(colors.TEXT_SECONDARY))
-        painter.drawText(pad + S.px(4), pad + S.px(12), f"Core {self._core_index}")
-
-        painter.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
-        painter.setPen(QColor(colors.TEXT_PRIMARY))
-        painter.drawText(w - pad - S.px(40), pad + S.px(12), f"{current:.0f}%")
-
-        painter.end()
-
-
-class CPUView(QWidget, ScaleMixin):
+class CPUView(QWidget, ScaleMixin, I18nMixin):
     """CPU monitoring dashboard with per-core graphs"""
 
     def __init__(self, parent=None):
@@ -143,7 +34,9 @@ class CPUView(QWidget, ScaleMixin):
         self._per_core = []
         self._total_usage = 0
         self._update_scheduled = False
+        self._sensors_panel = None
         self.scale_connect()
+        self.i18n_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
@@ -154,6 +47,10 @@ class CPUView(QWidget, ScaleMixin):
     def _on_theme_changed(self, theme_name: str):
         self.update()
 
+    def retranslate_ui(self):
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
+
     def set_data_collector(self, collector):
         """Set data collector and connect signals"""
         if collector:
@@ -161,6 +58,7 @@ class CPUView(QWidget, ScaleMixin):
 
     def update_data(self, data: dict):
         """Handle data update from window"""
+        self._update_sensors(data)
         if 'cpu' not in data:
             return
         cpu = data['cpu']
@@ -169,6 +67,23 @@ class CPUView(QWidget, ScaleMixin):
         if not getattr(self, '_update_scheduled', False):
             self._update_scheduled = True
             QTimer.singleShot(16, self._perform_update)
+
+    def _update_sensors(self, data: dict):
+        if self._sensors_panel is None:
+            return
+        sensors = data.get('system_info', {}).get('sensors')
+        if not sensors:
+            return
+
+        fans = [
+            (f.get('label', 'Fan'), f"{f['rpm']:.0f} RPM" if f.get('rpm') else "—")
+            for f in sensors.get('fans', [])
+        ]
+        voltages = [
+            (v.get('label', 'Rail'), f"{v['volts']:.2f} V" if v.get('volts') else "—")
+            for v in sensors.get('voltages', [])
+        ]
+        self._sensors_panel.update_sensors(fans, voltages)
 
     def _on_data_ready(self, data: dict):
         """Handle data from background thread"""
@@ -237,6 +152,9 @@ class CPUView(QWidget, ScaleMixin):
         graphs_section = self._create_graphs_section()
         main_layout.addWidget(graphs_section, stretch=1)
 
+        self._sensors_panel = SensorsPanel()
+        main_layout.addWidget(self._sensors_panel)
+
         main_layout.addStretch()
 
     def _create_header(self):
@@ -268,7 +186,7 @@ class CPUView(QWidget, ScaleMixin):
             pass
         layout.addWidget(cpu_icon)
 
-        title = QLabel("CPU Monitor")
+        title = QLabel(tr("CPU Monitor"))
         title.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
@@ -309,7 +227,7 @@ class CPUView(QWidget, ScaleMixin):
         except Exception:
             pass
         sec_header.addWidget(core_icon)
-        title = QLabel("Per-Core Usage")
+        title = QLabel(tr("Per-Core Usage"))
         title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         sec_header.addWidget(title)

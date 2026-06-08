@@ -60,6 +60,33 @@ class AppConfig:
     OVERLAY_MIN_WIDTH = 280
     OVERLAY_MIN_HEIGHT = 60
 
+    # Graph history buffer bounds (used with the History Length setting).
+    # MAX keeps a single graph's paint cost bounded (~15-30ms at a 30fps budget).
+    HISTORY_POINTS_MIN = 30
+    HISTORY_POINTS_MAX = 600
+
+    @staticmethod
+    def history_window(duration_seconds, interval_ms, target_points: int = None):
+        """Compute (max_points, stride) for a rolling graph buffer so it visually
+        spans `duration_seconds` of data sampled every `interval_ms`, while never
+        holding/painting more than `target_points` samples.
+
+        Rather than simply clamping the buffer length (which would make long
+        windows look identical to short ones once the raw point count exceeds
+        the cap), every `stride`-th raw sample is kept. That bounds paint cost
+        to `target_points` while still letting the graph cover the requested
+        time span at a coarser resolution.
+        """
+        target = AppConfig.HISTORY_POINTS_MAX if target_points is None else target_points
+        try:
+            interval_s = max(float(interval_ms), 1.0) / 1000.0
+            raw_points = max(1.0, float(duration_seconds) / interval_s)
+        except (TypeError, ValueError, ZeroDivisionError):
+            raw_points = float(target)
+        stride = max(1, round(raw_points / target))
+        max_points = max(AppConfig.HISTORY_POINTS_MIN, min(round(raw_points / stride), target))
+        return max_points, stride
+
 
 class FontConfig:
     """Font configuration - responsive font sizes"""
@@ -75,6 +102,9 @@ class SettingsManager:
     """Manages application settings with JSON persistence"""
 
     DEFAULT_SETTINGS = {
+        # Localization
+        'language': 'en',                   # 'en' or 'no'
+
         # Appearance
         'theme': 'cyber-cyan',
         'accent_color': '#10b981',
@@ -93,12 +123,18 @@ class SettingsManager:
         'alert_disk_threshold': 90,
         'alert_temperature_threshold': 80,
         'alert_gpu_threshold': 85,
+        'notification_method': 'system',  # 'system' (tray popups) or 'in_app' (in-app banner)
+
+        # Units & display
+        'temperature_unit': 'celsius',      # 'celsius' or 'fahrenheit'
+        'network_speed_unit': 'mbps',       # 'mbps' (megabits) or 'mbytes' (MB/s)
+        'decimal_places': 1,                # precision used for temperature/speed readouts
 
         # Features
         'show_gpu': True,
         'show_network': True,
         'show_processes': True,
-        'decimal_places': 1,
+        'hidden_views': [],   # view keys hidden from the sidebar, e.g. ["gpu"]
 
         # System
         'autostart': False,
@@ -109,6 +145,10 @@ class SettingsManager:
         # Export
         'export_format': 'csv',
         'export_directory': str(Path.home() / 'Documents'),
+
+        # External monitoring
+        'prometheus_enabled': False,
+        'prometheus_port': 9090,
 
     }
 

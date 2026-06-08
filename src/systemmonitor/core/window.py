@@ -13,6 +13,7 @@ from systemmonitor.widgets.glass_sidebar import GlassSidebar
 from systemmonitor.widgets.responsive import OverlayWidget
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.scaler import S, ScaleMixin, LayoutMode
+from systemmonitor.config import settings
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_debug
 
 
@@ -431,6 +432,7 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._active_view = None
         self._overlay_mode = False
         self._overlay_widget = None
+        self._alert_toast = None
         self._resize_debounce_timer = QTimer()
         self._resize_debounce_timer.setSingleShot(True)
         self._resize_debounce_timer.timeout.connect(self._on_debounced_resize)
@@ -443,6 +445,18 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _preload_overview(self):
         self._get_view("overview")
 
+    def closeEvent(self, event):
+        """Hide to the system tray instead of quitting — a monitoring tool
+        should keep collecting in the background when the window is closed."""
+        from systemmonitor.config import settings as app_settings
+        from PyQt6.QtWidgets import QSystemTrayIcon
+
+        if app_settings.get('show_system_tray', True) and QSystemTrayIcon.isSystemTrayAvailable():
+            event.ignore()
+            self.hide()
+        else:
+            super().closeEvent(event)
+
     def _get_view(self, view_name: str) -> QWidget:
         if view_name not in self._view_cache:
             from systemmonitor.views.overview_page import OverviewPage
@@ -451,6 +465,7 @@ class MainWindow(QMainWindow, ScaleMixin):
             from systemmonitor.views.network import NetworkView
             from systemmonitor.views.memory import MemoryView
             from systemmonitor.views.storage import StorageView
+            from systemmonitor.views.logs import LogView
             from systemmonitor.views.settings import SettingsView
 
             view_classes = {
@@ -460,6 +475,7 @@ class MainWindow(QMainWindow, ScaleMixin):
                 "network": NetworkView,
                 "memory": MemoryView,
                 "storage": StorageView,
+                "logs": LogView,
                 "settings": SettingsView,
             }
 
@@ -476,6 +492,21 @@ class MainWindow(QMainWindow, ScaleMixin):
         if key == 'ui_scale':
             from systemmonitor.scaler import S
             S.set_user_scale(float(value))
+        elif key == 'hidden_views':
+            hidden = set(value or [])
+            if hasattr(self, '_sidebar'):
+                self._sidebar.set_hidden_views(hidden)
+            if self._active_view in hidden:
+                self._sidebar.set_active_view('overview')
+                self._switch_view('overview')
+
+    def show_alert_toast(self, message: str, level: str = 'warning'):
+        """Show an in-app banner for a triggered alert (the 'In-app Visuals'
+        notification method, as an alternative to system tray popups)."""
+        if self._alert_toast is None:
+            from systemmonitor.widgets.alert_toast import AlertToast
+            self._alert_toast = AlertToast(self)
+        self._alert_toast.show_alert(message, level)
 
     def on_scale_changed(self, factor: float):
         if self._in_drag_resize:
@@ -614,6 +645,7 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _create_sidebar(self):
         sidebar = GlassSidebar()
         sidebar.view_selected.connect(self._switch_view)
+        sidebar.set_hidden_views(settings.get('hidden_views', []))
         if S.is_compact():
             sidebar._collapsed = True
             sidebar.setFixedWidth(S.px(64))
@@ -685,6 +717,8 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _on_debounced_resize(self):
         self._resize_debounce_active = False
         self._update_resize_corner_position()
+        if self._alert_toast is not None:
+            self._alert_toast.reposition()
 
 
 class ResizeCorner(QWidget, ScaleMixin):

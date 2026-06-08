@@ -48,6 +48,20 @@ class CPUCollector:
             print(f"CPU collect error: {e}")
             return self._get_fallback_data()
 
+    def _get_fallback_data(self) -> Dict[str, Any]:
+        """Return fallback data when collection fails"""
+        return {
+            'percent': 0,
+            'per_core': [],
+            'core_count': 1,
+            'thread_count': 1,
+            'frequency_current': 0,
+            'frequency_max': 0,
+            'temperature': None,
+            'ctx_switches': 0,
+            'interrupts': 0,
+        }
+
     def _get_temperature(self) -> Optional[float]:
         """Get CPU temperature using multiple fallback methods"""
         import psutil

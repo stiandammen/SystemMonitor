@@ -1,7 +1,7 @@
 """
 Utility helper functions
 """
-from typing import Union
+from typing import Optional, Union
 from datetime import timedelta
 
 # Import theme manager for color functions
@@ -62,6 +62,76 @@ def format_uptime(seconds: Union[int, float]) -> str:
         return f"{hours}h {minutes}m"
     else:
         return f"{minutes}m"
+
+
+def convert_temperature(celsius: Union[int, float, None], unit: str = 'celsius') -> Optional[float]:
+    """Convert a Celsius reading to the requested display unit ('celsius' or 'fahrenheit')."""
+    if celsius is None:
+        return None
+    value = float(celsius)
+    if unit == 'fahrenheit':
+        return value * 9.0 / 5.0 + 32.0
+    return value
+
+
+def temperature_unit_suffix(unit: Optional[str] = None) -> str:
+    """Degree symbol + letter for the given unit, or the user's configured unit."""
+    if unit is None:
+        from systemmonitor.config import settings
+        unit = settings.get('temperature_unit', 'celsius')
+    return '°F' if unit == 'fahrenheit' else '°C'
+
+
+def format_temperature(celsius: Union[int, float, None], precision: Optional[int] = None) -> str:
+    """Format a Celsius sensor reading honoring the user's unit and decimal-precision preferences."""
+    if celsius is None:
+        return "N/A"
+    from systemmonitor.config import settings
+    unit = settings.get('temperature_unit', 'celsius')
+    if precision is None:
+        precision = settings.get('decimal_places', 1)
+    value = convert_temperature(celsius, unit)
+    return f"{value:.{precision}f}{temperature_unit_suffix(unit)}"
+
+
+def format_temperature_parts(celsius: Union[int, float, None],
+                             precision: Optional[int] = None) -> tuple[str, str]:
+    """Like format_temperature, but returns (value, unit) separately for UIs that style them apart."""
+    if celsius is None:
+        return "N/A", ""
+    from systemmonitor.config import settings
+    unit = settings.get('temperature_unit', 'celsius')
+    if precision is None:
+        precision = settings.get('decimal_places', 1)
+    value = convert_temperature(celsius, unit)
+    return f"{value:.{precision}f}", temperature_unit_suffix(unit)
+
+
+def network_speed_value(bytes_per_sec: Union[int, float, None],
+                        unit: Optional[str] = None) -> tuple[float, str]:
+    """Convert a bytes/sec rate to the user's preferred network speed unit.
+
+    Returns (numeric_value, unit_label) — 'Mbps' (megabits, ISP convention,
+    value * 8 / 1_000_000) or 'MB/s' (megabytes, file-transfer convention,
+    value / 1_048_576).
+    """
+    if unit is None:
+        from systemmonitor.config import settings
+        unit = settings.get('network_speed_unit', 'mbps')
+    value = float(bytes_per_sec or 0)
+    if unit == 'mbytes':
+        return value / 1_048_576, 'MB/s'
+    return (value * 8.0) / 1_000_000, 'Mbps'
+
+
+def format_network_speed(bytes_per_sec: Union[int, float, None],
+                         precision: Optional[int] = None) -> str:
+    """Format a bytes/sec rate honoring the user's unit and decimal-precision preferences."""
+    from systemmonitor.config import settings
+    if precision is None:
+        precision = settings.get('decimal_places', 1)
+    speed, label = network_speed_value(bytes_per_sec)
+    return f"{speed:.{precision}f} {label}"
 
 
 def format_frequency(hz: Union[int, float]) -> str:

@@ -20,6 +20,8 @@ import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.scaler import S, ScaleMixin
+from systemmonitor.utils.helpers import format_temperature
+from systemmonitor.i18n import tr, I18nMixin
 
 
 def c():
@@ -275,7 +277,7 @@ class LiveGraphWidget(QWidget):
         if not self._read_history and not self._write_history:
             painter.setFont(QFont("Segoe UI", 9))
             painter.setPen(QColor(colors.TEXT_MUTED))
-            painter.drawText(w // 2 - 25, h // 2 + 4, "Waiting for data...")
+            painter.drawText(w // 2 - 25, h // 2 + 4, tr("Waiting for data..."))
             painter.end()
             return
 
@@ -365,6 +367,8 @@ class PerformanceHistoryGraph(QWidget):
         self._title = title
         self._unit = unit
         self._max_points = max_points
+        self._sample_stride = 1
+        self._sample_skip = 0
         self._series: Dict[str, dict] = {}  # name -> {data, color, mode}
         self.setMinimumHeight(S.px(170))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -374,8 +378,27 @@ class PerformanceHistoryGraph(QWidget):
         """Add a named data series. mode: 'line' (area fill) or 'scatter' (dots)."""
         self._series[name] = {'data': [], 'color': color, 'mode': mode}
 
+    def set_max_points(self, max_points: int):
+        """Resize all series buffers (e.g. from the History Length setting)"""
+        self._max_points = max(1, int(max_points))
+        for series in self._series.values():
+            data = series['data']
+            if len(data) > self._max_points:
+                series['data'] = data[-self._max_points:]
+
+    def set_sample_stride(self, stride: int):
+        """Keep only every Nth incoming sample (applied uniformly across all
+        series so they stay aligned in time) so a fixed-size buffer can span
+        a longer time window (e.g. from the History Length setting)."""
+        self._sample_stride = max(1, int(stride))
+        self._sample_skip = 0
+
     def push(self, **values: float):
         """Push new values: push(Read=1024.0, Write=512.0)."""
+        self._sample_skip += 1
+        if self._sample_skip < self._sample_stride:
+            return
+        self._sample_skip = 0
         for k, v in values.items():
             if k in self._series:
                 d = self._series[k]['data']
@@ -410,14 +433,14 @@ class PerformanceHistoryGraph(QWidget):
         # Title
         painter.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_SECONDARY))
-        painter.drawText(S.px(8), S.px(17), self._title)
+        painter.drawText(S.px(8), S.px(17), tr(self._title))
 
         # Gather all data for Y scale
         all_vals = [v for s in self._series.values() for v in s['data']]
         if not all_vals:
             painter.setFont(QFont("Segoe UI", S.font_pt(8)))
             painter.setPen(QColor(colors.TEXT_MUTED))
-            painter.drawText(ml + pw // 2 - S.px(50), mt + ph // 2 + S.px(4), "Venter på data...")
+            painter.drawText(ml + pw // 2 - S.px(50), mt + ph // 2 + S.px(4), tr("Waiting for data..."))
             painter.end()
             return
 
@@ -517,9 +540,10 @@ class PerformanceHistoryGraph(QWidget):
             ty = row_y + fm.ascent()
 
             # Series name
+            disp_name = tr(name)
             painter.setPen(QColor(colors.TEXT_SECONDARY))
-            painter.drawText(tx, ty, name)
-            tx += fm.horizontalAdvance(name) + S.px(10)
+            painter.drawText(tx, ty, disp_name)
+            tx += fm.horizontalAdvance(disp_name) + S.px(10)
 
             # min / max / avg
             if data:
@@ -690,7 +714,7 @@ class TemperatureBar(QWidget):
         # Label
         painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
-        painter.drawText(0, int(bar_y + 14), f"{self._temp:.0f}°C")
+        painter.drawText(0, int(bar_y + 14), format_temperature(self._temp))
 
         # Status dot
         icon_x = bar_x + bar_w + 8
@@ -814,137 +838,7 @@ class SMARTStatusWidget(QWidget):
         self._update_display()
 
 
-class ProcessIoRow(QFrame):
-    """Single row in the Process IO table for reuse"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(S.px(8), S.px(6), S.px(8), S.px(6))
-
-        self.name = QLabel()
-        self.name.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
-        self.name.setFixedWidth(S.px(120))
-        lay.addWidget(self.name)
-
-        self.pid = QLabel()
-        self.pid.setFont(QFont("Segoe UI", S.font_pt(8)))
-        self.pid.setFixedWidth(S.px(50))
-        lay.addWidget(self.pid)
-
-        self.read = QLabel()
-        self.read.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self.read.setFixedWidth(S.px(70))
-        lay.addWidget(self.read)
-
-        self.write = QLabel()
-        self.write.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self.write.setFixedWidth(S.px(70))
-        lay.addWidget(self.write)
-        lay.addStretch()
-        self.apply_theme()
-
-    def apply_theme(self):
-        colors = c()
-        self.setStyleSheet(f"background-color: {colors.BG_HOVER}; border-radius: {S.px(6)}px;")
-        self.name.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; border: none;")
-        self.pid.setStyleSheet(f"color: {colors.TEXT_MUTED}; border: none;")
-        self.read.setStyleSheet(f"color: {colors.ACCENT_GREEN}; border: none;")
-        self.write.setStyleSheet(f"color: {colors.ACCENT_BLUE}; border: none;")
-
-    def update_data(self, name, pid, read_rate, write_rate):
-        self.name.setText(name[:20])
-        self.pid.setText(str(pid))
-        self.read.setText(self._fmt_speed(read_rate))
-        self.write.setText(self._fmt_speed(write_rate))
-
-    @staticmethod
-    def _fmt_speed(bps: float) -> str:
-        if bps >= 1_048_576: return f"{bps/1_048_576:.1f} MB/s"
-        if bps >= 1024: return f"{bps/1024:.0f} KB/s"
-        return f"{bps:.0f} B/s"
-
-
-class ProcessIoTable(QFrame, ScaleMixin):
-    """
-    Table-like widget showing top processes by disk I/O activity.
-    Optimized to reuse row widgets for high performance.
-    """
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._rows: List[ProcessIoRow] = []
-        self._header_labels: List[QLabel] = []
-        self._empty_label = None
-        self._rows_container = None
-        self.scale_connect()
-        self._build_ui()
-        theme_manager.theme_changed.connect(self._apply_theme)
-
-    def _build_ui(self):
-        """Build widget tree once. Never called again after init."""
-        main = QVBoxLayout(self)
-        main.setContentsMargins(S.px(12), S.px(12), S.px(12), S.px(12))
-        main.setSpacing(S.px(8))
-
-        hdr = QHBoxLayout()
-        for txt, w in [("Process", 120), ("PID", 50), ("Read", 70), ("Write", 70)]:
-            lbl = QLabel(txt)
-            lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-            lbl.setFixedWidth(S.px(w))
-            hdr.addWidget(lbl)
-            self._header_labels.append(lbl)
-        hdr.addStretch()
-        main.addLayout(hdr)
-
-        self._rows_container = QVBoxLayout()
-        self._rows_container.setSpacing(S.px(4))
-        main.addLayout(self._rows_container)
-
-        self._empty_label = QLabel("Ingen betydelig aktivitet detektert")
-        self._empty_label.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty_label.hide()
-        self._rows_container.addWidget(self._empty_label)
-
-        main.addStretch()
-        self._apply_theme()
-
-    def _apply_theme(self):
-        """Update colors only — never deletes or recreates widgets."""
-        colors = c()
-        self.setStyleSheet(f"background-color: {colors.BG_CARD}; border-radius: {S.px(10)}px;")
-        for lbl in self._header_labels:
-            lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; border: none;")
-        if self._empty_label:
-            self._empty_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; border: none;")
-        for row in self._rows:
-            row.apply_theme()
-
-    def update_processes(self, processes: List[Dict]):
-        """Update the list of top I/O processes with row reuse"""
-        if not processes:
-            for r in self._rows: r.hide()
-            if self._empty_label:
-                self._empty_label.show()
-            return
-
-        if self._empty_label:
-            self._empty_label.hide()
-
-        while len(self._rows) < len(processes):
-            new_row = ProcessIoRow()
-            self._rows.append(new_row)
-            self._rows_container.insertWidget(len(self._rows) - 1, new_row)
-
-        for i, row_widget in enumerate(self._rows):
-            if i < len(processes):
-                p = processes[i]
-                row_widget.update_data(p['name'], p['pid'], p['read_rate'], p['write_rate'])
-                row_widget.show()
-            else:
-                row_widget.hide()
-
-
-class StorageDiskCard(QFrame):
+class StorageDiskCard(QFrame, I18nMixin):
     """
     Professional disk panel: compact header row + partition usage table +
     live IO graph column. Left accent border color-coded by disk type.
@@ -965,8 +859,12 @@ class StorageDiskCard(QFrame):
         self._agg_bar: Optional[AnimatedProgressBar] = None
         self._agg_pct_lbl: Optional[QLabel] = None
         self.setMouseTracking(True)
+        self.i18n_connect()
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def retranslate_ui(self):
+        self._setup_ui()
 
     # ── hover ─────────────────────────────────────────────────────────────────
     def enterEvent(self, event):
@@ -1291,7 +1189,7 @@ class StorageDiskCard(QFrame):
                     return f"Disk {m.group(1)}"
         if name and name not in ('Unknown',) and not name.startswith('\\\\'):
             return name
-        return "Ukjent Disk"
+        return tr("Unknown Disk")
 
     def _get_type_color(self) -> str:
         colors = c()

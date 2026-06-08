@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, QSize
 
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.scaler import S, ScaleMixin
+from systemmonitor.utils.ui_tick import ui_tick
 
 
 class SparklineWidget(QWidget, ScaleMixin):
@@ -33,23 +34,19 @@ class SparklineWidget(QWidget, ScaleMixin):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
-        # Throttle updates to ~30fps max
-        from PyQt6.QtCore import QTimer
-        self._update_timer = QTimer(self)
-        self._update_timer.setSingleShot(True)
-        self._update_timer.timeout.connect(self._do_update)
+        # Throttle repaints to ~30fps via the shared UI tick instead of a private QTimer
+        ui_tick.tick.connect(self._on_tick)
 
-    def _do_update(self):
-        self._pending_update = False
-        self.update()
+    def _on_tick(self):
+        if self._pending_update:
+            self._pending_update = False
+            self.update()
 
     def push(self, value):
         """Push a single value to the first line."""
         self._data[0].append(float(value))
         self._auto_scale(value)
-        if not self._pending_update:
-            self._pending_update = True
-            self._update_timer.start(33)  # ~30fps throttle
+        self._pending_update = True
 
     def push_multi(self, values):
         """Push multiple values, one per line."""
@@ -57,9 +54,7 @@ class SparklineWidget(QWidget, ScaleMixin):
             if i < len(self._data):
                 self._data[i].append(float(val))
                 self._auto_scale(val)
-        if not self._pending_update:
-            self._pending_update = True
-            self._update_timer.start(33)  # ~30fps throttle
+        self._pending_update = True
 
     def _auto_scale(self, value):
         """Track max value for autoscaling."""
@@ -83,9 +78,7 @@ class SparklineWidget(QWidget, ScaleMixin):
         for d in self._data:
             d.clear()
         self._max_value = None
-        if not self._pending_update:
-            self._pending_update = True
-            self._update_timer.start(33)
+        self._pending_update = True
 
     def _get_display_max(self):
         """Get the effective max value for scaling."""

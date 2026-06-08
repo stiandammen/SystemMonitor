@@ -27,6 +27,7 @@ while bundle_dir in sys.path:
 
 # Setup logging
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception
+from systemmonitor.i18n import tr, language_manager
 
 _log = get_logger()
 
@@ -100,6 +101,36 @@ def main():
         log_error(LogCategory.APP, f"Failed to create QApplication: {e}\n{traceback.format_exc()}")
         return 1
 
+    # Splash screen — shown immediately since PyQt6/psutil/WMI take a moment to
+    # import and the main window has heavy widgets to build on first show.
+    splash = None
+    try:
+        from PyQt6.QtWidgets import QSplashScreen
+        from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont as _SplashFont
+        from PyQt6.QtCore import Qt as _SplashQt
+
+        _pix = QPixmap(420, 240)
+        _pix.fill(QColor(13, 17, 23))
+        _painter = QPainter(_pix)
+        _painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        _painter.setPen(QColor(56, 189, 248))
+        _painter.setFont(_SplashFont("Segoe UI", 24, _SplashFont.Weight.Bold))
+        _painter.drawText(_pix.rect().adjusted(0, -30, 0, 0),
+                          _SplashQt.AlignmentFlag.AlignCenter, "System Monitor")
+        _painter.setPen(QColor(148, 163, 184))
+        _painter.setFont(_SplashFont("Segoe UI", 10))
+        _painter.drawText(_pix.rect().adjusted(0, 40, 0, 0),
+                          _SplashQt.AlignmentFlag.AlignCenter, tr("Loading monitoring engine…"))
+        _painter.end()
+
+        splash = QSplashScreen(_pix)
+        splash.show()
+        app.processEvents()
+        log_info(LogCategory.APP, "Splash screen shown")
+    except Exception as e:
+        log_warning(LogCategory.APP, f"Failed to show splash screen: {e}")
+        splash = None
+
     try:
         from systemmonitor.scaler import init_scaler, S, LayoutMode
         init_scaler(app)
@@ -132,8 +163,12 @@ def main():
         app.setStyleSheet(theme_manager.get_stylesheet())
         log_info(LogCategory.APP, "Theme applied OK")
 
-        # System tray for alert notifications (cross-platform via Qt)
-        from PyQt6.QtWidgets import QSystemTrayIcon
+        # Filled in once the MainWindow exists (not available in overlay mode),
+        # so the tray menu and in-app toast can reach it.
+        _main_window_ref = [None]
+
+        # System tray: alert notifications + minimize-to-tray controls (cross-platform via Qt)
+        from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
         from PyQt6.QtGui import QPixmap, QPainter, QColor, QIcon
         from PyQt6.QtCore import QSize, Qt as _Qt
 
@@ -148,9 +183,43 @@ def main():
             p.end()
             return QIcon(px)
 
+        def _restore_main_window():
+            win = _main_window_ref[0]
+            if win is not None:
+                win.showNormal()
+                win.activateWindow()
+                win.raise_()
+
+        def _toggle_main_window():
+            win = _main_window_ref[0]
+            if win is None:
+                return
+            if win.isVisible():
+                win.hide()
+            else:
+                _restore_main_window()
+
+        def _on_tray_activated(reason):
+            if reason == QSystemTrayIcon.ActivationReason.Trigger:
+                _toggle_main_window()
+
         tray = QSystemTrayIcon()  # type: ignore[call-overload]
         tray.setIcon(_build_tray_icon())
         tray.setToolTip("System Monitor")
+
+        _tray_menu = QMenu()
+        _show_action = _tray_menu.addAction(tr("Show System Monitor"), _restore_main_window)
+        _tray_menu.addSeparator()
+        _quit_action = _tray_menu.addAction(tr("Quit"), app.quit)
+        tray.setContextMenu(_tray_menu)
+        tray.activated.connect(_on_tray_activated)
+
+        def _retranslate_tray_menu(_language: str):
+            _show_action.setText(tr("Show System Monitor"))
+            _quit_action.setText(tr("Quit"))
+
+        language_manager.language_changed.connect(_retranslate_tray_menu)
+
         if QSystemTrayIcon.isSystemTrayAvailable():
             tray.show()
             log_info(LogCategory.APP, "System tray initialized")
@@ -158,18 +227,20 @@ def main():
         from systemmonitor.core.signals import signal_bus as _signal_bus
 
         def _show_alert(alert_dict):
+            level = alert_dict.get('level', 'warning')
+            message = alert_dict.get('message', tr('System threshold exceeded'))
+            method = app_settings.get('notification_method', 'system')
+
+            if method == 'in_app' and _main_window_ref[0] is not None:
+                _main_window_ref[0].show_alert_toast(message, level)
+                return
+
             if not tray.isVisible():
                 return
-            level = alert_dict.get('level', 'warning')
             icon_type = (QSystemTrayIcon.MessageIcon.Critical
                          if level in ('critical', 'CRITICAL')
                          else QSystemTrayIcon.MessageIcon.Warning)
-            tray.showMessage(
-                "System Monitor",
-                alert_dict.get('message', 'System threshold exceeded'),
-                icon_type,
-                6000,
-            )
+            tray.showMessage("System Monitor", message, icon_type, 6000)
 
         _signal_bus.alert_triggered.connect(_show_alert)
 
@@ -178,6 +249,8 @@ def main():
             from systemmonitor.widgets.responsive import OverlayWidget
             overlay = OverlayWidget()
             overlay.show()
+            if splash is not None:
+                splash.finish(overlay)
 
             # Start data collector
             from systemmonitor.data.coordinator import DataCollector
@@ -191,8 +264,21 @@ def main():
             return result
         else:
             window = MainWindow()
-            window.show()
-            log_info(LogCategory.APP, "MainWindow shown OK")
+            _main_window_ref[0] = window
+
+            start_minimized = (app_settings.get('start_minimized', False)
+                               and QSystemTrayIcon.isSystemTrayAvailable())
+            if start_minimized:
+                log_info(LogCategory.APP, "MainWindow created hidden (start minimized to tray)")
+            else:
+                window.show()
+                log_info(LogCategory.APP, "MainWindow shown OK")
+
+            if splash is not None:
+                if start_minimized:
+                    splash.close()
+                else:
+                    splash.finish(window)
 
             # Use the coordinator-based collector for better performance
             from systemmonitor.data.coordinator import DataCollector

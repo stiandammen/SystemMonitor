@@ -21,7 +21,6 @@ class StorageCollector(QThread):
     data_updated = pyqtSignal(dict)
 
     REFRESH_INTERVAL = 1.0  
-    PROCESS_SCAN_DIVIDER = 2  # Scan processes every 2 seconds (REFRESH * DIVIDER)
     EMA_ALPHA = 0.3
 
     def __init__(self, parent=None):
@@ -42,8 +41,6 @@ class StorageCollector(QThread):
         self._smart_cache = {}
         self._smart_cache_time = {}
         self._smart_cache_ttl = 30.0
-        self._process_io_history = {}
-        self._scan_counter = 0
 
     def run(self):
         """Main collection loop"""
@@ -54,11 +51,7 @@ class StorageCollector(QThread):
             try:
                 start_time = time.time()
                 
-                # Update counters
-                self._scan_counter += 1
-                should_scan_procs = (self._scan_counter % self.PROCESS_SCAN_DIVIDER == 0)
-
-                collected = self._collect(scan_procs=should_scan_procs)
+                collected = self._collect()
 
                 if collected:
                     self._data.update(collected)
@@ -76,8 +69,8 @@ class StorageCollector(QThread):
                 log_exception(LogCategory.DISK, "StorageCollector error", e)
                 time.sleep(2)
 
-    def _collect(self, scan_procs: bool = False) -> dict:
-        """Collect all storage data with conditional process scanning"""
+    def _collect(self) -> dict:
+        """Collect all storage data"""
         try:
             import psutil
 
@@ -116,9 +109,6 @@ class StorageCollector(QThread):
                 
                 self._prev_sys_io = sys_io
                 self._prev_sys_time = current_time
-
-            if scan_procs:
-                disks_data['top_processes'] = self._get_top_io_processes()
 
             # Collect per-disk information
             disks = self._get_disk_list()

@@ -47,7 +47,6 @@ class ThemeMode(Enum):
 class UpdateInterval(Enum):
     """Data update intervals in milliseconds."""
     FAST = 250      # CPU, GPU, RAM, Network
-    MEDIUM = 1000   # Processes
     SLOW = 5000     # Metadata, topology
 
 # View display names

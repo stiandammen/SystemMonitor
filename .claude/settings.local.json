@@ -112,7 +112,14 @@
       "Skill(fewer-permission-prompts)",
       "Bash(awk '{print $2}')",
       "Bash(xargs '-I{}' python3 -c ' *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(wait)",
+      "Bash(find . -iname \"activate*\")",
+      "Bash(find . -maxdepth 3 -iname \"*.venv*\" -type d)",
+      "Bash(find . -maxdepth 4 -iname \"pyvenv.cfg\")",
+      "PowerShell(try { \\(Get-Command python -ErrorAction Stop\\).Source } catch { \"no python\" }; try { \\(Get-Command py -ErrorAction Stop\\).Source } catch { \"no py\" })",
+      "Bash(ls \"/e/[python - prosjekter]/SystemMonitor/src/systemmonitor/utils/\")",
+      "Bash(ls \"/e/[python - prosjekter]/SystemMonitor/src/systemmonitor/widgets/\")"
     ]
   }
 }

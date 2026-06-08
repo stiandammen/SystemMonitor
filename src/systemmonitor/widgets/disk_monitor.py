@@ -15,6 +15,7 @@ from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
 import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager
+from systemmonitor.utils.helpers import format_temperature
 
 
 class SpeedGauge(QWidget):
@@ -129,7 +130,7 @@ class TemperatureIndicator(QWidget):
         # Temperature label
         painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         painter.setPen(QColor(c.TEXT_PRIMARY))
-        painter.drawText(0, int(bar_y + 15), f"{self._temp:.0f}°C")
+        painter.drawText(0, int(bar_y + 15), format_temperature(self._temp))
 
         # Status icon (circle indicator)
         icon_x = bar_x + bar_width + 10

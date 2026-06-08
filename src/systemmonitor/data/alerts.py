@@ -8,6 +8,7 @@ from systemmonitor.enum import Enum
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from systemmonitor.utils.constants import AlertLevel
+from systemmonitor.i18n import tr
 
 
 @dataclass
@@ -163,7 +164,7 @@ class AlertManager(QObject):
     def _trigger_alert(self, rule: AlertRule, value: float):
         """Create and emit an alert"""
         alert_id = f"{rule.metric}_{int(time.time())}"
-        message = rule.message_template.format(value=value, threshold=rule.threshold)
+        message = tr(rule.message_template).format(value=value, threshold=rule.threshold)
         
         alert = Alert(
             id=alert_id,

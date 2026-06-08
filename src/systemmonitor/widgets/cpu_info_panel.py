@@ -6,10 +6,11 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 from systemmonitor.styles.theme import theme_manager
+from systemmonitor.i18n import tr, I18nMixin
 from systemmonitor.scaler import S, ScaleMixin
 
 
-class CpuInfoPanel(QWidget, ScaleMixin):
+class CpuInfoPanel(QWidget, ScaleMixin, I18nMixin):
     """
     CPU information panel with 3-column layout:
     - Left: CPU name, architecture, uptime
@@ -21,8 +22,14 @@ class CpuInfoPanel(QWidget, ScaleMixin):
         super().__init__(parent)
         self._info = {}
         self._uptime_seconds = 0
+        self._label_widgets: list = []
         self.scale_connect()
+        self.i18n_connect()
         self._setup_ui()
+
+    def retranslate_ui(self):
+        for lbl, source_text in self._label_widgets:
+            lbl.setText(tr(source_text))
 
     def _setup_ui(self):
         """Setup the UI"""
@@ -34,7 +41,7 @@ class CpuInfoPanel(QWidget, ScaleMixin):
         self.setLayout(main_layout)
 
         # Title
-        title = QLabel("CPU Information")
+        title = QLabel(tr("CPU Information"))
         title_font = QFont("Segoe UI", 14, QFont.Weight.Bold)
         title.setFont(title_font)
         main_layout.addWidget(title)
@@ -149,16 +156,6 @@ class CpuInfoPanel(QWidget, ScaleMixin):
         self._usage_label = usage_widget.item_at(1)
         layout.addWidget(usage_widget.widget)
 
-        # Process Count
-        proc_widget = self._create_info_item("Processes", "0")
-        self._processes_label = proc_widget.item_at(1)
-        layout.addWidget(proc_widget.widget)
-
-        # Thread Count
-        thread_widget = self._create_info_item("Threads", "0")
-        self._threads_count_label = thread_widget.item_at(1)
-        layout.addWidget(thread_widget.widget)
-
         # Interrupts/sec
         int_widget = self._create_info_item("Interrupts/sec", "0")
         self._interrupts_label = int_widget.item_at(1)
@@ -175,9 +172,10 @@ class CpuInfoPanel(QWidget, ScaleMixin):
         layout.setSpacing(2)
         container.setLayout(layout)
 
-        lbl = QLabel(label)
+        lbl = QLabel(tr(label))
         lbl.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; font-size: 11px; background: transparent;")
         layout.addWidget(lbl)
+        self._label_widgets.append((lbl, label))
 
         val = QLabel(value)
         val.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; font-size: 13px; font-weight: bold; background: transparent;")
@@ -195,7 +193,7 @@ class CpuInfoPanel(QWidget, ScaleMixin):
         """Update panel with CPU data"""
         if 'info' in data:
             info = data['info']
-            self._cpu_name_label.setText(info.get('name', 'Unknown')[:50])
+            self._cpu_name_label.setText(info.get('name', tr('Unknown'))[:50])
             self._arch_label.setText(info.get('architecture', 'x64'))
 
         if 'uptime' in data:
@@ -215,8 +213,6 @@ class CpuInfoPanel(QWidget, ScaleMixin):
         if 'usage' in data:
             usage = data['usage']
             self._usage_label.setText(f"{usage.get('percent', 0):.1f}%")
-            self._processes_label.setText(str(usage.get('processes', 0)))
-            self._threads_count_label.setText(str(usage.get('threads', 0)))
             self._interrupts_label.setText(str(usage.get('interrupts', 0)))
 
             # Color code based on usage

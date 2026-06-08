@@ -98,13 +98,16 @@ class GPUManager:
         if not self._initialized:
             self._initialize_detectors()
 
-        # Check if cache is still valid
         current_time = time.time()
-        if (current_time - self._last_scan_time) < self._cache_ttl and self._cached_gpus:
-            self.logger.debug("Using cached GPU detection results")
+        
+        # We periodically force a full re-scan to catch eGPUs/hardware changes
+        # while still using the cache for high-frequency calls.
+        force_rescan = (current_time - self._last_scan_time) >= 15.0
+
+        if not force_rescan and self._cached_gpus:
             return [gpu.copy() for gpu in self._cached_gpus]
 
-        self.logger.info("Starting GPU detection across all backends...")
+        self.logger.debug("Starting GPU detection across all backends...")
         all_gpus = []
 
         # Run each detector and collect results

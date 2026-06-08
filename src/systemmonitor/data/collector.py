@@ -25,6 +25,18 @@ class BaseCollector(QThread):
         self._data = {}
         self._last_emit_time = 0
         self._min_emit_interval = 0.5  # Minimum interval between emissions
+        # Multiplier applied to REFRESH_INTERVAL, adjustable at runtime via the
+        # "Update Speed" setting (Fast/Normal/Low). 1.0 = the class default.
+        self._interval_scale = 1.0
+
+    def set_interval_scale(self, scale: float):
+        """Adjust the collection cadence at runtime (e.g. from the Update Speed setting).
+
+        Also rescales the emit throttle so faster settings actually surface
+        more frequent updates instead of being capped by a fixed throttle.
+        """
+        self._interval_scale = max(0.1, float(scale))
+        self._min_emit_interval = max(0.05, self.REFRESH_INTERVAL * self._interval_scale * 0.8)
 
     def run(self):
         """Main collection loop - runs in background thread"""
@@ -47,9 +59,9 @@ class BaseCollector(QThread):
                         self.data_updated.emit(self._data.copy())
                         self._last_emit_time = current_time
 
-                # Sleep for optimal interval
+                # Sleep for optimal interval (scaled by the Update Speed setting)
                 elapsed = time.time() - start_time
-                sleep_time = max(0, self.REFRESH_INTERVAL - elapsed)
+                sleep_time = max(0, self.REFRESH_INTERVAL * self._interval_scale - elapsed)
                 if sleep_time > 0:
                     time.sleep(sleep_time)
 
@@ -78,6 +90,17 @@ class CPUCollectorThread(BaseCollector):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cpu_initialized = False
+        self._cpu_manager = None
+        self._init_cpu_manager()
+
+    def _init_cpu_manager(self):
+        """Initialize the centralized CPU manager (name/topology/temperature)"""
+        try:
+            from systemmonitor.data.hardware.cpu_manager import CPUManager
+            self._cpu_manager = CPUManager()
+        except Exception as e:
+            log_error(LogCategory.CPU, f"CPU manager init failed: {e}")
+            self._cpu_manager = None
 
     def _collect(self) -> dict:
         """Collect CPU data"""
@@ -107,7 +130,7 @@ class CPUCollectorThread(BaseCollector):
                 'frequency_current': freq.current if freq else 0,
                 'frequency_max': freq.max if freq else 0,
                 'frequency_min': freq.min if freq else 0,
-                'temperature': self._get_cpu_temperature(),
+                'temperature': self._cpu_manager.get_temperature() if self._cpu_manager else None,
                 'interrupts': stats.interrupts if hasattr(stats, 'interrupts') else 0,
                 'ctx_switches': stats.ctx_switches if hasattr(stats, 'ctx_switches') else 0,
             }
@@ -117,136 +140,6 @@ class CPUCollectorThread(BaseCollector):
         except Exception as e:
             log_exception(LogCategory.CPU, "CPU collection failed", e)
             return {}
-
-    def _get_cpu_temperature(self):
-        """Get CPU temperature using psutil sensors or WMI fallback"""
-        import psutil
-        # Try psutil sensors first (only if available)
-        if hasattr(psutil, 'sensors_temperatures'):
-            try:
-                temps = psutil.sensors_temperatures()
-                if temps:
-                    for key in ['coretemp', 'cpu_thermal', 'k10temp', 'zenpower', 'cpu', 'cpu0']:
-                        if key in temps:
-                            entries = temps[key]
-                            if entries:
-                                for entry in entries:
-                                    if hasattr(entry, 'current') and entry.current is not None:
-                                        return float(entry.current)
-            except (AttributeError, Exception):
-                pass
-
-        # Fallback for Windows - try WMI MSAcpi_ThermalZoneTemperature
-        try:
-            import subprocess
-            result = subprocess.run(
-                ["powershell", "-Command",
-                 "(Get-CimInstance MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature"],
-                capture_output=True, text=True, timeout=3
-            )
-            if result.stdout.strip():
-                # Returns temperature in tenths of Kelvin
-                temp_k = float(result.stdout.strip())
-                return temp_k / 10 - 273.15
-        except Exception:
-            pass
-
-        # Try alternative via HWiNFO shared memory
-        try:
-            temp = self._read_hwinfo_temp()
-            if temp is not None:
-                return temp
-        except Exception:
-            pass
-
-        return None
-
-    def _read_hwinfo_temp(self):
-        """Try to read CPU temp from HWiNFO shared memory"""
-        import ctypes
-
-        # HWiNFO shared memory signatures (V1-V4)
-        HWINFO_SIGNATURES = [
-            b"HWiNFO",   # V1/V2 64-bit
-            b"HWiNFO32", # V1/V2 32-bit
-            b"HWiNFO_V", # V3/V4 signature prefix
-            b"HWiNFO32_V", # V3/V4 32-bit
-        ]
-
-        try:
-            kernel32 = ctypes.windll.kernel32
-
-            # HWiNFO shared memory names (newer versions use _V2, _V3, _V4)
-            HWINFO_NAMES = [
-                "HWiNFO32_Sens", "HWiNFO64_Sens",
-                "HWiNFO32_V2", "HWiNFO64_V2",
-                "HWiNFO32_V3", "HWiNFO64_V3",
-                "HWiNFO32_V4", "HWiNFO64_V4",
-            ]
-
-            mapping = None
-            found_name = None
-            handle = None
-
-            for name in HWINFO_NAMES:
-                handle = kernel32.OpenFileMappingW(0x0004, False, name)
-                if handle:
-                    found_name = name
-                    break
-
-            if not handle:
-                return None
-
-            try:
-                mapping = kernel32.MapViewOfFile(handle, 0x0004, 0, 0, 8192)
-            finally:
-                kernel32.CloseHandle(handle)
-
-            if not mapping:
-                return None
-
-            try:
-                # Read signature (16 bytes to be safe)
-                sig = ctypes.create_string_buffer(16)
-                ctypes.memmove(sig, mapping, 16)
-
-                # Check if signature matches any HWiNFO variant
-                is_hwinfo = any(sig.raw[:len(s)] == s for s in HWINFO_SIGNATURES)
-
-                if not is_hwinfo:
-                    return None
-
-                # Try multiple offsets to find temperature data
-                # Different HWiNFO versions use different offsets
-                for offset in [0x30, 0x34, 0x38, 0x40, 0x44, 0x48, 0x50, 0x60, 0x80, 0x100]:
-                    try:
-                        temp_raw = ctypes.c_float()
-                        ctypes.memmove(ctypes.addressof(temp_raw), mapping + offset, 4)
-                        temp = temp_raw.value
-                        # Valid CPU temperature range: 0-100°C (some systems may show up to 125°C under load)
-                        if 0 < temp < 125:
-                            return temp
-                    except Exception:
-                        continue
-
-                # Also try reading as Intel/AMD specific format
-                # Some systems store temperature at offset 0xB0 or higher
-                for offset in [0xB0, 0xB4, 0xB8, 0xBC, 0xC0, 0xC4]:
-                    try:
-                        temp_raw = ctypes.c_float()
-                        ctypes.memmove(ctypes.addressof(temp_raw), mapping + offset, 4)
-                        temp = temp_raw.value
-                        if 20 < temp < 100:  # CPUs rarely run below 20°C
-                            return temp
-                    except Exception:
-                        continue
-
-                return None
-            finally:
-                if mapping:
-                    kernel32.UnmapViewOfFile(mapping)
-        except Exception:
-            return None
 
 
 class MemoryCollectorThread(BaseCollector):
@@ -292,6 +185,7 @@ class DiskCollectorThread(BaseCollector):
         self._previous_time = 0
         self._io_per_disk = {}
         self._disk_mapping = {}
+        self._last_partition_set = set()
         # Global robust metrics state
         self._prev_sys_io = None
         self._prev_sys_time = 0
@@ -323,14 +217,20 @@ class DiskCollectorThread(BaseCollector):
                 self._prev_sys_io = sys_io
                 self._prev_sys_time = current_time
 
-            # Build mapping of physical disks to drive letters
-            self._update_disk_mapping()
+            # Get current partition list
+            current_partitions = psutil.disk_partitions(all=False)
+            current_partition_set = set(p.device for p in current_partitions if p.fstype)
+
+            # Build mapping only if partitions changed or not initialized
+            if current_partition_set != self._last_partition_set:
+                self._update_disk_mapping()
+                self._last_partition_set = current_partition_set
 
             # Get partition info
             partitions = []
             partition_io = {}
 
-            for part in psutil.disk_partitions(all=False):
+            for part in current_partitions:
                 if not part.fstype:
                     continue
                 try:
@@ -546,6 +446,47 @@ class NetworkCollectorThread(BaseCollector):
             self._previous_io = total_io
             self._previous_time = current_time
 
+            # Get active connections (throttled)
+            connections = []
+            if int(current_time) % 5 == 0:
+                try:
+                    import socket
+                    for conn in psutil.net_connections(kind="inet"):
+                        try:
+                            connections.append({
+                                "local_ip":    conn.laddr.ip   if conn.laddr else "—",
+                                "local_port":  conn.laddr.port if conn.laddr else "—",
+                                "remote_ip":   conn.raddr.ip   if conn.raddr else "—",
+                                "remote_port": conn.raddr.port if conn.raddr else "—",
+                                "proto":       "TCP" if conn.type == socket.SOCK_STREAM else "UDP",
+                                "state":       conn.status or "—",
+                            })
+                        except (OSError, ValueError):
+                            pass
+                except Exception:
+                    pass
+
+            # Get interface stats and addresses (throttled)
+            interfaces = {}
+            if int(current_time) % 10 == 0:
+                try:
+                    stats = psutil.net_if_stats()
+                    addrs = psutil.net_if_addrs()
+                    for name, stat in stats.items():
+                        ip = "—"
+                        for addr in addrs.get(name, []):
+                            import socket
+                            if addr.family == socket.AF_INET:
+                                ip = addr.address
+                                break
+                        interfaces[name] = {
+                            'isup': stat.isup,
+                            'speed': stat.speed,
+                            'ip': ip
+                        }
+                except Exception:
+                    pass
+
             return {
                 'download_speed': max(0, self._smoothed_download),
                 'upload_speed': max(0, self._smoothed_upload),
@@ -553,7 +494,9 @@ class NetworkCollectorThread(BaseCollector):
                 'bytes_recv': total_io.bytes_recv,
                 'active_interface': self._active_interface,
                 'raw_download': max(0, raw_download),
-                'raw_upload': max(0, raw_upload)
+                'raw_upload': max(0, raw_upload),
+                'connections': connections if connections else None,
+                'interfaces': interfaces if interfaces else None
             }
 
         except Exception as e:
@@ -702,6 +645,71 @@ class SystemInfoCollectorThread(BaseCollector):
         super().__init__(parent)
         self._info_cache = {}
         self._cache_time = 0
+        self._cpu_manager = None
+        self._battery_manager = None
+        self._sensor_manager = None
+        self._init_cpu_manager()
+        self._init_battery_manager()
+        self._init_sensor_manager()
+
+    def _init_cpu_manager(self):
+        """Initialize the centralized CPU manager (name cleanup/topology)"""
+        try:
+            from systemmonitor.data.hardware.cpu_manager import CPUManager
+            self._cpu_manager = CPUManager()
+        except Exception as e:
+            log_error(LogCategory.CPU, f"CPU manager init failed: {e}")
+            self._cpu_manager = None
+
+    def _init_battery_manager(self):
+        """Initialize the battery/power-plan reader (returns None on desktops)"""
+        try:
+            from systemmonitor.data.hardware.battery_manager import BatteryManager
+            self._battery_manager = BatteryManager()
+        except Exception as e:
+            log_error(LogCategory.HARDWARE, f"Battery manager init failed: {e}")
+            self._battery_manager = None
+
+    def _init_sensor_manager(self):
+        """Initialize the extended-sensor reader (fan RPM / voltages)"""
+        try:
+            from systemmonitor.data.hardware.sensor_manager import SensorManager
+            self._sensor_manager = SensorManager()
+        except Exception as e:
+            log_error(LogCategory.HARDWARE, f"Sensor manager init failed: {e}")
+            self._sensor_manager = None
+
+    def _get_sensor_info(self):
+        """Return {'fans': [...], 'voltages': [...]} of plain dicts (best-effort)"""
+        if self._sensor_manager is None:
+            return {'fans': [], 'voltages': []}
+        try:
+            fans = [{'label': f.label, 'rpm': f.rpm} for f in self._sensor_manager.get_fan_speeds()]
+        except Exception:
+            fans = []
+        try:
+            voltages = [{'label': v.label, 'volts': v.volts} for v in self._sensor_manager.get_voltages()]
+        except Exception:
+            voltages = []
+        return {'fans': fans, 'voltages': voltages}
+
+    def _get_battery_info(self):
+        """Return a plain dict of battery status, or None if no battery is present"""
+        if self._battery_manager is None:
+            return None
+        try:
+            info = self._battery_manager.get_status()
+        except Exception:
+            return None
+        if info is None:
+            return None
+        return {
+            'percent': info.percent,
+            'power_plugged': info.power_plugged,
+            'secs_left': info.secs_left,
+            'power_plan': info.power_plan,
+            'status_text': info.status_text,
+        }
 
     def _collect(self) -> dict:
         """Collect system info (cached for performance)"""
@@ -714,17 +722,26 @@ class SystemInfoCollectorThread(BaseCollector):
         try:
             import psutil
 
-            cpu_name = self._get_cpu_name()
+            cpu_info = self._cpu_manager.get_info() if self._cpu_manager else None
             gpu_name = self._get_gpu_name()
             motherboard = self._get_motherboard()
             ram_info = self._get_ram_info()
 
             self._info_cache = {
-                'cpu_name': cpu_name,
+                'cpu_name': cpu_info.name if cpu_info else (platform.processor() or "Unknown CPU"),
+                'cpu_topology': {
+                    'physical_cores': cpu_info.physical_cores,
+                    'logical_cores': cpu_info.logical_cores,
+                    'performance_cores': cpu_info.performance_cores,
+                    'efficiency_cores': cpu_info.efficiency_cores,
+                    'has_hybrid_architecture': cpu_info.has_hybrid_architecture,
+                } if cpu_info else None,
                 'gpu_name': gpu_name,
                 'motherboard': motherboard,
                 'ram_info': ram_info,
                 'boot_time': psutil.boot_time(),
+                'battery': self._get_battery_info(),
+                'sensors': self._get_sensor_info(),
             }
             self._cache_time = current_time
 
@@ -733,22 +750,6 @@ class SystemInfoCollectorThread(BaseCollector):
         except Exception as e:
             log_exception(LogCategory.HARDWARE, "System info collection failed", e)
             return {}
-
-    def _get_cpu_name(self) -> str:
-        """Get CPU name with caching"""
-        if platform.system() == 'Windows':
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ["powershell", "-Command",
-                     "(Get-CimInstance Win32_Processor).Name"],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.stdout.strip():
-                    return result.stdout.strip()
-            except:
-                pass
-        return platform.processor() or "Unknown CPU"
 
     def _get_gpu_name(self) -> str:
         """Get GPU name"""

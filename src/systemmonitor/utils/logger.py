@@ -36,6 +36,10 @@ class SystemLogger:
         self._backup_count = 3
         self._initialized = True
 
+    @property
+    def log_dir(self) -> Path:
+        return self._log_dir
+
     @staticmethod
     def _get_log_dir() -> Path:
         if getattr(sys, "frozen", False):

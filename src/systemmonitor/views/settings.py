@@ -1,12 +1,12 @@
-﻿"""
+"""
 Settings View — Professional rebuild
 Card-based sections, scroll support, consistent with the rest of the GUI theme.
 """
 from systemmonitor.pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QComboBox, QSlider, QFileDialog, QMessageBox,
-    QSizePolicy, QFrame, QScrollArea,
+    QComboBox, QSlider, QSpinBox, QFileDialog, QMessageBox,
+    QSizePolicy, QFrame, QScrollArea, QDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QFont
@@ -18,6 +18,7 @@ from systemmonitor.utils.exporters import DataExporter
 from systemmonitor.core.signals import signal_bus
 from systemmonitor.scaler import S, ScaleMixin
 from systemmonitor.styles.theme import theme_manager
+from systemmonitor.i18n import tr, language_manager, SUPPORTED_LANGUAGES, I18nMixin
 from systemmonitor.widgets.card import Card
 from systemmonitor.widgets.settings_row import ToggleWidget
 
@@ -26,7 +27,19 @@ def _c():
     return theme_manager.colors
 
 
-class SettingsView(QWidget, ScaleMixin):
+# Sidebar tabs the user is allowed to hide via the "Tab Visibility" section.
+# Dashboard and Settings stay out of this list — they must always remain
+# reachable (Settings is the only way back to re-enable a hidden tab).
+HIDEABLE_VIEWS = [
+    ("cpu", "Processor"),
+    ("gpu", "Graphics"),
+    ("network", "Network"),
+    ("memory", "Memory"),
+    ("storage", "Storage"),
+]
+
+
+class SettingsView(QWidget, ScaleMixin, I18nMixin):
     signals_changed = pyqtSignal(str, object)
 
     def __init__(self, parent=None):
@@ -37,6 +50,7 @@ class SettingsView(QWidget, ScaleMixin):
         self._exporter.export_completed.connect(self._on_export_result)
         signal_bus.data_updated.connect(self._on_data_updated)
         self.scale_connect()
+        self.i18n_connect()
         theme_manager.theme_changed.connect(self._on_theme_changed)
         self._setup_ui()
 
@@ -44,6 +58,10 @@ class SettingsView(QWidget, ScaleMixin):
         # Defer rebuild so any active widget event (e.g. combo click) finishes first.
         # Rebuilding the layout synchronously inside theme_changed destroys the combo
         # box while Qt is still processing its currentIndexChanged event → crash.
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
+
+    def retranslate_ui(self):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._setup_ui)
 
@@ -115,9 +133,14 @@ class SettingsView(QWidget, ScaleMixin):
         root.addWidget(scroll, stretch=1)
 
         self._build_general_section(content_layout)
+        self._build_visibility_section(content_layout)
+        self._build_performance_section(content_layout)
         self._build_appearance_section(content_layout)
+        self._build_units_section(content_layout)
         self._build_alerts_section(content_layout)
         self._build_data_section(content_layout)
+        self._build_export_server_section(content_layout)
+        self._build_information_section(content_layout)
         self._build_maintenance_section(content_layout)
         content_layout.addStretch()
 
@@ -140,7 +163,7 @@ class SettingsView(QWidget, ScaleMixin):
         layout.setSpacing(S.px(12))
         header.setLayout(layout)
 
-        title = QLabel("Settings")
+        title = QLabel(tr("Settings"))
         title.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
@@ -150,7 +173,7 @@ class SettingsView(QWidget, ScaleMixin):
         sep.setFont(QFont("Segoe UI", S.font_pt(14)))
         layout.addWidget(sep)
 
-        subtitle = QLabel("Application preferences")
+        subtitle = QLabel(tr("Application preferences"))
         subtitle.setFont(QFont("Segoe UI", S.font_pt(11)))
         subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         layout.addWidget(subtitle)
@@ -167,6 +190,129 @@ class SettingsView(QWidget, ScaleMixin):
         """)
         layout.addWidget(badge)
         return header
+
+    # ── Information Section ────────────────────────────────────────────────
+
+    def _build_information_section(self, parent: QVBoxLayout):
+        card = Card(title=tr("Information"), icon="ph.info")
+
+        about_btn = self._btn(tr("About System Monitor"), icon="ph.identification-card")
+        about_btn.clicked.connect(self._show_about_dialog)
+        card.add_widget(self._row(
+            tr("Application Info"),
+            tr("View version number, build details and project links"),
+            about_btn
+        ))
+
+        help_btn = self._btn(tr("Documentation & Help"), icon="ph.book-open")
+        help_btn.clicked.connect(self._show_help_dialog)
+        card.add_widget(self._row(
+            tr("Technical Documentation"),
+            tr("Learn what the different metrics (IRQ, P-cores, etc.) actually mean"),
+            help_btn, last=True
+        ))
+        parent.addWidget(card)
+
+    def _show_about_dialog(self):
+        c = _c()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("About System Monitor"))
+        dialog.setMinimumSize(S.px(450), S.px(350))
+        dialog.setStyleSheet(f"background-color: {c.BG_CARD}; border: 1px solid {c.BORDER};")
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(S.px(30), S.px(30), S.px(30), S.px(30))
+        layout.setSpacing(S.px(10))
+
+        title = QLabel("System Monitor")
+        title.setFont(QFont("Segoe UI", S.font_pt(20), QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        version = QLabel(tr("Version {0}").format("1.0.0"))
+        version.setFont(QFont("Segoe UI", S.font_pt(10)))
+        version.setStyleSheet(f"color: {c.TEXT_MUTED}; border: none;")
+        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(version)
+
+        layout.addSpacing(S.px(15))
+
+        desc = QLabel(tr(
+            "A professional-grade system monitoring utility "
+            "designed for deep hardware insights and real-time performance tracking."
+        ))
+        desc.setWordWrap(True)
+        desc.setFont(QFont("Segoe UI", S.font_pt(10)))
+        desc.setStyleSheet(f"color: {c.TEXT_PRIMARY}; border: none;")
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(desc)
+
+        layout.addStretch()
+
+        close_btn = self._btn(tr("Close"))
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        dialog.exec()
+
+    def _show_help_dialog(self):
+        from PyQt6.QtWidgets import QDialog, QScrollArea, QWidget, QVBoxLayout, QLabel
+        c = _c()
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("Documentation & Help"))
+        dialog.setMinimumSize(S.px(600), S.px(500))
+        dialog.setStyleSheet(f"background-color: {c.BG_CARD}; border: 1px solid {c.BORDER};")
+
+        main_layout = QVBoxLayout(dialog)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background: transparent; border: none;")
+
+        content = QWidget()
+        content.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(content)
+        layout.setSpacing(S.px(20))
+
+        help_topics = [
+            ("P-Cores & E-Cores",
+             "Hybrid Intel CPUs (12th gen+) use Performance cores for heavy tasks "
+             "and Efficiency cores for background work to save power."),
+            ("Context Switches",
+             "How often the CPU switches between different tasks. High numbers are normal, "
+             "but extreme spikes can indicate heavy multitasking or driver issues."),
+            ("Interrupts (IRQ)",
+             "Signals from hardware to the CPU. High interrupt rates can mean "
+             "malfunctioning hardware or high network/disk load."),
+            ("VRAM",
+             "Dedicated memory on your Graphics Card. If this fills up, "
+             "graphics-heavy apps will slow down significantly."),
+            ("Page File / Swap",
+             "A portion of your storage used as 'extra' RAM when physical memory is full. "
+             "Using this is much slower than real RAM."),
+        ]
+
+        for topic, text in help_topics:
+            topic_lbl = QLabel(tr(topic))
+            topic_lbl.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+            topic_lbl.setStyleSheet(f"color: {c.ACCENT_BLUE}; border: none;")
+            layout.addWidget(topic_lbl)
+
+            text_lbl = QLabel(tr(text))
+            text_lbl.setWordWrap(True)
+            text_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
+            text_lbl.setStyleSheet(f"color: {c.TEXT_PRIMARY}; border: none;")
+            layout.addWidget(text_lbl)
+
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll)
+
+        close_btn = self._btn(tr("Close"))
+        close_btn.clicked.connect(dialog.accept)
+        main_layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        dialog.exec()
 
     # ── Row builder ────────────────────────────────────────────────────────
 
@@ -312,7 +458,7 @@ class SettingsView(QWidget, ScaleMixin):
         return btn
 
     def _slider_row(self, minimum: int, maximum: int,
-                    value: int) -> tuple[QWidget, QSlider]:
+                    value: int, unit: str = '%') -> tuple[QWidget, QSlider]:
         c = _c()
         container = QWidget()
         container.setStyleSheet("background: transparent;")
@@ -350,9 +496,9 @@ class SettingsView(QWidget, ScaleMixin):
             }}
         """)
 
-        val_lbl = QLabel(f"{value}%")
+        val_lbl = QLabel(f"{value}{unit}")
         val_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
-        val_lbl.setFixedWidth(S.px(42))
+        val_lbl.setFixedWidth(S.px(48))
         val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         val_lbl.setStyleSheet(f"""
             color: {c.ACCENT_GREEN};
@@ -360,7 +506,7 @@ class SettingsView(QWidget, ScaleMixin):
             border: 1px solid {c.BORDER};
             border-radius: {S.px(4)}px;
         """)
-        slider.valueChanged.connect(lambda v: val_lbl.setText(f"{v}%"))
+        slider.valueChanged.connect(lambda v: val_lbl.setText(f"{v}{unit}"))
 
         lo.addWidget(slider)
         lo.addWidget(val_lbl)
@@ -372,75 +518,205 @@ class SettingsView(QWidget, ScaleMixin):
         toggle.toggled.connect(lambda v: self._on_setting_changed(key, v))
         return toggle
 
+    def _make_autostart_toggle(self) -> ToggleWidget:
+        """Toggle backed by the Windows registry Run key rather than a plain
+        settings value — the registry is the source of truth for its state."""
+        toggle = ToggleWidget()
+        toggle.setChecked(AutostartManager.is_enabled())
+        toggle.toggled.connect(self._on_autostart_toggled)
+        return toggle
+
+    def _on_autostart_toggled(self, enabled: bool):
+        ok = AutostartManager.enable() if enabled else AutostartManager.disable()
+        settings.set('autostart', enabled and ok)
+        self.signals_changed.emit('autostart', enabled and ok)
+
+    def _make_visibility_toggle(self, view_key: str) -> ToggleWidget:
+        """Toggle bound to the 'hidden_views' list rather than a plain bool key —
+        checked means visible (i.e. NOT present in the hidden list)."""
+        toggle = ToggleWidget()
+        toggle.setChecked(view_key not in settings.get('hidden_views', []))
+        toggle.toggled.connect(lambda visible: self._on_visibility_toggled(view_key, visible))
+        return toggle
+
     # ── Sections ───────────────────────────────────────────────────────────
 
     def _build_general_section(self, parent: QVBoxLayout):
-        card = Card(title="General", icon="ph.gear")
+        card = Card(title=tr("General"), icon="ph.gear")
+
+        lang_keys  = list(SUPPORTED_LANGUAGES.keys())
+        lang_names = list(SUPPORTED_LANGUAGES.values())
+        lang_combo = self._combo(lang_names, lang_keys,
+                                 settings.get('language', 'en'))
+        lang_combo.currentIndexChanged.connect(
+            lambda i: self._on_language_selected(lang_keys[i]))
+        card.add_widget(self._row(
+            tr("Language"),
+            tr("Display language used throughout the application"),
+            lang_combo
+        ))
 
         rows = [
-            ("Show system tray icon",
-             "Display the application icon in the Windows system tray",
+            (tr("Show system tray icon"),
+             tr("Display the application icon in the Windows system tray"),
              self._make_toggle('show_system_tray', True), False),
-            ("Start application minimized",
-             "Launch directly to tray without showing the main window",
+            (tr("Start application minimized"),
+             tr("Launch directly to tray without showing the main window"),
              self._make_toggle('start_minimized', False), False),
-            ("Enable animations",
-             "Smooth transitions and animated charts throughout the interface",
+            (tr("Run on Startup"),
+             tr("Launch System Monitor automatically when you sign in to Windows"),
+             self._make_autostart_toggle(), False),
+            (tr("Enable animations"),
+             tr("Smooth transitions and animated charts throughout the interface"),
              self._make_toggle('enable_animations', True), False),
-            ("Check for updates on startup",
-             "Automatically check for new versions when the application starts",
+            (tr("Check for updates on startup"),
+             tr("Automatically check for new versions when the application starts"),
              self._make_toggle('check_for_updates', True), False),
         ]
         for label, desc, ctrl, last in rows:
             card.add_widget(self._row(label, desc, ctrl, last))
 
-        btn = self._btn("Check now")
+        btn = self._btn(tr("Check now"))
         btn.clicked.connect(self._on_check_for_updates)
         card.add_widget(self._row(
-            "Check for updates",
-            "Manually query for the latest available release",
+            tr("Check for updates"),
+            tr("Manually query for the latest available release"),
             btn, last=True
         ))
         parent.addWidget(card)
 
+    def _build_visibility_section(self, parent: QVBoxLayout):
+        card = Card(title=tr("Tab Visibility"), icon="ph.eye")
+
+        for i, (view_key, label) in enumerate(HIDEABLE_VIEWS):
+            last = i == len(HIDEABLE_VIEWS) - 1
+            translated_label = tr(label)
+            card.add_widget(self._row(
+                tr("Show {0} tab").format(translated_label),
+                tr("Display the {0} tab in the sidebar — hide it for a cleaner interface "
+                   "if you don't use it (e.g. no dedicated GPU)").format(translated_label),
+                self._make_visibility_toggle(view_key),
+                last,
+            ))
+        parent.addWidget(card)
+
+    def _on_visibility_toggled(self, view_key: str, visible: bool):
+        hidden = list(settings.get('hidden_views', []))
+        if visible:
+            if view_key in hidden:
+                hidden.remove(view_key)
+        elif view_key not in hidden:
+            hidden.append(view_key)
+        settings.set('hidden_views', hidden)
+        self.signals_changed.emit('hidden_views', hidden)
+
+    def _build_performance_section(self, parent: QVBoxLayout):
+        card = Card(title=tr("Performance"), icon="ph.gauge")
+
+        speed_vals  = [250, 500, 2000]
+        speed_names = [tr("Fast (250ms)"), tr("Normal (500ms)"), tr("Low (2000ms)")]
+        speed_combo = self._combo(speed_names, speed_vals,
+                                  settings.get('update_interval', 500))
+        speed_combo.currentIndexChanged.connect(
+            lambda i: self._on_setting_changed('update_interval', speed_vals[i]))
+        card.add_widget(self._row(
+            tr("Update speed"),
+            tr("How often metrics are refreshed — faster gives real-time detail, "
+               "slower saves CPU and power"),
+            speed_combo
+        ))
+
+        history_vals  = [300, 900, 3600]
+        history_names = [tr("5 minutes"), tr("15 minutes"), tr("1 hour")]
+        history_combo = self._combo(history_names, history_vals,
+                                    settings.get('history_duration', 300))
+        history_combo.currentIndexChanged.connect(
+            lambda i: self._on_setting_changed('history_duration', history_vals[i]))
+        card.add_widget(self._row(
+            tr("History length"),
+            tr("How much time the live graphs keep visible before scrolling off"),
+            history_combo, last=True
+        ))
+        parent.addWidget(card)
+
     def _build_appearance_section(self, parent: QVBoxLayout):
-        card = Card(title="Appearance", icon="ph.palette")
+        card = Card(title=tr("Appearance"), icon="ph.palette")
 
         theme_keys  = [
             "cyber-cyan", "premium", "cyberpunk", "heimdal",
         ]
         theme_names = [
-            "Cyber Cyan (Default)", "Premium Dark", "Cyberpunk", "Heimdal",
+            tr("Cyber Cyan (Default)"), tr("Premium Dark"), tr("Cyberpunk"), tr("Heimdal"),
         ]
         theme_combo = self._combo(theme_names, theme_keys,
                                   settings.get('theme', 'cyber-cyan'))
         theme_combo.currentIndexChanged.connect(
             lambda _: self._on_theme_selected(theme_combo.currentData()))
         card.add_widget(self._row(
-            "Theme",
-            "Overall visual appearance of the application",
+            tr("Theme"),
+            tr("Overall visual appearance of the application"),
             theme_combo
         ))
 
         scale_vals  = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50]
-        scale_names = ["75%", "90%", "100% (Default)", "110%", "125%", "150%"]
+        scale_names = ["75%", "90%", tr("100% (Default)"), "110%", "125%", "150%"]
         scale_combo = self._combo(scale_names, scale_vals,
                                   settings.get('ui_scale', 1.0))
         scale_combo.currentIndexChanged.connect(
             lambda i: self._on_setting_changed('ui_scale', scale_vals[i]))
         card.add_widget(self._row(
-            "UI Scale",
-            "Adjust the overall interface size to match your display",
+            tr("UI Scale"),
+            tr("Adjust the overall interface size to match your display"),
             scale_combo, last=True
         ))
         parent.addWidget(card)
 
+    def _build_units_section(self, parent: QVBoxLayout):
+        card = Card(title=tr("Units & Display"), icon="ph.ruler")
+
+        temp_keys  = ['celsius', 'fahrenheit']
+        temp_names = [tr('Celsius (°C)'), tr('Fahrenheit (°F)')]
+        temp_combo = self._combo(temp_names, temp_keys,
+                                 settings.get('temperature_unit', 'celsius'))
+        temp_combo.currentIndexChanged.connect(
+            lambda i: self._on_setting_changed('temperature_unit', temp_keys[i]))
+        card.add_widget(self._row(
+            tr("Temperature unit"),
+            tr("Unit used to display CPU, GPU and storage temperature readings"),
+            temp_combo
+        ))
+
+        speed_keys  = ['mbps', 'mbytes']
+        speed_names = [tr('Mbps (Megabits — ISP standard)'), tr('MB/s (Megabytes — file transfer)')]
+        speed_combo = self._combo(speed_names, speed_keys,
+                                  settings.get('network_speed_unit', 'mbps'))
+        speed_combo.currentIndexChanged.connect(
+            lambda i: self._on_setting_changed('network_speed_unit', speed_keys[i]))
+        card.add_widget(self._row(
+            tr("Network speed unit"),
+            tr("Unit used to display network download and upload speeds"),
+            speed_combo
+        ))
+
+        decimals_keys  = [0, 1, 2]
+        decimals_names = [tr('0 decimals (e.g. 42)'), tr('1 decimal (e.g. 42.3)'), tr('2 decimals (e.g. 42.34)')]
+        decimals_combo = self._combo(decimals_names, decimals_keys,
+                                     settings.get('decimal_places', 1))
+        decimals_combo.currentIndexChanged.connect(
+            lambda i: self._on_setting_changed('decimal_places', decimals_keys[i]))
+        card.add_widget(self._row(
+            tr("Decimal precision"),
+            tr("Number of decimal places shown for temperature and network speed readouts"),
+            decimals_combo, last=True
+        ))
+        parent.addWidget(card)
+
     def _build_alerts_section(self, parent: QVBoxLayout):
-        card = Card(title="Alerts & Notifications", icon="ph.bell")
+        card = Card(title=tr("Alerts & Notifications"), icon="ph.bell")
 
         card.add_widget(self._row(
-            "Enable system alerts",
-            "Receive notifications when system metrics exceed configured thresholds",
+            tr("Enable system alerts"),
+            tr("Receive notifications when system metrics exceed configured thresholds"),
             self._make_toggle('alerts_enabled', True)
         ))
 
@@ -449,43 +725,85 @@ class SettingsView(QWidget, ScaleMixin):
         slider_cpu.valueChanged.connect(
             lambda v: self._on_setting_changed('alert_cpu_threshold', v))
         card.add_widget(self._row(
-            "CPU alert threshold",
-            "Send an alert when CPU usage exceeds this percentage",
+            tr("CPU alert threshold"),
+            tr("Send an alert when CPU usage exceeds this percentage"),
             ctrl_cpu
         ))
 
+        mem_thresh = settings.get('alert_memory_threshold', 85)
+        ctrl_mem, slider_mem = self._slider_row(50, 100, mem_thresh)
+        slider_mem.valueChanged.connect(
+            lambda v: self._on_setting_changed('alert_memory_threshold', v))
+        card.add_widget(self._row(
+            tr("RAM usage threshold"),
+            tr("Send an alert when memory usage exceeds this percentage"),
+            ctrl_mem
+        ))
+
+        disk_thresh = settings.get('alert_disk_threshold', 90)
+        ctrl_disk, slider_disk = self._slider_row(50, 100, disk_thresh)
+        slider_disk.valueChanged.connect(
+            lambda v: self._on_setting_changed('alert_disk_threshold', v))
+        card.add_widget(self._row(
+            tr("Disk space threshold"),
+            tr("Send an alert when a partition's used space exceeds this percentage"),
+            ctrl_disk
+        ))
+
+        cpu_temp_thresh = settings.get('alert_temperature_threshold', 80)
+        ctrl_cpu_temp, slider_cpu_temp = self._slider_row(50, 110, cpu_temp_thresh, unit='°C')
+        slider_cpu_temp.valueChanged.connect(
+            lambda v: self._on_setting_changed('alert_temperature_threshold', v))
+        card.add_widget(self._row(
+            tr("CPU temperature threshold"),
+            tr("Send an alert when CPU temperature exceeds this value (°C)"),
+            ctrl_cpu_temp
+        ))
+
         gpu_thresh = settings.get('alert_gpu_threshold', 85)
-        ctrl_gpu, slider_gpu = self._slider_row(50, 110, gpu_thresh)
+        ctrl_gpu, slider_gpu = self._slider_row(50, 110, gpu_thresh, unit='°C')
         slider_gpu.valueChanged.connect(
             lambda v: self._on_setting_changed('alert_gpu_threshold', v))
         card.add_widget(self._row(
-            "GPU temperature threshold",
-            "Send an alert when GPU temperature exceeds this value (°C)",
-            ctrl_gpu, last=True
+            tr("GPU temperature threshold"),
+            tr("Send an alert when GPU temperature exceeds this value (°C)"),
+            ctrl_gpu
+        ))
+
+        method_keys  = ['system', 'in_app']
+        method_names = [tr('System Notifications (Windows popups)'), tr('In-app Visuals')]
+        method_combo = self._combo(method_names, method_keys,
+                                   settings.get('notification_method', 'system'))
+        method_combo.currentIndexChanged.connect(
+            lambda i: self._on_setting_changed('notification_method', method_keys[i]))
+        card.add_widget(self._row(
+            tr("Notification method"),
+            tr("Show alerts as Windows system tray popups, or as banners inside the app"),
+            method_combo, last=True
         ))
         parent.addWidget(card)
 
     def _build_data_section(self, parent: QVBoxLayout):
         c = _c()
-        card = Card(title="Data & Export", icon="ph.download")
+        card = Card(title=tr("Data & Export"), icon="ph.download")
 
         fmt_vals  = ["csv", "json", "txt"]
-        fmt_names = ["CSV", "JSON", "Plain text"]
+        fmt_names = [tr("CSV"), tr("JSON"), tr("Plain text")]
         fmt_combo = self._combo(fmt_names, fmt_vals,
                                 settings.get('export_format', 'csv'))
         fmt_combo.currentIndexChanged.connect(
             lambda i: self._on_setting_changed('export_format', fmt_vals[i]))
         card.add_widget(self._row(
-            "Export format",
-            "File format used when exporting monitoring snapshots",
+            tr("Export format"),
+            tr("File format used when exporting monitoring snapshots"),
             fmt_combo
         ))
 
-        browse_btn = self._btn("Browse…", icon="ph.folder-open")
+        browse_btn = self._btn(tr("Browse…"), icon="ph.folder-open")
         browse_btn.clicked.connect(self._on_browse_export_directory)
         card.add_widget(self._row(
-            "Export destination",
-            "Folder where exported monitoring data files are saved",
+            tr("Export destination"),
+            tr("Folder where exported monitoring data files are saved"),
             browse_btn
         ))
 
@@ -504,26 +822,77 @@ class SettingsView(QWidget, ScaleMixin):
             Qt.TextInteractionFlag.TextSelectableByMouse)
         self._path_label.setCursor(Qt.CursorShape.IBeamCursor)
         card.add_widget(self._row(
-            "Current path", "", self._path_label
+            tr("Current path"), "", self._path_label
         ))
 
-        export_btn = self._btn("Export now", accent=True, icon="ph.download-simple")
+        export_btn = self._btn(tr("Export now"), accent=True, icon="ph.download-simple")
         export_btn.clicked.connect(self._on_export_now)
         card.add_widget(self._row(
-            "Export snapshot",
-            "Save a snapshot of current system metrics to the export folder",
+            tr("Export snapshot"),
+            tr("Save a snapshot of current system metrics to the export folder"),
             export_btn, last=True
         ))
         parent.addWidget(card)
 
-    def _build_maintenance_section(self, parent: QVBoxLayout):
-        card = Card(title="Maintenance", icon="ph.wrench")
+    def _build_export_server_section(self, parent: QVBoxLayout):
+        c = _c()
+        card = Card(title=tr("Prometheus Exporter"), icon="ph.broadcast")
 
-        reset_btn = self._btn("Reset all settings to default", danger=True, icon="ph.arrow-counter-clockwise")
+        card.add_widget(self._row(
+            tr("Enable metrics endpoint"),
+            tr("Expose live metrics at /metrics in Prometheus text format so external "
+               "tools (Prometheus, Grafana agent, curl) can scrape this machine"),
+            self._make_toggle('prometheus_enabled', False)
+        ))
+
+        port_spin = QSpinBox()
+        port_spin.setRange(1024, 65535)
+        port_spin.setValue(int(settings.get('prometheus_port', 9090)))
+        port_spin.setFixedWidth(S.px(90))
+        port_spin.setStyleSheet(f"""
+            QSpinBox {{
+                color: {c.TEXT_PRIMARY};
+                background: {c.BG_SECONDARY};
+                border: 1px solid {c.BORDER};
+                border-radius: {S.px(4)}px;
+                padding: {S.px(4)}px {S.px(6)}px;
+            }}
+        """)
+        card.add_widget(self._row(
+            tr("Port"),
+            tr("TCP port the metrics server listens on"),
+            port_spin
+        ))
+
+        url_label = QLabel(f"http://localhost:{settings.get('prometheus_port', 9090)}/metrics")
+        url_label.setFont(QFont("Consolas", S.font_pt(9)))
+        url_label.setStyleSheet(f"""
+            color: {c.TEXT_SECONDARY};
+            background: {c.BG_SECONDARY};
+            border: 1px solid {c.BORDER};
+            border-radius: {S.px(4)}px;
+            padding: {S.px(4)}px {S.px(8)}px;
+        """)
+        url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        url_label.setCursor(Qt.CursorShape.IBeamCursor)
+        port_spin.valueChanged.connect(lambda v: url_label.setText(f"http://localhost:{v}/metrics"))
+        port_spin.valueChanged.connect(lambda v: self._on_setting_changed('prometheus_port', v))
+        card.add_widget(self._row(
+            tr("Scrape URL"),
+            tr("Point your Prometheus server (or curl) at this address while enabled"),
+            url_label, last=True
+        ))
+
+        parent.addWidget(card)
+
+    def _build_maintenance_section(self, parent: QVBoxLayout):
+        card = Card(title=tr("Maintenance"), icon="ph.wrench")
+
+        reset_btn = self._btn(tr("Reset all settings to default"), danger=True, icon="ph.arrow-counter-clockwise")
         reset_btn.clicked.connect(self._on_reset_clicked)
         card.add_widget(self._row(
-            "Reset settings",
-            "Restore all preferences to factory defaults — this cannot be undone",
+            tr("Reset settings"),
+            tr("Restore all preferences to factory defaults — this cannot be undone"),
             reset_btn, last=True
         ))
         parent.addWidget(card)
@@ -536,6 +905,11 @@ class SettingsView(QWidget, ScaleMixin):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, lambda: theme_manager.set_theme(theme))
 
+    def _on_language_selected(self, language: str):
+        self.signals_changed.emit('language', language)
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: language_manager.set_language(language))
+
     def _on_setting_changed(self, key: str, value):
         settings.set(key, value)
         self.signals_changed.emit(key, value)
@@ -543,8 +917,8 @@ class SettingsView(QWidget, ScaleMixin):
 
     def _on_check_for_updates(self):
         QMessageBox.information(
-            self, "Update Check",
-            "You are running the latest version.\n\nVersion: 1.0.0\nNo updates available.",
+            self, tr("Update Check"),
+            tr("You are running the latest version.\n\nVersion: {0}\nNo updates available.").format("1.0.0"),
             QMessageBox.StandardButton.Ok)
 
     def _on_data_updated(self, data: dict):
@@ -554,7 +928,7 @@ class SettingsView(QWidget, ScaleMixin):
         current = settings.get('export_directory',
                                str(Path.home() / 'Documents'))
         directory = QFileDialog.getExistingDirectory(
-            self, "Select Export Directory", current,
+            self, tr("Select Export Directory"), current,
             QFileDialog.Option.ShowDirsOnly)
         if directory:
             self._on_setting_changed('export_directory', directory)
@@ -564,8 +938,8 @@ class SettingsView(QWidget, ScaleMixin):
     def _on_export_now(self):
         if not self._last_data:
             QMessageBox.warning(
-                self, "No Data",
-                "No monitoring data available yet.\nPlease wait a moment and try again.",
+                self, tr("No Data"),
+                tr("No monitoring data available yet.\nPlease wait a moment and try again."),
                 QMessageBox.StandardButton.Ok)
             return
 
@@ -582,17 +956,17 @@ class SettingsView(QWidget, ScaleMixin):
     def _on_export_result(self, success: bool, message: str):
         if success:
             QMessageBox.information(
-                self, "Export Successful", message,
+                self, tr("Export Successful"), message,
                 QMessageBox.StandardButton.Ok)
         else:
             QMessageBox.critical(
-                self, "Export Failed", message,
+                self, tr("Export Failed"), message,
                 QMessageBox.StandardButton.Ok)
 
     def _on_reset_clicked(self):
         reply = QMessageBox.question(
-            self, "Reset Settings",
-            "Reset all settings to their default values?\n\nThis cannot be undone.",
+            self, tr("Reset Settings"),
+            tr("Reset all settings to their default values?\n\nThis cannot be undone."),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
@@ -601,7 +975,7 @@ class SettingsView(QWidget, ScaleMixin):
             self.signals_changed.emit('reset', True)
             self._setup_ui()
             QMessageBox.information(
-                self, "Settings Reset",
-                "All settings have been reset to defaults.\n"
-                "Some changes may require a restart to take effect.",
+                self, tr("Settings Reset"),
+                tr("All settings have been reset to defaults.\n"
+                   "Some changes may require a restart to take effect."),
                 QMessageBox.StandardButton.Ok)

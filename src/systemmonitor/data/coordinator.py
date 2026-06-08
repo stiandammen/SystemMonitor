@@ -43,6 +43,31 @@ class DataCollectorCoordinator(QObject):
         self._alert_manager = None
         self._alerts_ready = False
 
+        self._prometheus_exporter = None
+
+    def _interval_scale_for(self, update_interval_ms) -> float:
+        """Map the 'update_interval' setting (ms) to a scale factor relative
+        to the Normal baseline (AppConfig.UPDATE_INTERVAL_MS), which the
+        collectors' hardcoded REFRESH_INTERVAL values are tuned for."""
+        from systemmonitor.config import AppConfig
+        try:
+            ms = float(update_interval_ms)
+        except (TypeError, ValueError):
+            ms = AppConfig.UPDATE_INTERVAL_MS
+        if ms <= 0:
+            ms = AppConfig.UPDATE_INTERVAL_MS
+        return ms / AppConfig.UPDATE_INTERVAL_MS
+
+    def _apply_update_speed(self, update_interval_ms=None):
+        """Apply the configured Update Speed to all running collectors."""
+        from systemmonitor.config import settings
+        if update_interval_ms is None:
+            update_interval_ms = settings.get('update_interval', 500)
+        scale = self._interval_scale_for(update_interval_ms)
+        for collector in self._collectors.values():
+            if hasattr(collector, 'set_interval_scale'):
+                collector.set_interval_scale(scale)
+
     def start(self):
         """Start all data collection threads"""
         log_info(LogCategory.COLLECTOR, "Starting DataCollectorCoordinator")
@@ -89,11 +114,17 @@ class DataCollectorCoordinator(QObject):
 
         log_info(LogCategory.COLLECTOR, f"Started {len(self._collectors)} collector threads")
 
+        self._apply_update_speed()
         self._init_alerts()
+        self._init_prometheus_exporter()
 
     def stop(self):
         """Stop all data collection threads"""
         log_info(LogCategory.COLLECTOR, "Stopping DataCollectorCoordinator")
+
+        if self._prometheus_exporter is not None:
+            self._prometheus_exporter.stop()
+            self._prometheus_exporter = None
 
         for name, collector in self._collectors.items():
             collector.stop()
@@ -115,6 +146,12 @@ class DataCollectorCoordinator(QObject):
             self._alert_manager.update_rule_threshold(
                 'cpu_percent', float(settings.get('alert_cpu_threshold', 80)))
             self._alert_manager.update_rule_threshold(
+                'memory_percent', float(settings.get('alert_memory_threshold', 85)))
+            self._alert_manager.update_rule_threshold(
+                'disk_percent', float(settings.get('alert_disk_threshold', 90)))
+            self._alert_manager.update_rule_threshold(
+                'cpu_temperature', float(settings.get('alert_temperature_threshold', 80)))
+            self._alert_manager.update_rule_threshold(
                 'gpu_temperature', float(settings.get('alert_gpu_threshold', 85)))
 
             # Forward triggered alerts to the global signal bus
@@ -127,6 +164,42 @@ class DataCollectorCoordinator(QObject):
             log_info(LogCategory.COLLECTOR, "Alert system initialized")
         except Exception as e:
             log_error(LogCategory.COLLECTOR, f"Alert system init failed: {e}")
+
+    def _init_prometheus_exporter(self):
+        """Create the exporter and start it if enabled in settings."""
+        try:
+            from systemmonitor.utils.prometheus_exporter import PrometheusExporter
+            from systemmonitor.config import settings
+
+            self._prometheus_exporter = PrometheusExporter(self.get_data)
+            if settings.get('prometheus_enabled', False):
+                self._start_prometheus_exporter(int(settings.get('prometheus_port', 9090)))
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Prometheus exporter init failed: {e}")
+
+    def _start_prometheus_exporter(self, port: int):
+        if self._prometheus_exporter is None:
+            return
+        try:
+            self._prometheus_exporter.start(port)
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Prometheus exporter could not start on port {port}: {e}")
+
+    def _apply_prometheus_setting(self, key: str, value):
+        if self._prometheus_exporter is None:
+            return
+        from systemmonitor.config import settings
+        try:
+            if key == 'prometheus_enabled':
+                if value:
+                    self._start_prometheus_exporter(int(settings.get('prometheus_port', 9090)))
+                else:
+                    self._prometheus_exporter.stop()
+            elif key == 'prometheus_port':
+                if settings.get('prometheus_enabled', False):
+                    self._start_prometheus_exporter(int(value))
+        except Exception as e:
+            log_error(LogCategory.COLLECTOR, f"Prometheus exporter setting update failed: {e}")
 
     def _on_alert_triggered(self, alert):
         """Convert Alert object to dict and forward to signal bus"""
@@ -148,7 +221,18 @@ class DataCollectorCoordinator(QObject):
             log_error(LogCategory.COLLECTOR, f"Alert forward failed: {e}")
 
     def _on_setting_changed(self, key: str, value):
-        """Update alert rules when relevant settings change"""
+        """React to relevant settings changes (alert rules, collection speed)"""
+        if key == 'update_interval':
+            try:
+                self._apply_update_speed(value)
+            except Exception as e:
+                log_error(LogCategory.COLLECTOR, f"Update speed change failed: {e}")
+            return
+
+        if key in ('prometheus_enabled', 'prometheus_port'):
+            self._apply_prometheus_setting(key, value)
+            return
+
         if self._alert_manager is None:
             return
         try:
@@ -156,6 +240,12 @@ class DataCollectorCoordinator(QObject):
                 self._alert_manager.set_globally_enabled(bool(value))
             elif key == 'alert_cpu_threshold':
                 self._alert_manager.update_rule_threshold('cpu_percent', float(value))
+            elif key == 'alert_memory_threshold':
+                self._alert_manager.update_rule_threshold('memory_percent', float(value))
+            elif key == 'alert_disk_threshold':
+                self._alert_manager.update_rule_threshold('disk_percent', float(value))
+            elif key == 'alert_temperature_threshold':
+                self._alert_manager.update_rule_threshold('cpu_temperature', float(value))
             elif key == 'alert_gpu_threshold':
                 self._alert_manager.update_rule_threshold('gpu_temperature', float(value))
         except Exception as e:

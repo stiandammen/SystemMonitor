@@ -4,12 +4,16 @@ Responsive design with adaptive collapse, smooth animations, and glassmorphism
 """
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget, QSizePolicy, QGraphicsDropShadowEffect
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QFont, QIcon, QPainter, QLinearGradient, QColor, QPen
+from PyQt6.QtGui import QFont, QIcon, QPainter, QLinearGradient, QColor, QPen, QPixmap
 import qtawesome as qta
 from typing import Optional, Dict
 
 from systemmonitor.styles.theme import theme_manager
+from systemmonitor.i18n import tr, language_manager
 from systemmonitor.scaler import S, ScaleMixin, LayoutMode
+from systemmonitor.utils.constants import get_resource_path
+
+LOGO_PATH = get_resource_path("assets/hacker.png")
 
 
 NAV_STRUCTURE = {
@@ -27,6 +31,7 @@ NAV_STRUCTURE = {
     "tools": {
         "title": None,
         "items": [
+            {"key": "logs", "label": "Logs", "icon": "ph.file-text"},
             {"key": "settings", "label": "Settings", "icon": "ph.gear"},
         ]
     }
@@ -62,12 +67,16 @@ class GlassNavItem(QPushButton, ScaleMixin):
         self.clicked.connect(lambda: self.clicked_with_name.emit(key))
         self._apply_style()
         theme_manager.theme_changed.connect(self._on_theme_changed)
+        language_manager.language_changed.connect(self._on_language_changed)
         self.scale_connect()
 
     def _on_theme_changed(self, theme_name: str):
         # Refresh accent so nav items don't keep the old theme's color
         self._accent = theme_manager.colors.ACCENT_GREEN
         self._apply_style()
+        self._setup_icon()
+
+    def _on_language_changed(self, _language: str):
         self._setup_icon()
 
     def on_scale_changed(self, factor: float):
@@ -82,7 +91,7 @@ class GlassNavItem(QPushButton, ScaleMixin):
             self.setMinimumWidth(S.px(44))
             self.setMaximumWidth(S.px(64))
         else:
-            self.setText(f"  {self._label}")
+            self.setText(f"  {tr(self._label)}")
             self.setIconSize(QSize(S.px(20), S.px(20)))
             self.setMinimumWidth(S.px(100))
             self.setMaximumWidth(16777215)
@@ -103,10 +112,10 @@ class GlassNavItem(QPushButton, ScaleMixin):
                 self.setText("")
             else:
                 self.setIconSize(QSize(S.px(20), S.px(20)))
-                self.setText(f"  {self._label}")
+                self.setText(f"  {tr(self._label)}")
         except Exception:
             if not self._collapsed:
-                self.setText(f"  {self._label}")
+                self.setText(f"  {tr(self._label)}")
 
     def _apply_style(self):
         c = theme_manager.colors
@@ -219,6 +228,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._setup_ui()
         self._apply_theme()
         theme_manager.theme_changed.connect(self._on_theme_changed)
+        language_manager.language_changed.connect(self._on_language_changed)
         self.scale_connect()
 
         shadow = QGraphicsDropShadowEffect(self)
@@ -236,6 +246,15 @@ class GlassSidebar(QFrame, ScaleMixin):
         self.setMinimumWidth(self._collapsed_width)
         self.setMaximumWidth(self._expanded_width + S.px(40))
         self.setFixedWidth(current_width)
+
+        # Update header (logo + title)
+        if hasattr(self, '_logo_label'):
+            self._logo_label.setFixedSize(S.px(28), S.px(28))
+        if hasattr(self, '_title_label'):
+            self._title_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
+        if hasattr(self, '_header') and self._header.layout():
+            self._header.layout().setSpacing(S.px(10))
+        self._update_header_collapse_state()
 
         # Update nav container margins/spacing
         if hasattr(self, '_nav_container') and self._nav_container.layout():
@@ -276,6 +295,16 @@ class GlassSidebar(QFrame, ScaleMixin):
         for item in self._items.values():
             item._on_theme_changed(theme_name)
 
+    def _on_language_changed(self, _language: str):
+        if hasattr(self, '_status_text'):
+            self._status_text.setText(tr("Operational"))
+        for label, section_data in zip(
+                self._nav_container.findChildren(QLabel, "section_label"),
+                NAV_STRUCTURE.values()):
+            title = section_data.get("title")
+            if title:
+                label.setText(tr(title).upper())
+
     def _toggle_collapse(self):
         self._collapsed = not self._collapsed
         target_width = self._collapsed_width if self._collapsed else self._expanded_width
@@ -296,6 +325,8 @@ class GlassSidebar(QFrame, ScaleMixin):
 
         if hasattr(self, '_footer'):
             self._footer.setVisible(not self._collapsed)
+
+        self._update_header_collapse_state()
 
         for item in self._items.values():
             item.set_collapsed(self._collapsed)
@@ -330,6 +361,9 @@ class GlassSidebar(QFrame, ScaleMixin):
         layout.setSpacing(0)
         self.setLayout(layout)
 
+        self._setup_header()
+        layout.addWidget(self._header)
+
         nav_container = QFrame()
         nav_container.setObjectName("nav_container")
         self._nav_container = nav_container
@@ -341,7 +375,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         for section_key, section_data in NAV_STRUCTURE.items():
             title = section_data.get("title")
             if title:
-                section_label = QLabel(title.upper())
+                section_label = QLabel(tr(title).upper())
                 section_label.setObjectName("section_label")
                 section_label.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.DemiBold))
                 section_label.setStyleSheet("""
@@ -388,6 +422,44 @@ class GlassSidebar(QFrame, ScaleMixin):
 
         self._setup_footer()
         self._footer.setVisible(not self._collapsed)
+        self._update_header_collapse_state()
+
+    def _setup_header(self):
+        """Brand header — app logo plus name, collapses down to just the icon."""
+        header = QFrame()
+        header.setObjectName("sidebar_header")
+        header.setFrameShape(QFrame.Shape.NoFrame)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(S.px(14), S.px(14), S.px(14), S.px(14))
+        layout.setSpacing(S.px(10))
+        header.setLayout(layout)
+
+        logo = QLabel()
+        logo.setObjectName("sidebar_logo")
+        self._logo_pixmap = QPixmap(LOGO_PATH)
+        logo.setFixedSize(S.px(28), S.px(28))
+        logo.setScaledContents(True)
+        if not self._logo_pixmap.isNull():
+            logo.setPixmap(self._logo_pixmap)
+        layout.addWidget(logo)
+        self._logo_label = logo
+
+        title = QLabel("System Monitor")
+        title.setObjectName("sidebar_title")
+        title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
+        layout.addWidget(title)
+        layout.addStretch()
+        self._title_label = title
+
+        self._header = header
+
+    def _update_header_collapse_state(self):
+        if hasattr(self, '_title_label'):
+            self._title_label.setVisible(not self._collapsed)
+        if hasattr(self, '_header'):
+            self._header.layout().setContentsMargins(
+                S.px(14), S.px(14), S.px(8) if self._collapsed else S.px(14), S.px(14))
 
     def _setup_footer(self):
         footer = QFrame()
@@ -408,7 +480,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._status_indicator.setFixedSize(S.px(6), S.px(6))
         status_layout.addWidget(self._status_indicator)
 
-        self._status_text = QLabel("Operational")
+        self._status_text = QLabel(tr("Operational"))
         self._status_text.setFont(QFont("Segoe UI", S.font_pt(8)))
         status_layout.addWidget(self._status_text)
         status_layout.addStretch()
@@ -435,6 +507,7 @@ class GlassSidebar(QFrame, ScaleMixin):
             nav_bg = "rgba(26, 30, 53, 0.7)"
             nav_border = "rgba(74, 108, 247, 0.15)"
             footer_bg = "rgba(26, 30, 53, 0.5)"
+            title_color = "#E8ECFF"
             muted_color = "#525A7A"
             status_color = "#00E096"
             collapse_bg = "rgba(30, 35, 64, 0.6)"
@@ -452,12 +525,24 @@ class GlassSidebar(QFrame, ScaleMixin):
             nav_bg = c.BG_SECONDARY
             nav_border = c.BORDER
             footer_bg = c.BG_SECONDARY
+            title_color = c.TEXT_PRIMARY
             muted_color = c.TEXT_MUTED
             status_color = c.STATUS_GREEN
             collapse_bg = c.BG_HOVER
             collapse_color = c.TEXT_SECONDARY
             collapse_hover_bg = getattr(c, 'ACCENT_GREEN_DIM', 'rgba(16, 185, 129, 0.15)')
             collapse_hover_color = c.TEXT_PRIMARY
+
+        if hasattr(self, '_header'):
+            self._header.setStyleSheet(f"""
+                #sidebar_header {{
+                    background-color: transparent;
+                    border-bottom: 1px solid {nav_border};
+                }}
+            """)
+
+        if hasattr(self, '_title_label'):
+            self._title_label.setStyleSheet(f"color: {title_color}; background: transparent;")
 
         if hasattr(self, '_nav_container'):
             self._nav_container.setStyleSheet(f"""
@@ -508,6 +593,14 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._current_view = view_name
         for key, item in self._items.items():
             item.set_active(key == view_name)
+
+    def set_hidden_views(self, hidden_keys):
+        """Show/hide nav items based on the user's "hidden views" feature toggle.
+        Hidden items are simply not visible — Qt's layout reflows around them,
+        so the sidebar stays compact without needing a full rebuild."""
+        hidden = set(hidden_keys or [])
+        for key, item in self._items.items():
+            item.setVisible(key not in hidden)
 
     def get_sidebar_width(self):
         return self.width()
