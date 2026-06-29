@@ -3,8 +3,8 @@ Enhanced GPU Information Data Class
 Contains comprehensive information about GPUs
 """
 from dataclasses import dataclass, field
-from systemmonitor.typing import Optional, List, Dict, Any
-from systemmonitor.enum import Enum
+from systemmonitor.typing_ext import Optional, List, Dict, Any
+from systemmonitor.enums import Enum
 
 
 class GPUType(Enum):

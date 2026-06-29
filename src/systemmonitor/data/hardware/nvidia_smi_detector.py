@@ -6,7 +6,7 @@ Provides clocks, temperatures, utilisation, VRAM, power and fan data.
 import subprocess
 import time
 import logging
-from systemmonitor.typing import List, Optional
+from systemmonitor.typing_ext import List, Optional
 
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
@@ -64,6 +64,7 @@ class NvidiaSMIDetector(GPUDetector):
                 capture_output=True,
                 text=True,
                 timeout=5,
+                creationflags=0x08000000,
             )
         except Exception as exc:
             self.logger.error(f"nvidia-smi subprocess failed: {exc}")
@@ -96,6 +97,7 @@ class NvidiaSMIDetector(GPUDetector):
                 capture_output=True,
                 text=True,
                 timeout=5,
+                creationflags=0x08000000,
             )
             return r.returncode == 0 and bool(r.stdout.strip())
         except FileNotFoundError:

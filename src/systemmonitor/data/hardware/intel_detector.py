@@ -5,7 +5,7 @@ Uses WMI and other methods for Intel GPU detection
 import time
 import logging
 import platform
-from systemmonitor.typing import List, Dict, Any, Optional
+from systemmonitor.typing_ext import List, Dict, Any, Optional
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
 from systemmonitor.utils.opencl_vram import get_vram_via_opencl

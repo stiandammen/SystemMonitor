@@ -13,7 +13,7 @@ import logging
 import platform
 import subprocess
 
-from systemmonitor.typing import Optional
+from systemmonitor.typing_ext import Optional
 from .cpu_info import CPUInfo, CPUVendor
 
 
@@ -93,8 +93,8 @@ class CPUManager:
         if platform.system() == 'Windows':
             try:
                 result = subprocess.run(
-                    ["powershell", "-Command", "(Get-CimInstance Win32_Processor).Name"],
-                    capture_output=True, text=True, timeout=5
+                    ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor).Name"],
+                    capture_output=True, text=True, timeout=5, creationflags=0x08000000
                 )
                 name = result.stdout.strip()
                 if name:
@@ -226,10 +226,10 @@ class CPUManager:
 
         try:
             result = subprocess.run(
-                ["powershell", "-Command",
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                  "(Get-CimInstance MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | "
                  "Select-Object -First 1).CurrentTemperature"],
-                capture_output=True, text=True, timeout=3
+                capture_output=True, text=True, timeout=3, creationflags=0x08000000
             )
             value = result.stdout.strip()
             if value:

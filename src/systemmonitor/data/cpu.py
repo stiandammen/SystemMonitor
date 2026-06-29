@@ -3,7 +3,7 @@ CPU Data Collector
 """
 import platform
 import subprocess
-from systemmonitor.typing import Dict, Any, List, Optional
+from systemmonitor.typing_ext import Dict, Any, List, Optional
 
 
 class CPUCollector:
@@ -83,9 +83,9 @@ class CPUCollector:
         if platform.system() == 'Windows':
             try:
                 result = subprocess.run(
-                    ["powershell", "-Command",
+                    ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                      "(Get-CimInstance MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature"],
-                    capture_output=True, text=True, timeout=3
+                    capture_output=True, text=True, timeout=3, creationflags=0x08000000
                 )
                 if result.stdout.strip():
                     temp_k = float(result.stdout.strip())
@@ -131,9 +131,9 @@ class CPUCollector:
         if platform.system() == 'Windows':
             try:
                 result = subprocess.run(
-                    ["powershell", "-Command",
+                    ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                      "(Get-CimInstance Win32_Processor).Name | Select-Object -First 1"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True, text=True, timeout=5, creationflags=0x08000000
                 )
                 if result.stdout.strip():
                     return result.stdout.strip()
@@ -195,7 +195,7 @@ class CPUCollector:
         cache = {'L1': 0, 'L2': 0, 'L3': 0}
         try:
             result = subprocess.run(
-                ["powershell", "-Command",
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                  """
                  $cache = Get-CimInstance Win32_CacheMemory | Where-Object { $_.DeviceID -match 'L[123]' -and $_.InstalledSize -gt 0 }
                  foreach ($c in $cache) {
@@ -204,7 +204,7 @@ class CPUCollector:
                      elseif ($c.DeviceID -match 'L3') { Write-Output "L3:$($c.InstalledSize)" }
                  }
                  """],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, timeout=5, creationflags=0x08000000
             )
             if result.stdout:
                 for line in result.stdout.strip().split('\n'):
@@ -215,13 +215,13 @@ class CPUCollector:
 
             if cache['L1'] == 0 and cache['L2'] == 0:
                 result2 = subprocess.run(
-                    ["powershell", "-Command",
+                    ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                      """
                      $proc = Get-CimInstance Win32_Processor
                      Write-Output "L2:$($proc.L2CacheSize)"
                      Write-Output "L3:$($proc.L3CacheSize)"
                      """],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True, text=True, timeout=5, creationflags=0x08000000
                 )
                 if result2.stdout:
                     for line in result2.stdout.strip().split('\n'):

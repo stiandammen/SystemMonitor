@@ -1,75 +1,64 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
+import os
+from PyInstaller.utils.hooks import collect_all
 
-block_cipher = None
+# Base directory
+base_dir = os.getcwd()
+src_dir = os.path.join(base_dir, 'src')
+python_lib = r'C:\Users\RSman\AppData\Local\Python\pythoncore-3.14-64\Lib'
+site_packages = r'C:\Users\RSman\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages'
+
+# Collect everything from systemmonitor
+datas, binaries, hiddenimports = collect_all('systemmonitor')
+
+# Explicitly add standard library modules that are failing or commonly needed
+hiddenimports += [
+    'csv',
+    '_csv',
+    'json',
+    '_json',
+    'datetime',
+    'logging',
+    'pathlib',
+    'enum',
+    'typing',
+    'inspect',
+    're',
+    'struct',
+    'threading',
+    'psutil',
+    'wmi',
+    'GPUtil',
+    'qtawesome',
+    'PyQt6.QtCore',
+    'PyQt6.QtGui',
+    'PyQt6.QtWidgets',
+    'PyQt6.sip',
+]
+
+# Add assets
+assets_src = os.path.join(src_dir, 'systemmonitor', 'assets')
+if os.path.exists(assets_src):
+    datas += [(assets_src, 'systemmonitor/assets')]
 
 a = Analysis(
     ['__main__.py'],
-    pathex=[],
-    binaries=[],
-    datas=[
-        ('styles', 'styles'),
-        ('core', 'core'),
-        ('data', 'data'),
-        ('views', 'views'),
-        ('utils', 'utils'),
-        ('widgets', 'widgets'),
-        ('assets', 'assets'),
-    ],
-    hiddenimports=[
-        'core',
-        'core.window',
-        'core.theme',
-        'core.signals',
-        'core.app',
-        'data',
-        'data.collector',
-        'data.gpu',
-        'views',
-        'views.overview_page',
-        'views.cpu',
-        'views.memory',
-        'views.processes',
-        'views.disks',
-        'views.network',
-        'views.overview',
-        'views.settings',
-        'views.gpu',
-        'views.base',
-        'utils',
-        'widgets',
-        'psutil',
-        'pynvml',
-        'GPUtil',
-        'wmi',
-        'win32com',
-        'win32api',
-        'win32gui',
-        'win32con',
-        'win32process',
-        'win32print',
-        'win32service',
-        'win32evtlog',
-        'win32file',
-        'win32net',
-        'win32netcon',
-        'win32pipe',
-        'win32profile',
-        'win32security',
-        'win32service',
-        'win32timezone',
-        'win32wnet',
-    ],
+    pathex=[base_dir, src_dir, python_lib, site_packages],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
+    cipher=None,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
     pyz,
@@ -82,7 +71,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
@@ -91,5 +80,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    onefile=True,
+    uac_admin=True,
+    icon=os.path.join(src_dir, 'systemmonitor', 'assets', 'hacker.png') if os.path.exists(os.path.join(src_dir, 'systemmonitor', 'assets', 'hacker.png')) else None,
 )

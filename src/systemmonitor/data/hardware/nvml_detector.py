@@ -5,7 +5,7 @@ Uses NVIDIA Management Library for detailed NVIDIA GPU information
 import time
 import logging
 import platform
-from systemmonitor.typing import List, Dict, Any, Optional
+from systemmonitor.typing_ext import List, Dict, Any, Optional
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
 

@@ -67,10 +67,10 @@ class SensorManager:
             return []
         try:
             result = subprocess.run(
-                ["powershell", "-Command",
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                  "Get-CimInstance Win32_Fan -ErrorAction SilentlyContinue | "
                  "ForEach-Object { \"$($_.Name)|$($_.DesiredSpeed)\" }"],
-                capture_output=True, text=True, timeout=3
+                capture_output=True, text=True, timeout=3, creationflags=0x08000000
             )
         except Exception:
             return []
@@ -101,10 +101,11 @@ class SensorManager:
             return []
         try:
             result = subprocess.run(
-                ["powershell", "-Command",
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                  "(Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | "
                  "Select-Object -First 1).CurrentVoltage"],
-                capture_output=True, text=True, timeout=3
+                capture_output=True, text=True, timeout=3,
+                creationflags=0x08000000
             )
             value = result.stdout.strip()
             if not value:

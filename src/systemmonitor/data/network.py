@@ -3,7 +3,7 @@ Network Data Collector
 """
 import socket
 import platform
-from systemmonitor.typing import Dict, Any, List, Optional
+from systemmonitor.typing_ext import Dict, Any, List, Optional
 
 
 class NetworkCollector:

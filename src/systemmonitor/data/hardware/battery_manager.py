@@ -79,7 +79,7 @@ class BatteryManager:
             try:
                 result = subprocess.run(
                     ["powercfg", "/getactivescheme"],
-                    capture_output=True, text=True, timeout=3
+                    capture_output=True, text=True, timeout=3, creationflags=0x08000000
                 )
                 out = result.stdout.strip()
                 if '(' in out and ')' in out:

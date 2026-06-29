@@ -2,7 +2,7 @@
 Disk Data Collector
 """
 import platform
-from systemmonitor.typing import Dict, Any, List
+from systemmonitor.typing_ext import Dict, Any, List
 
 
 class DiskCollector:

@@ -34,8 +34,9 @@ class StorageHeader(QWidget, ScaleMixin, I18nMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def retranslate_ui(self):
-        self._setup_ui()
-        self.set_live(self._live_state)
+        from PyQt6.QtCore import QTimer
+        live_state = self._live_state
+        QTimer.singleShot(0, lambda: (self._setup_ui(), self.set_live(live_state)))
 
     def _setup_ui(self):
         if self.layout() is not None:

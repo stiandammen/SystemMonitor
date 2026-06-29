@@ -1,80 +1,89 @@
-"""Windows autostart management.
+"""Windows autostart management using Task Scheduler.
 
-Adds/removes a value under HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
-so the app can launch automatically when the user signs in. The Run key lives in
-HKEY_CURRENT_USER, so no elevation is required. On non-Windows platforms `winreg`
-is unavailable and every operation is a safe no-op that returns False.
+This implementation uses Windows Task Scheduler instead of the Registry 'Run' key.
+This is necessary because the app requires Administrator privileges (UAC).
+Windows block apps with UAC requirements from starting via the Registry.
+Task Scheduler allows us to bypass this by creating a task that runs with 
+'Highest Privileges' at user logon.
 """
 import os
 import sys
-
-try:
-    import winreg
-except ImportError:  # pragma: no cover - non-Windows platforms
-    winreg = None
-
+import subprocess
+import platform
 
 class AutostartManager:
-    """Manages whether SystemMonitor launches automatically at sign-in."""
+    """Manages whether SystemMonitor launches automatically at sign-in using Task Scheduler."""
 
-    REGISTRY_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-    APP_NAME = "SystemMonitor"
+    TASK_NAME = "SystemMonitorAutostart"
 
     @classmethod
-    def _command(cls) -> str:
-        """Command line written to the registry to relaunch the app.
-
-        Frozen (PyInstaller) builds run directly from their executable; otherwise
-        the interpreter and entry script must both be quoted and passed along.
-        """
+    def _get_exe_path(cls) -> str:
+        """Returns the absolute path to the executable or script."""
         if getattr(sys, 'frozen', False):
-            return f'"{sys.executable}"'
-        script = os.path.abspath(sys.argv[0])
-        return f'"{sys.executable}" "{script}"'
+            return os.path.abspath(sys.executable)
+        return os.path.abspath(sys.argv[0])
 
     @classmethod
     def is_enabled(cls) -> bool:
-        """Check whether the Run key currently points at this app."""
-        if winreg is None:
+        """Check if the scheduled task exists."""
+        if platform.system() != 'Windows':
             return False
+            
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.REGISTRY_KEY, 0, winreg.KEY_READ) as key:
-                value, _ = winreg.QueryValueEx(key, cls.APP_NAME)
-                return bool(value)
-        except OSError:
+            # Check if task exists using schtasks
+            result = subprocess.run(
+                ["schtasks", "/Query", "/TN", cls.TASK_NAME],
+                capture_output=True, text=True, creationflags=0x08000000
+            )
+            return result.returncode == 0
+        except Exception:
             return False
 
     @classmethod
     def enable(cls) -> bool:
-        """Add (or refresh) the Run key entry so the app starts at sign-in."""
-        if winreg is None:
+        """Create a scheduled task to run with highest privileges at logon."""
+        if platform.system() != 'Windows':
             return False
+            
+        exe_path = cls._get_exe_path()
+        # We use PowerShell to create the task because it allows setting 'Highest' principal easily
+        ps_command = (
+            f"$action = New-ScheduledTaskAction -Execute '{exe_path}'; "
+            f"$trigger = New-ScheduledTaskTrigger -AtLogOn; "
+            f"$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest; "
+            f"$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0; "
+            f"Register-ScheduledTask -TaskName '{cls.TASK_NAME}' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force"
+        )
+        
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.REGISTRY_KEY, 0, winreg.KEY_SET_VALUE) as key:
-                winreg.SetValueEx(key, cls.APP_NAME, 0, winreg.REG_SZ, cls._command())
-            return True
-        except OSError:
+            # Note: Creating/Registering a task with 'Highest' usually requires being admin themselves
+            # which our app already is.
+            result = subprocess.run(
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command", ps_command],
+                capture_output=True, text=True, creationflags=0x08000000
+            )
+            return result.returncode == 0
+        except Exception:
             return False
 
     @classmethod
     def disable(cls) -> bool:
-        """Remove the Run key entry so the app no longer starts at sign-in."""
-        if winreg is None:
-            return False
+        """Remove the scheduled task."""
+        if platform.system() != 'Windows':
+            return True
+            
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.REGISTRY_KEY, 0, winreg.KEY_SET_VALUE) as key:
-                winreg.DeleteValue(key, cls.APP_NAME)
-            return True
-        except FileNotFoundError:
-            return True
-        except OSError:
+            result = subprocess.run(
+                ["schtasks", "/Delete", "/TN", cls.TASK_NAME, "/F"],
+                capture_output=True, text=True, creationflags=0x08000000
+            )
+            return result.returncode == 0 or "not found" in result.stderr.lower()
+        except Exception:
             return False
 
     @classmethod
     def toggle(cls) -> bool:
-        """Flip the current autostart state and return the resulting state."""
+        """Flip the current autostart state."""
         if cls.is_enabled():
-            cls.disable()
-            return False
-        cls.enable()
-        return True
+            return not cls.disable()
+        return cls.enable()

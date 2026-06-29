@@ -3,7 +3,7 @@ GPU View - Rik GPU-overvåking med klokker, temperaturer og sanntidsdata.
 Støtter NVIDIA, AMD, Intel. Faner per GPU. Bærbar/integrert GPU-bevisst.
 """
 from __future__ import annotations
-from systemmonitor.typing import Optional, List
+from systemmonitor.typing_ext import Optional, List
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QTabWidget

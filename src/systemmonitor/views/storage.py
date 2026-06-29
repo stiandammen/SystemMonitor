@@ -2,7 +2,7 @@
 Storage View — Professional storage monitoring dashboard
 Clean dashboard layout with live metrics, animated KPI cards, and per-disk panels.
 """
-from systemmonitor.typing import Dict
+from systemmonitor.typing_ext import Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QFrame, QSizePolicy, QScrollArea

@@ -106,7 +106,8 @@ class SensorsPanel(QFrame, ScaleMixin, I18nMixin):
         self._setup_ui()
 
     def retranslate_ui(self):
-        self._setup_ui()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
 
     def _setup_ui(self):
         old = self.layout()

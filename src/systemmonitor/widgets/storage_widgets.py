@@ -864,7 +864,8 @@ class StorageDiskCard(QFrame, I18nMixin):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def retranslate_ui(self):
-        self._setup_ui()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._setup_ui)
 
     # ── hover ─────────────────────────────────────────────────────────────────
     def enterEvent(self, event):

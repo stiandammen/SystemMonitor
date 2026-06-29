@@ -49,10 +49,8 @@ TRANSLATIONS_NO = {
     "Technical Documentation": "Teknisk dokumentasjon",
     "Learn what the different metrics (IRQ, P-cores, etc.) actually mean": "Lær hva de ulike målingene (IRQ, P-kjerner, osv.) faktisk betyr",
     "Version {0}": "Versjon {0}",
-    "A professional-grade system monitoring utility "
-    "designed for deep hardware insights and real-time performance tracking.":
-        "Et profesjonelt systemovervåkingsverktøy "
-        "laget for dyptgående maskinvareinnsikt og sanntids ytelsessporing.",
+    "Advanced system diagnostics and hardware telemetry in real-time.":
+        "Avansert systemdiagnostikk og maskinvaretelemetri i sanntid.",
     "Close": "Lukk",
     "P-Cores & E-Cores": "P-kjerner og E-kjerner",
     "Hybrid Intel CPUs (12th gen+) use Performance cores for heavy tasks "
@@ -407,4 +405,29 @@ TRANSLATIONS_NO = {
     "No matching log entries.": "Ingen samsvarende loggoppføringer.",
     "Showing last {0} lines of {1}": "Viser siste {0} linjer av {1}",
     "Could not read log file: {0}": "Kunne ikke lese loggfil: {0}",
+
+    # ── About Dialog Additions ───────────────────────────────────────────
+    "Key Features:": "Nøkkelfunksjoner:",
+    "Processor (CPU)": "Prosessor (CPU)",
+    "Advanced real-time analysis of core load (P/E cores), clocks, temperatures, and IRQs.":
+        "Avansert sanntidsanalyse av kjernebelastning (P/E-kjerner), frekvenser, temperaturer og IRQ.",
+    "Graphics (GPU)": "Grafikk (GPU)",
+    "Telemetry for GPU utilization, VRAM allocation, temperatures, and power draw.":
+        "Telemetri for GPU-utnyttelse, VRAM-allokering, temperaturer og strømforbruk.",
+    "System Memory (RAM)": "Arbeidsminne (RAM)",
+    "Precise tracking of physical RAM and pagefile, memory speed, and top processes.":
+        "Presis overvåking av fysisk RAM, sidefil, minnehastighet og topp-prosesser.",
+    "Storage (Disk)": "Lagring (Disk)",
+    "Real-time I/O throughput, partition space usage, and SMART health monitoring.":
+        "Sanntids I/O-hastigheter, partisjonsbruk og SMART-helseovervåking.",
+    "Network": "Nettverk",
+    "Bandwidth tracking (download/upload), active connections, and network topology.":
+        "Båndbreddeanalyse (nedlasting/opplasting), aktive tilkoblinger og topologi.",
+    "Smart Alerts": "Terskelvarsler",
+    "Threshold alarms for hardware events via system notifications or in-app toasts.":
+        "Terskelvarsler for maskinvarehendelser via systemvarsler eller in-app-toasts.",
+    "Telemetry Export": "Dataeksport og API",
+    "JSON/CSV snapshot export and built-in Prometheus metrics server (/metrics).":
+        "Eksport av JSON/CSV og innebygd Prometheus-endepunkt (/metrics).",
 }
+

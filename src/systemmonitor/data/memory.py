@@ -3,7 +3,7 @@ Memory Data Collector
 """
 import subprocess
 import re
-from systemmonitor.typing import Dict, Any, List, Optional
+from systemmonitor.typing_ext import Dict, Any, List, Optional
 
 _SMBIOS_TYPES = {
     20: "DDR",
@@ -25,8 +25,9 @@ def get_ram_type() -> str:
     try:
         cmd = "Get-CimInstance Win32_PhysicalMemory | Select-Object -ExpandProperty SMBIOSMemoryType"
         result = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
+            ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-NonInteractive", "-Command", cmd],
             capture_output=True, text=True, timeout=8,
+            creationflags=0x08000000
         )
         codes = re.findall(r'\d+', result.stdout)
         if not codes:

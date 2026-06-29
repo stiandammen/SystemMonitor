@@ -19,12 +19,6 @@ parent_dir = os.path.abspath(os.path.join(bundle_dir, os.pardir))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-# Remove the package directory itself (src/systemmonitor/) from sys.path — Python adds it
-# automatically when running __main__.py directly, which causes typing.py and enum.py
-# inside the package to shadow the stdlib modules of the same name.
-while bundle_dir in sys.path:
-    sys.path.remove(bundle_dir)
-
 # Setup logging
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception
 from systemmonitor.i18n import tr, language_manager
@@ -102,36 +96,161 @@ def main():
         return 1
 
     # Splash screen — shown immediately since PyQt6/psutil/WMI take a moment to
+    # Splash screen — shown immediately since PyQt6/psutil/WMI take a moment to
     # import and the main window has heavy widgets to build on first show.
     splash = None
     try:
         from PyQt6.QtWidgets import QSplashScreen
-        from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont as _SplashFont
-        from PyQt6.QtCore import Qt as _SplashQt
+        from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont as _SplashFont, QPen, QLinearGradient, QBrush, QPainterPath
+        from PyQt6.QtCore import Qt as _SplashQt, QRectF
+        import math
+        import time
 
-        _pix = QPixmap(420, 240)
-        _pix.fill(QColor(13, 17, 23))
-        _painter = QPainter(_pix)
-        _painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        _painter.setPen(QColor(56, 189, 248))
-        _painter.setFont(_SplashFont("Segoe UI", 24, _SplashFont.Weight.Bold))
-        _painter.drawText(_pix.rect().adjusted(0, -30, 0, 0),
-                          _SplashQt.AlignmentFlag.AlignCenter, "System Monitor")
-        _painter.setPen(QColor(148, 163, 184))
-        _painter.setFont(_SplashFont("Segoe UI", 10))
-        _painter.drawText(_pix.rect().adjusted(0, 40, 0, 0),
-                          _SplashQt.AlignmentFlag.AlignCenter, tr("Loading monitoring engine…"))
-        _painter.end()
+        class AnimatedSplashScreen(QSplashScreen):
+            def __init__(self):
+                # Create a blank transparent pixmap of the size we want the splash screen to be
+                pix = QPixmap(460, 280)
+                pix.fill(QColor(0, 0, 0, 0))  # Start fully transparent
+                super().__init__(pix)
+                
+                # Make splash screen frameless and translucent
+                self.setWindowFlags(self.windowFlags() | _SplashQt.WindowType.FramelessWindowHint)
+                self.setAttribute(_SplashQt.WidgetAttribute.WA_TranslucentBackground, True)
+                
+                self.angle = 0
+                self.loading_text = tr("Loading monitoring engine")
+                
+            def rotate(self):
+                # We rotate by 4 degrees for an ultra-smooth motion
+                self.angle = (self.angle + 4) % 360
+                self.update()  # Repaint
+                
+            def set_loading_text(self, text):
+                # Remove trailing dots if any, we format it as terminal output
+                clean_text = text.replace('…', '').replace('...', '').strip()
+                self.loading_text = clean_text
+                self.update()
+                
+            def paintEvent(self, event):
+                painter = QPainter(self)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                
+                # 1. Glassmorphic Background with Rounded Corners
+                path = QPainterPath()
+                path.addRoundedRect(QRectF(0, 0, self.width(), self.height()), 16, 16)
+                
+                # Draw background gradient inside path (semi-translucent dark cyberpunk theme)
+                grad = QLinearGradient(0, 0, self.width(), self.height())
+                grad.setColorAt(0.0, QColor(10, 13, 20, 248))  # Deep dark space blue
+                grad.setColorAt(1.0, QColor(21, 27, 38, 248))  # Tech slate
+                painter.fillPath(path, QBrush(grad))
+                
+                # 2. Glowing Neon Border
+                border_grad = QLinearGradient(0, 0, self.width(), self.height())
+                border_grad.setColorAt(0.0, QColor(6, 182, 212))   # Cyan
+                border_grad.setColorAt(0.5, QColor(99, 102, 241))  # Indigo
+                border_grad.setColorAt(1.0, QColor(16, 185, 129))  # Emerald
+                
+                border_pen = QPen(border_grad, 1.5)
+                painter.setPen(border_pen)
+                painter.setBrush(_SplashQt.BrushStyle.NoBrush)
+                painter.drawPath(path)
+                
+                # 3. Dynamic Title with Gradient Text & Breathing Glow
+                rad = self.angle * math.pi / 180
+                alpha = int(170 + 85 * math.sin(rad * 2))  # pulses twice per rotation
+                alpha = max(80, min(255, alpha))
+                
+                title_grad = QLinearGradient(0, 35, 0, 75)
+                title_grad.setColorAt(0.0, QColor(0, 242, 254, alpha))  # Bright cyan
+                title_grad.setColorAt(1.0, QColor(79, 172, 254, alpha)) # Deep sky blue
+                
+                painter.setPen(QPen(title_grad, 1))
+                font_title = _SplashFont("Segoe UI", 26, _SplashFont.Weight.Black)
+                painter.setFont(font_title)
+                painter.drawText(self.rect().adjusted(0, 35, 0, 0),
+                                 _SplashQt.AlignmentFlag.AlignHCenter | _SplashQt.AlignmentFlag.AlignTop,
+                                 "SYSTEM MONITOR")
+                                 
+                # Subtitle (Small uppercase tracked out tech text)
+                painter.setPen(QColor(148, 163, 184, int(alpha * 0.7)))
+                font_sub = _SplashFont("Segoe UI", 7, _SplashFont.Weight.Bold)
+                painter.setFont(font_sub)
+                painter.drawText(self.rect().adjusted(0, 75, 0, 0),
+                                 _SplashQt.AlignmentFlag.AlignHCenter | _SplashQt.AlignmentFlag.AlignTop,
+                                 "E N T E R P R I S E   H A R D W A R E   S U I T E")
+                                 
+                # 4. Concentric HUD Loader Spinner
+                cx = self.width() / 2
+                cy = self.height() / 2 + 15
+                
+                # Outer dashed HUD track (slow rotation counter-clockwise)
+                r1 = 28
+                dashed_pen = QPen(QColor(148, 163, 184, 40), 1.5)
+                dashed_pen.setStyle(_SplashQt.PenStyle.DashLine)
+                painter.setPen(dashed_pen)
+                painter.drawEllipse(int(cx - r1), int(cy - r1), r1 * 2, r1 * 2)
+                
+                # Middle Cyan Active Arc (rotates clockwise)
+                r2 = 23
+                pen_spinner1 = QPen(QColor(6, 182, 212), 3.5)
+                pen_spinner1.setCapStyle(_SplashQt.PenCapStyle.RoundCap)
+                painter.setPen(pen_spinner1)
+                painter.drawArc(int(cx - r2), int(cy - r2), r2 * 2, r2 * 2, -self.angle * 16, 120 * 16)
+                
+                # Inner Emerald Arc (rotates counter-clockwise faster)
+                r3 = 15
+                pen_spinner2 = QPen(QColor(16, 185, 129), 2)
+                pen_spinner2.setCapStyle(_SplashQt.PenCapStyle.RoundCap)
+                painter.setPen(pen_spinner2)
+                inner_angle = int(self.angle * 1.6) % 360
+                painter.drawArc(int(cx - r3), int(cy - r3), r3 * 2, r3 * 2, inner_angle * 16, 90 * 16)
+                
+                # Center Glowing Pulse core
+                pulse_r = 4.0 + 1.5 * math.sin(rad * 3)
+                core_color = QColor(6, 182, 212, int(150 + 105 * math.sin(rad * 3)))
+                painter.setPen(_SplashQt.PenStyle.NoPen)
+                painter.setBrush(QBrush(core_color))
+                painter.drawEllipse(QRectF(cx - pulse_r, cy - pulse_r, pulse_r * 2, pulse_r * 2))
+                
+                # 5. Technical Terminal-Style Loading status log
+                painter.setPen(QColor(165, 243, 252)) # Light cyan
+                font_text = _SplashFont("Consolas", 9)  # Code terminal font
+                painter.setFont(font_text)
+                
+                # Format text: e.g. ":: LOADING CORE ENGINE..."
+                formatted_text = f":: {self.loading_text.upper()}..."
+                painter.drawText(self.rect().adjusted(0, 0, 0, 30),
+                                 _SplashQt.AlignmentFlag.AlignHCenter | _SplashQt.AlignmentFlag.AlignBottom,
+                                 formatted_text)
+                                 
+                painter.end()
 
-        splash = QSplashScreen(_pix)
+        splash = AnimatedSplashScreen()
         splash.show()
-        app.processEvents()
-        log_info(LogCategory.APP, "Splash screen shown")
+        
+        def animate_phase(duration_ms, text):
+            if splash:
+                splash.set_loading_text(text)
+            steps = int(duration_ms / 16)
+            for _ in range(steps):
+                if splash:
+                    splash.rotate()
+                app.processEvents()
+                time.sleep(0.016)
+
+        # Initial transition phase (400ms)
+        animate_phase(400, tr("Starting System Monitor…"))
+            
+        log_info(LogCategory.APP, "Animated splash screen shown")
     except Exception as e:
         log_warning(LogCategory.APP, f"Failed to show splash screen: {e}")
         splash = None
 
     try:
+        if splash:
+            animate_phase(500, tr("Initializing resolution scaler…"))
+
         from systemmonitor.scaler import init_scaler, S, LayoutMode
         init_scaler(app)
 
@@ -152,6 +271,9 @@ def main():
         log_error(LogCategory.APP, f"Failed to init scaler: {e}")
 
     try:
+        if splash:
+            animate_phase(600, tr("Loading core window modules…"))
+
         from systemmonitor.core.window import MainWindow
         from systemmonitor.styles.theme import theme_manager
         from systemmonitor.config import settings as app_settings
@@ -165,7 +287,7 @@ def main():
 
         # Filled in once the MainWindow exists (not available in overlay mode),
         # so the tray menu and in-app toast can reach it.
-        _main_window_ref = [None]
+        _main_window_ref: list = [None]
 
         # System tray: alert notifications + minimize-to-tray controls (cross-platform via Qt)
         from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
@@ -263,6 +385,9 @@ def main():
             collector.stop()
             return result
         else:
+            if splash:
+                animate_phase(600, tr("Building user interface widgets…"))
+
             window = MainWindow()
             _main_window_ref[0] = window
 
@@ -279,6 +404,9 @@ def main():
                     splash.close()
                 else:
                     splash.finish(window)
+
+            if splash:
+                animate_phase(600, tr("Starting background monitoring threads…"))
 
             # Use the coordinator-based collector for better performance
             from systemmonitor.data.coordinator import DataCollector

@@ -2,7 +2,7 @@
 Settings View — Professional rebuild
 Card-based sections, scroll support, consistent with the rest of the GUI theme.
 """
-from systemmonitor.pathlib import Path
+from systemmonitor.paths_ext import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QSlider, QSpinBox, QFileDialog, QMessageBox,
@@ -217,38 +217,112 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         c = _c()
         dialog = QDialog(self)
         dialog.setWindowTitle(tr("About System Monitor"))
-        dialog.setMinimumSize(S.px(450), S.px(350))
+        dialog.setMinimumSize(S.px(700), S.px(520))
         dialog.setStyleSheet(f"background-color: {c.BG_CARD}; border: 1px solid {c.BORDER};")
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(S.px(30), S.px(30), S.px(30), S.px(30))
+        layout.setContentsMargins(S.px(30), S.px(25), S.px(30), S.px(25))
         layout.setSpacing(S.px(10))
+
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(S.px(10))
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         title = QLabel("System Monitor")
         title.setFont(QFont("Segoe UI", S.font_pt(20), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        header_layout.addWidget(title)
 
-        version = QLabel(tr("Version {0}").format("1.0.0"))
-        version.setFont(QFont("Segoe UI", S.font_pt(10)))
-        version.setStyleSheet(f"color: {c.TEXT_MUTED}; border: none;")
-        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(version)
+        version = QLabel("v2.0.0")
+        version.setFont(QFont("Segoe UI", S.font_pt(9.5), QFont.Weight.Bold))
+        version.setStyleSheet(f"""
+            color: {c.TEXT_SECONDARY};
+            background-color: {c.BG_SECONDARY};
+            border-radius: {S.px(6)}px;
+            padding: {S.px(2)}px {S.px(8)}px;
+            border: 1px solid {c.BORDER};
+        """)
+        header_layout.addWidget(version)
+        layout.addLayout(header_layout)
 
-        layout.addSpacing(S.px(15))
-
-        desc = QLabel(tr(
-            "A professional-grade system monitoring utility "
-            "designed for deep hardware insights and real-time performance tracking."
-        ))
+        desc = QLabel(tr("Advanced system diagnostics and hardware telemetry in real-time."))
         desc.setWordWrap(True)
-        desc.setFont(QFont("Segoe UI", S.font_pt(10)))
-        desc.setStyleSheet(f"color: {c.TEXT_PRIMARY}; border: none;")
-        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setFont(QFont("Segoe UI", S.font_pt(10.5), QFont.Weight.Medium))
+        desc.setStyleSheet(f"color: {c.TEXT_PRIMARY}; border: none; margin-bottom: 2px;")
+        desc.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(desc)
 
-        layout.addStretch()
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        sep.setStyleSheet(f"background-color: {c.BORDER}; max-height: 1px; border: none;")
+        layout.addWidget(sep)
+
+        features_title = QLabel(tr("Key Features:"))
+        features_title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        features_title.setStyleSheet(f"color: {c.ACCENT_BLUE}; border: none; margin-top: 5px; margin-bottom: 2px;")
+        layout.addWidget(features_title)
+
+        from PyQt6.QtWidgets import QGridLayout
+        grid_widget = QWidget()
+        grid_widget.setStyleSheet("background: transparent; border: none;")
+        grid = QGridLayout(grid_widget)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(S.px(14))
+
+        features_list = [
+            ("Processor (CPU)", "Advanced real-time analysis of core load (P/E cores), clocks, temperatures, and IRQs.", 0, 0),
+            ("Graphics (GPU)", "Telemetry for GPU utilization, VRAM allocation, temperatures, and power draw.", 0, 1),
+            ("System Memory (RAM)", "Precise tracking of physical RAM and pagefile, memory speed, and top processes.", 1, 0),
+            ("Storage (Disk)", "Real-time I/O throughput, partition space usage, and SMART health monitoring.", 1, 1),
+            ("Network", "Bandwidth tracking (download/upload), active connections, and network topology.", 2, 0),
+            ("Smart Alerts", "Threshold alarms for hardware events via system notifications or in-app toasts.", 2, 1),
+            ("Telemetry Export", "JSON/CSV snapshot export and built-in Prometheus metrics server (/metrics).", 3, 0)
+        ]
+
+        for title_str, desc_str, r, col in features_list[:6]:
+            feat_widget = QWidget()
+            feat_widget.setStyleSheet("background: transparent; border: none;")
+            feat_layout = QVBoxLayout(feat_widget)
+            feat_layout.setContentsMargins(0, 0, 0, 0)
+            feat_layout.setSpacing(S.px(2))
+
+            name_label = QLabel(tr(title_str))
+            name_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+            name_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
+            
+            desc_label = QLabel(tr(desc_str))
+            desc_label.setWordWrap(True)
+            desc_label.setFont(QFont("Segoe UI", S.font_pt(9.5)))
+            desc_label.setStyleSheet(f"color: {c.TEXT_SECONDARY}; border: none;")
+            
+            feat_layout.addWidget(name_label)
+            feat_layout.addWidget(desc_label)
+            grid.addWidget(feat_widget, r, col)
+
+        # 7th item spanning 2 columns
+        title_str, desc_str, r, col = features_list[6]
+        feat_widget = QWidget()
+        feat_widget.setStyleSheet("background: transparent; border: none;")
+        feat_layout = QVBoxLayout(feat_widget)
+        feat_layout.setContentsMargins(0, 0, 0, 0)
+        feat_layout.setSpacing(S.px(2))
+
+        name_label = QLabel(tr(title_str))
+        name_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        name_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
+        
+        desc_label = QLabel(tr(desc_str))
+        desc_label.setWordWrap(True)
+        desc_label.setFont(QFont("Segoe UI", S.font_pt(9.5)))
+        desc_label.setStyleSheet(f"color: {c.TEXT_SECONDARY}; border: none;")
+        
+        feat_layout.addWidget(name_label)
+        feat_layout.addWidget(desc_label)
+        grid.addWidget(feat_widget, r, col, 1, 2)
+
+        layout.addWidget(grid_widget)
+        layout.addSpacing(S.px(10))
 
         close_btn = self._btn(tr("Close"))
         close_btn.clicked.connect(dialog.accept)

@@ -519,9 +519,10 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
             return self._system_info_cache['gpu_name']
         try:
             result = subprocess.run(
-                ["powershell", "-Command",
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                  "(Get-CimInstance Win32_VideoController).Name | Select-Object -First 1"],
-                capture_output=True, text=True, timeout=3
+                capture_output=True, text=True, timeout=3,
+                creationflags=0x08000000
             )
             if result.stdout.strip():
                 name = result.stdout.strip()

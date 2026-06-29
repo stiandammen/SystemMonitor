@@ -273,12 +273,12 @@ class DiskCollectorThread(BaseCollector):
         try:
             import subprocess
             result = subprocess.run(
-                ["powershell", "-Command",
+                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                  "Get-CimInstance Win32_DiskDrive | ForEach-Object { $dd = $_; "
                  "Get-CimInstance -Query \"ASSOCIATORS OF {Win32_DiskDrive.DeviceID='$($dd.DeviceID)'} WHERE AssocClass=Win32_DiskDriveToDiskPartition\" | "
                  "ForEach-Object { Get-CimInstance -Query \"ASSOCIATORS OF {Win32_DiskPartition.DeviceID='$($_.DeviceID)'} WHERE AssocClass=Win32_LogicalDiskToPartition\" | "
                  "ForEach-Object { \"$($dd.Index)|$($_.DeviceID)\" } } }"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, timeout=5, creationflags=0x08000000
             )
             if result.stdout.strip():
                 for line in result.stdout.strip().split('\n'):
@@ -563,7 +563,7 @@ class GPUCollectorThread(BaseCollector):
             # Try to get any temperature from MSAcpi or other thermal zones that might be GPU-related
             # on some laptops/systems
             cmd = "(Get-CimInstance MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Where-Object { $_.CurrentTemperature -gt 0 } | Select-Object -First 1).CurrentTemperature"
-            result = subprocess.run(["powershell", "-Command", cmd], capture_output=True, text=True, timeout=2)
+            result = subprocess.run(["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command", cmd], capture_output=True, text=True, timeout=2, creationflags=0x08000000)
             if result.stdout.strip():
                 return float(result.stdout.strip()) / 10 - 273.15
         except:
@@ -757,9 +757,9 @@ class SystemInfoCollectorThread(BaseCollector):
             try:
                 import subprocess
                 result = subprocess.run(
-                    ["powershell", "-Command",
+                    ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                      "(Get-CimInstance Win32_VideoController).Name | Select-Object -First 1"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True, text=True, timeout=5, creationflags=0x08000000
                 )
                 if result.stdout.strip():
                     name = result.stdout.strip()
@@ -774,9 +774,9 @@ class SystemInfoCollectorThread(BaseCollector):
             try:
                 import subprocess
                 result = subprocess.run(
-                    ["powershell", "-Command",
+                    ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
                      "(Get-CimInstance Win32_BaseBoard).Product"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True, text=True, timeout=5, creationflags=0x08000000
                 )
                 if result.stdout.strip():
                     return result.stdout.strip()

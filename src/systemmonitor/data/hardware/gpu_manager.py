@@ -4,7 +4,7 @@ Orchestrates GPU detection using multiple backends with intelligent fallback
 """
 import time
 import logging
-from systemmonitor.typing import List, Dict, Any, Optional
+from systemmonitor.typing_ext import List, Dict, Any, Optional
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
 from .wmi_detector import WMIDetector
