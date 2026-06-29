@@ -48,15 +48,7 @@ else:
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
 
-<<<<<<< HEAD
-=======
-    # Remove the package directory itself (src/systemmonitor/) from sys.path — Python adds it
-    # automatically when running __main__.py directly, which causes typing.py and enum.py
-    # inside the package to shadow the stdlib modules of the same name.
-    while bundle_dir in sys.path:
-        sys.path.remove(bundle_dir)
 
->>>>>>> 7cfc828b8dce6ed565ab4e18d9d314d16b4b0da0
 # Setup logging
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception
 from systemmonitor.i18n import tr, language_manager
