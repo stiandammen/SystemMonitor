@@ -6,11 +6,18 @@ import sys
 import sysconfig
 import importlib.util
 
-# Locate the real stdlib enum module file
-_std_path = os.path.join(sysconfig.get_path('stdlib'), 'enum.py')
-_spec = importlib.util.spec_from_file_location('enum_std', _std_path)
-_std_mod = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_std_mod)
+# Locate the real stdlib enum module
+this_dir = os.path.dirname(os.path.abspath(__file__))
+saved_path = sys.path.copy()
+sys.path = [p for p in sys.path if os.path.abspath(p) != os.path.abspath(this_dir)]
+had_enum = 'enum' in sys.modules
+old_enum = sys.modules.pop('enum', None)
+try:
+    import enum as _std_mod
+finally:
+    sys.path = saved_path
+    if had_enum:
+        sys.modules['enum'] = old_enum
 
 # Explicit static assignments so Pylance can resolve common names
 Enum = _std_mod.Enum

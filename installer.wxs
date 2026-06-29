@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <!-- Changed UpgradeCode to decouple from old per-machine installations -->
+    <Product Id="*" Name="System Monitor" Language="1033" Version="2.0.0" Manufacturer="System Monitor Team" UpgradeCode="C45D8FA3-84E3-4E87-A1BC-55720E77FF51">
+        
+        <!-- 
+          InstallScope="perUser" and InstallPrivileges="limited" 
+          forces Windows Installer to run completely as a standard user without UAC/admin elevation.
+        -->
+        <Package InstallerVersion="200" Compressed="yes" InstallScope="perUser" Platform="x64" InstallPrivileges="limited" />
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." AllowSameVersionUpgrades="yes" />
+        <MediaTemplate EmbedCab="yes" />
+
+        <!-- Force per-user installation properties -->
+        <Property Id="ALLUSERS" Value="2" />
+        <Property Id="MSIINSTALLPERUSER" Value="1" />
+
+        <!-- Icon for Add/Remove Programs (ARP) -->
+        <Icon Id="AppIcon" SourceFile="dist\SystemMonitor.exe" />
+        <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+
+        <!-- UI Configuration for choosing install directory -->
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+        <UIRef Id="WixUI_InstallDir" />
+        
+        <!-- License agreement file -->
+        <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+        <Feature Id="ProductFeature" Title="System Monitor" Level="1">
+            <ComponentGroupRef Id="ProductComponents" />
+        </Feature>
+    </Product>
+
+    <Fragment>
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <!-- User Local AppData folder to install without admin rights -->
+            <Directory Id="LocalAppDataFolder">
+                <Directory Id="INSTALLFOLDER" Name="System Monitor" />
+            </Directory>
+            <!-- Start Menu folder -->
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="System Monitor"/>
+            </Directory>
+            <!-- Desktop folder -->
+            <Directory Id="DesktopFolder" Name="Desktop" />
+        </Directory>
+    </Fragment>
+
+    <Fragment>
+        <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+            <Component Id="ProductComponent" Guid="EAA0DF4A-95B8-4395-B7D4-48E0D251D5A6" Win64="yes">
+                <!-- Registry key to track install state for per-user install (required for perUser) -->
+                <RegistryValue Root="HKCU" Key="Software\SystemMonitorTeam\SystemMonitor" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+                
+                <!-- Principal Executable -->
+                <File Id="SystemMonitorEXE" Source="dist\SystemMonitor.exe" />
+                
+                <!-- Non-advertised shortcuts targeting the file -->
+                <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="System Monitor" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" IconIndex="0" Target="[#SystemMonitorEXE]" />
+                <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="System Monitor" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" IconIndex="0" Target="[#SystemMonitorEXE]" />
+                
+                <!-- Cleanup folders on uninstall -->
+                <RemoveFolder Id="CleanupProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+                <RemoveFolder Id="CleanupInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+            </Component>
+        </ComponentGroup>
+    </Fragment>
+</Wix>

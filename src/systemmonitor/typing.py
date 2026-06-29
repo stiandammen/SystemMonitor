@@ -7,10 +7,17 @@ import sysconfig
 import importlib.util
 
 # Locate the real stdlib typing module
-_std_path = os.path.join(sysconfig.get_path('stdlib'), 'typing.py')
-_spec = importlib.util.spec_from_file_location('typing_std', _std_path)
-_std_mod = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_std_mod)
+this_dir = os.path.dirname(os.path.abspath(__file__))
+saved_path = sys.path.copy()
+sys.path = [p for p in sys.path if os.path.abspath(p) != os.path.abspath(this_dir)]
+had_typing = 'typing' in sys.modules
+old_typing = sys.modules.pop('typing', None)
+try:
+    import typing as _std_mod
+finally:
+    sys.path = saved_path
+    if had_typing:
+        sys.modules['typing'] = old_typing
 
 # Explicit static assignments so Pylance can resolve common names
 Any = _std_mod.Any

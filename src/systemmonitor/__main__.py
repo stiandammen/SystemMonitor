@@ -8,22 +8,51 @@ import sys
 import argparse
 import traceback
 
+# Monkey-patch subprocess.Popen on Windows to hide black console windows globally
+if sys.platform == 'win32':
+    import subprocess
+    _orig_Popen = subprocess.Popen
+    def _patched_Popen(*args, **kwargs):
+        # 0x08000000 is CREATE_NO_WINDOW
+        flags = kwargs.get('creationflags', 0)
+        # Skip if it is a detached process (like the installer)
+        if not (flags & (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)):
+            kwargs['creationflags'] = flags | 0x08000000
+        return _orig_Popen(*args, **kwargs)
+    subprocess.Popen = _patched_Popen
+
+# Single Instance Lock on Windows to prevent multiple tray icons and background instances
+if sys.platform == 'win32':
+    try:
+        import win32event
+        import win32api
+        import winerror
+        
+        mutex_name = "Local\\SystemMonitor_SingleInstance_Mutex"
+        # We must keep a reference to the handle so it doesn't get garbage collected
+        _single_instance_mutex = win32event.CreateMutex(None, True, mutex_name)
+        if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+            # Another instance is already running, exit silently
+            sys.exit(0)
+    except Exception:
+        pass
+
 # Handle PyInstaller packaged app paths
 if getattr(sys, 'frozen', False):
     bundle_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.argv[0])))
 else:
     bundle_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Ensure src/ is at the front of sys.path so systemmonitor.* imports work
-parent_dir = os.path.abspath(os.path.join(bundle_dir, os.pardir))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+    # Ensure src/ is at the front of sys.path so systemmonitor.* imports work
+    parent_dir = os.path.abspath(os.path.join(bundle_dir, os.pardir))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
 
-# Remove the package directory itself (src/systemmonitor/) from sys.path — Python adds it
-# automatically when running __main__.py directly, which causes typing.py and enum.py
-# inside the package to shadow the stdlib modules of the same name.
-while bundle_dir in sys.path:
-    sys.path.remove(bundle_dir)
+    # Remove the package directory itself (src/systemmonitor/) from sys.path — Python adds it
+    # automatically when running __main__.py directly, which causes typing.py and enum.py
+    # inside the package to shadow the stdlib modules of the same name.
+    while bundle_dir in sys.path:
+        sys.path.remove(bundle_dir)
 
 # Setup logging
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception

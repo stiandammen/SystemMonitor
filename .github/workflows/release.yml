@@ -1,0 +1,54 @@
+name: Build and Release MSI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # Allows manual trigger of the workflow
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Executable with PyInstaller
+        run: |
+          pyinstaller SystemMonitor.spec
+
+      - name: Add WiX Toolset to PATH
+        run: |
+          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
+        shell: pwsh
+
+      - name: Build MSI Installer with WiX Toolset
+        run: |
+          candle installer.wxs
+          light installer.wixobj -ext WixUIExtension -out dist/SystemMonitor.msi
+        shell: cmd
+
+      - name: Create GitHub Release and Upload MSI
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SystemMonitor.msi
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

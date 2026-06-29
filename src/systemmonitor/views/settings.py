@@ -21,6 +21,7 @@ from systemmonitor.styles.theme import theme_manager
 from systemmonitor.i18n import tr, language_manager, SUPPORTED_LANGUAGES, I18nMixin
 from systemmonitor.widgets.card import Card
 from systemmonitor.widgets.settings_row import ToggleWidget
+from systemmonitor.utils.logger import log_info, log_error, LogCategory
 
 
 def _c():
@@ -916,10 +917,86 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         signal_bus.setting_changed.emit(key, value)
 
     def _on_check_for_updates(self):
-        QMessageBox.information(
-            self, tr("Update Check"),
-            tr("You are running the latest version.\n\nVersion: {0}\nNo updates available.").format("1.0.0"),
-            QMessageBox.StandardButton.Ok)
+        from systemmonitor.utils.updater import UpdateCheckerThread
+        self._update_btn = self.sender()
+        if self._update_btn and hasattr(self._update_btn, 'setEnabled'):
+            self._update_btn.setEnabled(False)
+            self._update_btn.setText(tr("Checking..."))
+            
+        self._checker = UpdateCheckerThread(self)
+        self._checker.check_finished.connect(self._on_manual_check_finished)
+        self._checker.start()
+
+    def _on_manual_check_finished(self, available: bool, info: dict):
+        if self._update_btn and hasattr(self._update_btn, 'setEnabled'):
+            self._update_btn.setEnabled(True)
+            self._update_btn.setText(tr("Check now"))
+            
+        if "error" in info:
+            QMessageBox.critical(
+                self, tr("Update Error"),
+                tr("Failed to check for updates:\n{0}").format(info["error"]),
+                QMessageBox.StandardButton.Ok
+            )
+            return
+            
+        if available:
+            reply = QMessageBox.question(
+                self, tr("Update Available"),
+                tr("A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download and install it now?").format(info["version"], info["release_notes"]),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.start_update_download(info)
+        else:
+            from systemmonitor import __version__
+            QMessageBox.information(
+                self, tr("Update Check"),
+                tr("You are running the latest version.\n\nVersion: {0}\nNo updates available.").format(__version__),
+                QMessageBox.StandardButton.Ok
+            )
+
+    def start_update_download(self, info: dict):
+        if not info.get("msi_url"):
+            # Fallback to browser download page if no MSI asset is found
+            from PyQt6.QtGui import QDesktopServices
+            from PyQt6.QtCore import QUrl
+            url_str = info.get("html_url", "https://github.com")
+            log_info(LogCategory.APP, f"No MSI url in release, opening html page: {url_str}")
+            QDesktopServices.openUrl(QUrl(url_str))
+            return
+            
+        from PyQt6.QtWidgets import QProgressDialog
+        from systemmonitor.utils.updater import UpdateDownloaderThread
+        
+        self._progress_dialog = QProgressDialog(tr("Downloading update..."), tr("Cancel"), 0, 100, self)
+        self._progress_dialog.setWindowTitle(tr("Downloading"))
+        self._progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._progress_dialog.setAutoClose(True)
+        
+        self._downloader = UpdateDownloaderThread(info["msi_url"], info["msi_name"], self)
+        self._downloader.progress.connect(self._progress_dialog.setValue)
+        self._downloader.finished.connect(self._on_download_finished)
+        
+        self._progress_dialog.canceled.connect(self._downloader.cancel)
+        self._downloader.start()
+        self._progress_dialog.show()
+
+    def _on_download_finished(self, success: bool, file_path: str, error_msg: str):
+        if hasattr(self, '_progress_dialog'):
+            self._progress_dialog.close()
+            
+        if success:
+            from systemmonitor.utils.updater import run_msi_installer
+            run_msi_installer(file_path)
+        else:
+            if error_msg != "Download cancelled":
+                QMessageBox.critical(
+                    self, tr("Download Failed"),
+                    tr("Failed to download the update:\n{0}").format(error_msg),
+                    QMessageBox.StandardButton.Ok
+                )
 
     def _on_data_updated(self, data: dict):
         self._last_data = data

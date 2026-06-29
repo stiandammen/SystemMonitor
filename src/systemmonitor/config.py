@@ -1,4 +1,4 @@
-﻿"""
+"""
 System Monitor - Configuration
 Application settings, colors, fonts, and constants with responsive defaults
 """
@@ -141,6 +141,7 @@ class SettingsManager:
         'minimize_to_tray': False,
         'start_minimized': False,
         'overlay_mode': False,
+        'check_for_updates': True,
 
         # Export
         'export_format': 'csv',
