@@ -8,6 +8,10 @@ logs/
 
 # Build / distribution artifacts
 build/
+dist/
+wix_bin/
+*.wixobj
+*.wixpdb
 *.egg-info/
 .dist/
 

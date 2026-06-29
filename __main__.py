@@ -7,3 +7,4 @@ if __name__ == '__main__':
     from systemmonitor.__main__ import main  # type: ignore
     sys.exit(main())
 
+    

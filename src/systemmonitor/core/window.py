@@ -15,6 +15,7 @@ from systemmonitor.styles.theme import theme_manager
 from systemmonitor.scaler import S, ScaleMixin, LayoutMode
 from systemmonitor.config import settings
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_debug
+from systemmonitor.i18n import tr
 
 
 def _cap(scaled: int, maximum: int) -> int:
@@ -442,8 +443,34 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._setup_ui()
         self._preload_overview()
 
+        # Check for updates in background on startup (if enabled)
+        from systemmonitor.config import settings as app_settings
+        if app_settings.get('check_for_updates', True):
+            QTimer.singleShot(5000, self._check_for_updates_startup)
+
     def _preload_overview(self):
         self._get_view("overview")
+
+    def _check_for_updates_startup(self):
+        from systemmonitor.utils.updater import UpdateCheckerThread
+        self._startup_updater = UpdateCheckerThread(self)
+        self._startup_updater.check_finished.connect(self._on_startup_update_check_finished)
+        self._startup_updater.start()
+
+    def _on_startup_update_check_finished(self, available: bool, info: dict):
+        if available and not self.isMinimized() and self.isVisible():
+            from PyQt6.QtWidgets import QMessageBox
+            reply = QMessageBox.question(
+                self, tr("Update Available"),
+                tr("A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download and install it now?").format(info["version"], info["release_notes"]),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._switch_view("settings")
+                settings_view = self._get_view("settings")
+                if hasattr(settings_view, "start_update_download"):
+                    settings_view.start_update_download(info)
 
     def closeEvent(self, event):
         """Hide to the system tray instead of quitting — a monitoring tool
@@ -578,6 +605,16 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _setup_ui(self):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setWindowTitle("System Monitor")
+        try:
+            import sys
+            import os
+            from PyQt6.QtGui import QIcon
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            icon_path = os.path.join(base_dir, "assets", "icon.png")
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
 
         screen = self.screen()
         if screen:
