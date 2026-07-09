@@ -2,6 +2,38 @@
 import sys
 import os
 
+# --------------------------------------------------------------------------
+# Work around a known PyInstaller/Windows bug: on Windows, PyInstaller
+# isolated-imports every collected pure-Python package in a single shared
+# child interpreter to detect os.add_dll_directory()/PATH side effects
+# (see PyInstaller.building.build_main.find_binary_dependencies). Certain
+# import orders corrupt that child interpreter and crash it with
+# STATUS_STACK_OVERFLOW (exit code 3221225725) on a *later*, unrelated
+# import - PyInstaller itself works around this for known offenders like
+# 'pyqtgraph.canvas' and 'PySimpleGUI' (see their build_main.py, and
+# https://github.com/pyinstaller/pyinstaller/issues/8322). Our own build hit
+# the exact same crash signature while importing 'systemmonitor.data'.
+#
+# None of our first-party systemmonitor.* modules call
+# os.add_dll_directory() or touch PATH (verified by grep), so this DLL
+# search-path probe is a no-op for them anyway. We therefore skip the whole
+# systemmonitor.* namespace from that probe, the same way PyInstaller
+# already skips the packages named above.
+if sys.platform == 'win32':
+    import PyInstaller.building.build_main as _pyi_build_main
+
+    _original_find_binary_dependencies = _pyi_build_main.find_binary_dependencies
+
+    def _find_binary_dependencies_skip_own_package(binaries, import_packages, symlink_suppression_patterns):
+        filtered = [
+            pkg for pkg in import_packages
+            if pkg != 'systemmonitor' and not pkg.startswith('systemmonitor.')
+        ]
+        return _original_find_binary_dependencies(binaries, filtered, symlink_suppression_patterns)
+
+    _pyi_build_main.find_binary_dependencies = _find_binary_dependencies_skip_own_package
+# --------------------------------------------------------------------------
+
 # Base directory
 base_dir = os.getcwd()
 src_dir = os.path.join(base_dir, 'src')
