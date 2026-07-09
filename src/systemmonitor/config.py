@@ -110,6 +110,7 @@ class SettingsManager:
         'accent_color': '#10b981',
         'sidebar_collapsed': False,
         'ui_scale': 1.0,
+        'home_screen_style': 'sidebar',     # 'sidebar' (classic) or 'launcher' (module grid start screen)
 
         # Performance
         'update_interval': 500,

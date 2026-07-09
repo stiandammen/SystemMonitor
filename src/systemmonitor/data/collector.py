@@ -7,6 +7,7 @@ import time
 import platform
 from PyQt6.QtCore import QThread, pyqtSignal, QTimer
 
+from systemmonitor.typing_ext import Optional
 from systemmonitor.utils.logger import get_logger, LogCategory, log_debug, log_info, log_warning, log_error, log_exception
 
 

@@ -234,7 +234,8 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         title.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
         header_layout.addWidget(title)
 
-        version = QLabel("v2.0.0")
+        from systemmonitor import __version__ as _app_version
+        version = QLabel(f"v{_app_version}")
         version.setFont(QFont("Segoe UI", S.font_pt(9.5), QFont.Weight.Bold))
         version.setStyleSheet(f"""
             color: {c.TEXT_SECONDARY};
@@ -733,6 +734,18 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
             theme_combo
         ))
 
+        home_keys  = ["sidebar", "launcher"]
+        home_names = [tr("Sidebar navigation (Default)"), tr("Module launcher")]
+        home_combo = self._combo(home_names, home_keys,
+                                 settings.get('home_screen_style', 'sidebar'))
+        home_combo.currentIndexChanged.connect(
+            lambda i: self._on_home_screen_style_changed(home_keys[i]))
+        card.add_widget(self._row(
+            tr("Home screen"),
+            tr("Choose between the classic sidebar or a centered grid of module tiles as your start screen"),
+            home_combo
+        ))
+
         scale_vals  = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50]
         scale_names = ["75%", "90%", tr("100% (Default)"), "110%", "125%", "150%"]
         scale_combo = self._combo(scale_names, scale_vals,
@@ -979,6 +992,10 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         self.signals_changed.emit('theme', theme)
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, lambda: theme_manager.set_theme(theme))
+
+    def _on_home_screen_style_changed(self, style: str):
+        settings.set('home_screen_style', style)
+        self.signals_changed.emit('home_screen_style', style)
 
     def _on_language_selected(self, language: str):
         self.signals_changed.emit('language', language)

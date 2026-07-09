@@ -17,6 +17,28 @@ TRANSLATIONS_NO = {
     "Settings": "Innstillinger",
     "Operational": "I drift",
 
+    # ── Module launcher (alternate home screen) ──────────────────────────
+    "Home": "Hjem",
+    "Select a module": "Velg en modul",
+    "Click a module to open detailed monitoring": "Klikk på en modul for å åpne detaljert overvåkning",
+    "Operating system": "Operativsystem",
+    "Version": "Versjon",
+    "All systems operational": "Alle systemer operative",
+    "Live system overview": "Live systemoversikt",
+    "CPU load and temperature": "CPU-belastning og temperatur",
+    "GPU load and VRAM": "GPU-belastning og VRAM",
+    "RAM usage and swap": "RAM-bruk og swap",
+    "Download and upload speed": "Ned- og opplastingshastighet",
+    "Disk space and I/O": "Diskplass og I/O",
+    "Theme, alerts and units": "Tema, varsler og enheter",
+
+    # ── Settings — home screen option ────────────────────────────────────
+    "Home screen": "Startskjerm",
+    "Choose between the classic sidebar or a centered grid of module tiles as your start screen":
+        "Velg mellom det klassiske sidepanelet eller et sentrert rutenett av modul-bokser som startskjerm",
+    "Sidebar navigation (Default)": "Sidepanel-navigasjon (standard)",
+    "Module launcher": "Modul-oversikt",
+
     # ── Alert message templates (formatted with {value}/{threshold}) ────
     "CPU usage is {value:.1f}% (threshold: {threshold:.1f}%)":
         "CPU-bruk er {value:.1f} % (terskel: {threshold:.1f} %)",

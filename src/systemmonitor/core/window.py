@@ -494,6 +494,7 @@ class MainWindow(QMainWindow, ScaleMixin):
             from systemmonitor.views.storage import StorageView
             from systemmonitor.views.logs import LogView
             from systemmonitor.views.settings import SettingsView
+            from systemmonitor.widgets.module_launcher import ModuleLauncherPage
 
             view_classes = {
                 "overview": OverviewPage,
@@ -504,6 +505,7 @@ class MainWindow(QMainWindow, ScaleMixin):
                 "storage": StorageView,
                 "logs": LogView,
                 "settings": SettingsView,
+                "home": ModuleLauncherPage,
             }
 
             if view_name in view_classes:
@@ -512,6 +514,8 @@ class MainWindow(QMainWindow, ScaleMixin):
                 self._content.addWidget(view)
                 if view_name == 'settings' and hasattr(view, 'signals_changed'):
                     view.signals_changed.connect(self._on_settings_changed)
+                if view_name == 'home' and hasattr(view, 'module_selected'):
+                    view.module_selected.connect(self._switch_view)
 
         return self._view_cache[view_name]
 
@@ -526,6 +530,9 @@ class MainWindow(QMainWindow, ScaleMixin):
             if self._active_view in hidden:
                 self._sidebar.set_active_view('overview')
                 self._switch_view('overview')
+        elif key == 'home_screen_style':
+            if hasattr(self, '_sidebar'):
+                self._sidebar.set_home_screen_enabled(value == 'launcher')
 
     def show_alert_toast(self, message: str, level: str = 'warning'):
         """Show an in-app banner for a triggered alert (the 'In-app Visuals'
@@ -668,9 +675,13 @@ class MainWindow(QMainWindow, ScaleMixin):
             """)
         content_layout.addWidget(self._content, stretch=1)
 
-        overview = self._get_view("overview")
-        self._content.setCurrentWidget(overview)
-        self._active_view = "overview"
+        initial_view = "home" if settings.get('home_screen_style', 'sidebar') == 'launcher' else "overview"
+        initial_widget = self._get_view(initial_view)
+        self._content.setCurrentWidget(initial_widget)
+        self._active_view = initial_view
+        if hasattr(self, '_sidebar'):
+            self._sidebar.set_active_view(initial_view)
+            self._sidebar.setVisible(initial_view != 'home')
 
         self._resize_corner = ResizeCorner(self)
         self._update_resize_corner_position()
@@ -692,6 +703,9 @@ class MainWindow(QMainWindow, ScaleMixin):
         view = self._get_view(view_name)
         self._content.setCurrentWidget(view)
         self._active_view = view_name
+        if hasattr(self, '_sidebar'):
+            self._sidebar.set_active_view(view_name)
+            self._sidebar.setVisible(view_name != 'home')
         log_info(LogCategory.UI, f"Switched to view: {view_name}")
 
     def update_data(self, data: dict):

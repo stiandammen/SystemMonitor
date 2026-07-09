@@ -12,9 +12,12 @@ from systemmonitor.styles.theme import theme_manager
 from systemmonitor.i18n import tr, language_manager
 from systemmonitor.scaler import S, ScaleMixin, LayoutMode
 from systemmonitor.utils.constants import get_resource_path
+from systemmonitor.config import settings
 
 LOGO_PATH = get_resource_path("assets/hacker.png")
 
+
+HOME_ITEM = {"key": "home", "label": "Home", "icon": "mdi.home-variant"}
 
 NAV_STRUCTURE = {
     "main": {
@@ -237,6 +240,27 @@ class GlassSidebar(QFrame, ScaleMixin):
         shadow.setOffset(2, 0)
         self.setGraphicsEffect(shadow)
 
+    def _home_screen_enabled(self) -> bool:
+        return settings.get('home_screen_style', 'sidebar') == 'launcher'
+
+    def set_home_screen_enabled(self, enabled: bool):
+        """Live add/remove of the 'Home' nav item when the user changes the
+        Home screen setting, without needing a full sidebar rebuild."""
+        has_home = HOME_ITEM["key"] in self._items
+        if enabled and not has_home:
+            home_item = GlassNavItem(
+                key=HOME_ITEM["key"], label=HOME_ITEM["label"], icon_name=HOME_ITEM["icon"]
+            )
+            home_item.clicked_with_name.connect(self._on_item_clicked)
+            home_item.set_collapsed(self._collapsed)
+            self._nav_container.layout().insertWidget(0, home_item)
+            self._items[HOME_ITEM["key"]] = home_item
+        elif not enabled and has_home:
+            item = self._items.pop(HOME_ITEM["key"])
+            self._nav_container.layout().removeWidget(item)
+            item.hide()
+            item.deleteLater()
+
     def on_scale_changed(self, factor: float):
         self._expanded_width = S.px(220)
         self._collapsed_width = S.px(58)
@@ -371,6 +395,14 @@ class GlassSidebar(QFrame, ScaleMixin):
         nav_layout.setContentsMargins(S.px(6), S.px(8), S.px(6), S.px(8))
         nav_layout.setSpacing(S.px(2))
         nav_container.setLayout(nav_layout)
+
+        if self._home_screen_enabled():
+            home_item = GlassNavItem(
+                key=HOME_ITEM["key"], label=HOME_ITEM["label"], icon_name=HOME_ITEM["icon"]
+            )
+            home_item.clicked_with_name.connect(self._on_item_clicked)
+            nav_layout.addWidget(home_item)
+            self._items[HOME_ITEM["key"]] = home_item
 
         for section_key, section_data in NAV_STRUCTURE.items():
             title = section_data.get("title")

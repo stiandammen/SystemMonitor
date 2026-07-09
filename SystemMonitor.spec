@@ -43,42 +43,11 @@ if os.path.exists(assets_src):
     datas += [(assets_src, 'systemmonitor/assets')]
 
 a = Analysis(
-<<<<<<< HEAD
     ['__main__.py'],
     pathex=[base_dir, src_dir, python_lib, site_packages],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-=======
-    ['src/systemmonitor/__main__.py'],
-    pathex=['src'],
-    binaries=[],
-    datas=[
-        ('src/systemmonitor/assets', 'assets'),
-    ],
-    hiddenimports=[
-        'psutil',
-        'pynvml',
-        'GPUtil',
-        'wmi',
-        'win32com',
-        'win32api',
-        'win32gui',
-        'win32process',
-        'win32print',
-        'win32service',
-        'win32evtlog',
-        'win32file',
-        'win32net',
-        'win32netcon',
-        'win32pipe',
-        'win32profile',
-        'win32security',
-        'win32service',
-        'win32timezone',
-        'win32wnet',
-    ],
->>>>>>> 7cfc828b8dce6ed565ab4e18d9d314d16b4b0da0
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -106,7 +75,6 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
-    icon='src/systemmonitor/assets/icon.ico',
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

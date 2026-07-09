@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QPalette
 
 APP_NAME = "System Monitor"
-VERSION = "2.0.0"
+VERSION = "2.2.0"
 PUBLISHER = "System Monitor Team"
 REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\SystemMonitor"
 

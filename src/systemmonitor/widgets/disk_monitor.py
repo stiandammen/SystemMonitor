@@ -10,12 +10,13 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QProgressBar, QGridLayout
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QRectF
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QLinearGradient
 import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.utils.helpers import format_temperature
+from systemmonitor.scaler import S
 
 
 class SpeedGauge(QWidget):
