@@ -52,11 +52,26 @@
       </Directory>
     </Directory>
 
+    <!--
+      Per-user (HKCU-scoped) components require a registry KeyPath rather
+      than a file KeyPath (ICE38), and every directory under the user
+      profile that this MSI creates must have a matching RemoveFolder entry
+      so uninstall cleans it up (ICE64). RemoveFolder only deletes a
+      directory if it ends up empty, so removing "Programs" here is safe
+      even if other per-user apps also use %LocalAppData%\Programs.
+    -->
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="MainExecutable" Guid="13CCD789-918A-4511-A6D4-CE033AFCC1DF">
         <File Id="SystemMonitorEXE"
-              Source="dist\SystemMonitor.exe"
-              KeyPath="yes" />
+              Source="dist\SystemMonitor.exe" />
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+        <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                        Key="Software\SystemMonitor"
+                        Name="InstallPath"
+                        Type="string"
+                        Value="[INSTALLFOLDER]SystemMonitor.exe"
+                        KeyPath="yes" />
       </Component>
     </DirectoryRef>
 
