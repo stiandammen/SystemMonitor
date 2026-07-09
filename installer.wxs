@@ -2,9 +2,11 @@
 <!--
   System Monitor - WiX v3 installer definition.
 
-  Installs per-user (no admin rights required) into
-  %LocalAppData%\Programs\System Monitor, matching the same install
-  location already used by src/systemmonitor/utils/setup_installer.py.
+  Installs per-user (no admin rights required). Default location is
+  %LocalAppData%\Programs\System Monitor, matching the location already
+  used by src/systemmonitor/utils/setup_installer.py - but the wizard
+  below (WixUI_Mondo) lets the user change the install folder, and lets
+  them opt in/out of the Start Menu and Desktop shortcuts individually.
 
   IMPORTANT: UpgradeCode below must NEVER change across future versions.
   It is what lets Windows Installer recognize a new .msi as an upgrade
@@ -18,6 +20,11 @@
   src/systemmonitor/__init__.py's __version__ - this is the single source
   of truth for the app version, so this file never needs manual updates
   and can never drift out of sync with the app again.
+
+  Uninstall requires no extra setup here: any properly built MSI with a
+  stable UpgradeCode/ProductCode and correctly declared components (as
+  below) automatically appears in Windows Settings > Apps, where it can
+  be uninstalled through the normal Windows Installer uninstall flow.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
@@ -41,6 +48,9 @@
     <Property Id="ARPHELPLINK" Value="https://github.com/stiandammen/SystemMonitor" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/stiandammen/SystemMonitor" />
 
+    <!-- Lets the WixUI_Mondo wizard's directory-chooser page edit INSTALLFOLDER -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="LocalAppDataFolder">
         <Directory Id="ProgramsFolder" Name="Programs">
@@ -50,13 +60,15 @@
       <Directory Id="ProgramMenuFolder">
         <Directory Id="ApplicationProgramsFolder" Name="System Monitor" />
       </Directory>
+      <!-- Standard WiX-recognized folder id, resolves to the current user's Desktop -->
+      <Directory Id="DesktopFolder" />
     </Directory>
 
     <!--
       Per-user (HKCU-scoped) components require a registry KeyPath rather
-      than a file KeyPath (ICE38), and every directory under the user
-      profile that this MSI creates must have a matching RemoveFolder entry
-      so uninstall cleans it up (ICE64). RemoveFolder only deletes a
+      than a file KeyPath (ICE38), and every custom directory under the
+      user profile that this MSI creates must have a matching RemoveFolder
+      entry so uninstall cleans it up (ICE64). RemoveFolder only deletes a
       directory if it ends up empty, so removing "Programs" here is safe
       even if other per-user apps also use %LocalAppData%\Programs.
     -->
@@ -93,10 +105,43 @@
       </Component>
     </DirectoryRef>
 
-    <Feature Id="ProductFeature" Title="System Monitor" Level="1">
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="4F10BD16-ABC2-4A81-A3C1-51B83DBD19EC">
+        <Shortcut Id="ApplicationDesktopShortcut"
+                  Name="System Monitor"
+                  Description="Real-time system performance monitoring"
+                  Target="[INSTALLFOLDER]SystemMonitor.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="icon.ico" />
+        <RegistryValue Root="HKCU"
+                        Key="Software\SystemMonitor"
+                        Name="DesktopShortcutInstalled"
+                        Type="integer"
+                        Value="1"
+                        KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!--
+      Top-level feature (the app itself) is always installed - Absent="disallow"
+      prevents it from being unchecked in the feature tree. The two shortcut
+      features are independent and optional, so the user can turn either or
+      both off during install.
+    -->
+    <Feature Id="ProductFeature" Title="System Monitor" Level="1" Absent="disallow" AllowAdvertise="no">
       <ComponentRef Id="MainExecutable" />
-      <ComponentRef Id="ApplicationShortcut" />
+      <Feature Id="StartMenuShortcutFeature" Title="Start Menu Shortcut" Description="Adds a shortcut to the Start Menu." Level="1">
+        <ComponentRef Id="ApplicationShortcut" />
+      </Feature>
+      <Feature Id="DesktopShortcutFeature" Title="Desktop Shortcut" Description="Adds a shortcut to the Desktop." Level="1">
+        <ComponentRef Id="DesktopShortcut" />
+      </Feature>
     </Feature>
+
+    <!-- Full wizard: welcome/license -> feature selection (shortcuts on/off) -> install directory -> install -> finish -->
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    <UIRef Id="WixUI_Mondo" />
+    <UIRef Id="WixUI_ErrorProgressText" />
 
   </Product>
 </Wix>
