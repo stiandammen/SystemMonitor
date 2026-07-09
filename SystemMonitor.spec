@@ -6,8 +6,6 @@ from PyInstaller.utils.hooks import collect_all
 # Base directory
 base_dir = os.getcwd()
 src_dir = os.path.join(base_dir, 'src')
-python_lib = r'C:\Users\RSman\AppData\Local\Python\pythoncore-3.14-64\Lib'
-site_packages = r'C:\Users\RSman\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages'
 
 # Collect everything from systemmonitor
 datas, binaries, hiddenimports = collect_all('systemmonitor')
@@ -44,7 +42,7 @@ if os.path.exists(assets_src):
 
 a = Analysis(
     ['__main__.py'],
-    pathex=[base_dir, src_dir, python_lib, site_packages],
+    pathex=[base_dir, src_dir],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
