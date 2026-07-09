@@ -12,12 +12,18 @@
   Product Id is intentionally "*" (auto-generated per build) — that is
   standard WiX practice when relying on UpgradeCode + MajorUpgrade for
   upgrade detection.
+
+  Version is passed in at build time via "candle -dProductVersion=X.Y.Z"
+  (see .github/workflows/release.yml), read directly from
+  src/systemmonitor/__init__.py's __version__ - this is the single source
+  of truth for the app version, so this file never needs manual updates
+  and can never drift out of sync with the app again.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
            Name="System Monitor"
            Language="1033"
-           Version="2.2.0"
+           Version="$(var.ProductVersion)"
            Manufacturer="System Monitor Team"
            UpgradeCode="412EAF73-0FE0-48F3-B305-4570AAAA7304">
 

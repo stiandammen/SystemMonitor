@@ -39,12 +39,35 @@ jobs:
 
       - name: Add WiX Toolset to PATH
         run: |
-          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
+          # Discover the actual installed WiX version dynamically instead of
+          # hardcoding a version number - the chocolatey wixtoolset package
+          # has moved past v3.11 (currently ships v3.14.x), and a hardcoded
+          # "v3.11" path silently breaks every time the package is upgraded.
+          $wixBin = Get-ChildItem -Path "C:\Program Files (x86)\WiX Toolset v*\bin" -Directory -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $wixBin) {
+            Write-Error "Could not find a WiX Toolset 'bin' directory under 'C:\Program Files (x86)'. Is the 'Install WiX Toolset' step still working?"
+            exit 1
+          }
+          Write-Host "Found WiX Toolset at: $wixBin"
+          echo $wixBin >> $env:GITHUB_PATH
+        shell: pwsh
+
+      - name: Read app version
+        id: appversion
+        run: |
+          $ver = (Select-String -Path "src/systemmonitor/__init__.py" -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if (-not $ver) {
+            Write-Error "Could not read __version__ from src/systemmonitor/__init__.py"
+            exit 1
+          }
+          Write-Host "App version: $ver"
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Build MSI Installer with WiX Toolset
         run: |
-          candle installer.wxs
+          candle -dProductVersion=${{ steps.appversion.outputs.version }} installer.wxs
           light installer.wixobj -ext WixUIExtension -out dist/SystemMonitor.msi
         shell: cmd
 

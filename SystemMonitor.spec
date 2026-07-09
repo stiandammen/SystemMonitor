@@ -121,5 +121,9 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     uac_admin=True,
-    icon=os.path.join(src_dir, 'systemmonitor', 'assets', 'hacker.png') if os.path.exists(os.path.join(src_dir, 'systemmonitor', 'assets', 'hacker.png')) else None,
+    # Windows EXE icons must be .ico (or .exe) - a .png here fails the build
+    # unless Pillow is installed for auto-conversion (it isn't, in CI). Use the
+    # same icon.ico that installer.wxs already uses for the MSI/ARP icon, so
+    # the .exe and the installer show a consistent icon.
+    icon=os.path.join(src_dir, 'systemmonitor', 'assets', 'icon.ico') if os.path.exists(os.path.join(src_dir, 'systemmonitor', 'assets', 'icon.ico')) else None,
 )
