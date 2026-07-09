@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  System Monitor - WiX v3 installer definition.
+
+  Installs per-user (no admin rights required) into
+  %LocalAppData%\Programs\System Monitor, matching the same install
+  location already used by src/systemmonitor/utils/setup_installer.py.
+
+  IMPORTANT: UpgradeCode below must NEVER change across future versions.
+  It is what lets Windows Installer recognize a new .msi as an upgrade
+  of this same product instead of a separate, side-by-side install.
+  Product Id is intentionally "*" (auto-generated per build) — that is
+  standard WiX practice when relying on UpgradeCode + MajorUpgrade for
+  upgrade detection.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="System Monitor"
+           Language="1033"
+           Version="2.2.0"
+           Manufacturer="System Monitor Team"
+           UpgradeCode="412EAF73-0FE0-48F3-B305-4570AAAA7304">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perUser"
+             Description="System Monitor Installer"
+             Manufacturer="System Monitor Team" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="icon.ico" SourceFile="src\systemmonitor\assets\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/stiandammen/SystemMonitor" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/stiandammen/SystemMonitor" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLFOLDER" Name="System Monitor" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="System Monitor" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="13CCD789-918A-4511-A6D4-CE033AFCC1DF">
+        <File Id="SystemMonitorEXE"
+              Source="dist\SystemMonitor.exe"
+              KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="9F030125-56EA-4A56-848A-8B344A33C9D4">
+        <Shortcut Id="ApplicationStartMenuShortcut"
+                  Name="System Monitor"
+                  Description="Real-time system performance monitoring"
+                  Target="[INSTALLFOLDER]SystemMonitor.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="icon.ico" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                        Key="Software\SystemMonitor"
+                        Name="Installed"
+                        Type="integer"
+                        Value="1"
+                        KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="ProductFeature" Title="System Monitor" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+
+  </Product>
+</Wix>
