@@ -67,8 +67,8 @@ jobs:
 
       - name: Build MSI Installer with WiX Toolset
         run: |
-          candle -ext WixUIExtension -dProductVersion=${{ steps.appversion.outputs.version }} installer.wxs
-          light installer.wixobj -ext WixUIExtension -cultures:en-us -out dist/SystemMonitor.msi
+          candle -ext WixUIExtension -ext WixUtilExtension -dProductVersion=${{ steps.appversion.outputs.version }} installer.wxs
+          light installer.wixobj -ext WixUIExtension -ext WixUtilExtension -cultures:en-us -out dist/SystemMonitor.msi
         shell: cmd
 
       - name: Create GitHub Release and Upload MSI
