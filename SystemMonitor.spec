@@ -120,7 +120,16 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    uac_admin=True,
+    # No admin/elevation required: nothing in the app actually needs it
+    # (WMI, psutil, NVML, PowerShell CIM, HWiNFO shared memory all work
+    # as a normal user, with existing fallback chains for anything that
+    # can't be read). uac_admin=True was previously set "for hardware
+    # sensors" but nothing in the codebase actually required it, and it
+    # directly contradicted the per-user, no-admin MSI install (see
+    # installer.wxs InstallScope="perUser") - a UAC prompt required on
+    # every launch, silently blocked by policy on some machines, is the
+    # leading explanation for the app appearing to not start at all.
+    uac_admin=False,
     # Windows EXE icons must be .ico (or .exe) - a .png here fails the build
     # unless Pillow is installed for auto-conversion (it isn't, in CI). Use the
     # same icon.ico that installer.wxs already uses for the MSI/ARP icon, so

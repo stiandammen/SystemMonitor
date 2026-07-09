@@ -22,8 +22,9 @@ args = [
     f'--paths={src_dir}',
     # Add assets folder. Format: "source;destination"
     f'--add-data={assets_dir}{os.pathsep}systemmonitor/assets',
-    # Request administrator privileges for hardware sensors
-    '--uac-admin',
+    # No admin/elevation required - see SystemMonitor.spec for the full
+    # explanation. Nothing in the app's hardware/sensor code actually
+    # needs it, and it contradicts the per-user, no-admin MSI install.
     # Set the icon
     f'--icon={icon_path}',
     # ULTRA-EXPLICIT imports to bypass any remaining shadowing issues
