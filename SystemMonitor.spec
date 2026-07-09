@@ -1,14 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import os
-from PyInstaller.utils.hooks import collect_all
 
 # Base directory
 base_dir = os.getcwd()
 src_dir = os.path.join(base_dir, 'src')
 
-# Collect everything from systemmonitor
-datas, binaries, hiddenimports = collect_all('systemmonitor')
+# NOTE: we deliberately do NOT use collect_all('systemmonitor') here.
+# collect_all() is meant for THIRD-PARTY packages that need their data
+# files/hidden imports discovered automatically - using it on our own
+# first-party source package forces PyInstaller to isolated-import-walk
+# every single submodule individually (including unused/dead ones), which
+# is unnecessary (PyInstaller's normal static analysis of __main__.py
+# already finds everything we actually import) and was the likely cause
+# of a STATUS_STACK_OVERFLOW crash in PyInstaller's isolated subprocess
+# during the GitHub Actions build. It would also have bundled the local
+# src/systemmonitor/logs/*.log files, which should never ship at all.
+datas = []
+binaries = []
+hiddenimports = []
 
 # Explicitly add standard library modules that are failing or commonly needed
 hiddenimports += [
