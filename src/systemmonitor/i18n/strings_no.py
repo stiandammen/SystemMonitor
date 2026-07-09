@@ -120,6 +120,20 @@ TRANSLATIONS_NO = {
     "Update Check": "Oppdateringssjekk",
     "You are running the latest version.\n\nVersion: {0}\nNo updates available.":
         "Du kjører den nyeste versjonen.\n\nVersjon: {0}\nIngen oppdateringer tilgjengelig.",
+    "Checking...": "Sjekker...",
+    "Update Available": "Oppdatering tilgjengelig",
+    "A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download the MSI installer now? You will need to run it yourself to complete the update.":
+        "En ny versjon ({0}) av System Monitor er tilgjengelig.\n\nEndringslogg:\n{1}\n\nVil du laste ned MSI-installasjonsfilen nå? Du må kjøre den selv for å fullføre oppdateringen.",
+    "Update Error": "Oppdateringsfeil",
+    "Failed to check for updates:\n{0}": "Kunne ikke sjekke etter oppdateringer:\n{0}",
+    "Downloading": "Laster ned",
+    "Downloading update...": "Laster ned oppdatering...",
+    "Cancel": "Avbryt",
+    "Download Complete": "Nedlasting fullført",
+    "The installer has been downloaded. System Monitor will now close and open the installer - follow the on-screen steps to complete the update.":
+        "Installasjonsfilen er lastet ned. System Monitor lukkes nå og åpner installasjonsprogrammet - følg trinnene på skjermen for å fullføre oppdateringen.",
+    "Download Failed": "Nedlasting mislyktes",
+    "Failed to download the update:\n{0}": "Kunne ikke laste ned oppdateringen:\n{0}",
 
     # ── Settings — Tab visibility ────────────────────────────────────────
     "Tab Visibility": "Fanesynlighet",

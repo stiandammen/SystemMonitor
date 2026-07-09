@@ -1034,7 +1034,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         if available:
             reply = QMessageBox.question(
                 self, tr("Update Available"),
-                tr("A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download and install it now?").format(info["version"], info["release_notes"]),
+                tr("A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download the MSI installer now? You will need to run it yourself to complete the update.").format(info["version"], info["release_notes"]),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
@@ -1080,6 +1080,11 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
             
         if success:
             from systemmonitor.utils.updater import run_msi_installer
+            QMessageBox.information(
+                self, tr("Download Complete"),
+                tr("The installer has been downloaded. System Monitor will now close and open the installer - follow the on-screen steps to complete the update."),
+                QMessageBox.StandardButton.Ok
+            )
             run_msi_installer(file_path)
         else:
             if error_msg != "Download cancelled":

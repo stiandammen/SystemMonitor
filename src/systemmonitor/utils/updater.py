@@ -7,7 +7,6 @@ import sys
 import json
 import urllib.request
 import urllib.error
-import subprocess
 import tempfile
 from PyQt6.QtCore import QThread, pyqtSignal
 from systemmonitor import __version__
@@ -68,24 +67,17 @@ class UpdateCheckerThread(QThread):
                     
                     update_available = is_newer_version(__version__, remote_version)
                     
-                    # Find EXE (preferred Setup.exe) or MSI asset in release assets
+                    # Find the MSI installer asset in the release - this is the only
+                    # installer artifact the release pipeline produces, and the user
+                    # always installs it manually themselves (never a silent auto-install)
                     update_url = ""
                     update_name = ""
                     for asset in data.get("assets", []):
                         name = asset.get("name", "")
-                        if name.endswith(".exe"):
+                        if name.endswith(".msi"):
                             update_url = asset.get("browser_download_url", "")
                             update_name = name
                             break
-                    
-                    if not update_url:
-                        # Fallback to MSI if no EXE was found
-                        for asset in data.get("assets", []):
-                            name = asset.get("name", "")
-                            if name.endswith(".msi"):
-                                update_url = asset.get("browser_download_url", "")
-                                update_name = name
-                                break
                     
                     update_info = {
                         "version": remote_version,
@@ -172,26 +164,21 @@ class UpdateDownloaderThread(QThread):
 
 
 def run_msi_installer(file_path: str):
-    """Launches the downloaded installer (.exe or .msi) and closes the application"""
-    log_info(LogCategory.APP, f"Launching installer: {file_path}")
+    """Opens the downloaded MSI installer so the user can install it themselves.
+
+    Uses the OS's default handler for the .msi file (the same as double-clicking
+    it in Explorer), which shows the normal Windows Installer wizard. The update
+    is never installed silently/automatically in the background - the user always
+    has to click through and confirm the installation manually.
+    """
+    log_info(LogCategory.APP, f"Opening installer for manual install: {file_path}")
     try:
-        if file_path.lower().endswith(".msi"):
-            cmd = f'msiexec.exe /i "{file_path}" /qb /norestart'
-        else:
-            # For Setup.exe, run it directly in detached mode
-            cmd = f'"{file_path}"'
-        
-        # Start as a completely detached background process
-        subprocess.Popen(
-            cmd,
-            shell=True,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-        )
-        
-        # Exit SystemMonitor immediately so the installer can replace the files
-        log_info(LogCategory.APP, "Exiting SystemMonitor for update installation...")
+        os.startfile(file_path)
+
+        # Exit SystemMonitor so the installer can replace the running files
+        log_info(LogCategory.APP, "Exiting SystemMonitor so the update can be installed...")
         from PyQt6.QtWidgets import QApplication
         QApplication.quit()
         sys.exit(0)
     except Exception as e:
-        log_error(LogCategory.APP, f"Failed to execute installer: {e}")
+        log_error(LogCategory.APP, f"Failed to open installer: {e}")

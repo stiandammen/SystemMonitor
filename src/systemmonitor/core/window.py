@@ -462,7 +462,7 @@ class MainWindow(QMainWindow, ScaleMixin):
             from PyQt6.QtWidgets import QMessageBox
             reply = QMessageBox.question(
                 self, tr("Update Available"),
-                tr("A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download and install it now?").format(info["version"], info["release_notes"]),
+                tr("A new version ({0}) of System Monitor is available.\n\nRelease notes:\n{1}\n\nDo you want to download the MSI installer now? You will need to run it yourself to complete the update.").format(info["version"], info["release_notes"]),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
