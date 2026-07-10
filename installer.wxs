@@ -5,8 +5,18 @@
   Installs per-user (no admin rights required). Default location is
   %LocalAppData%\Programs\System Monitor, matching the location already
   used by src/systemmonitor/utils/setup_installer.py - but the wizard
-  below (WixUI_Mondo) lets the user change the install folder, and lets
-  them opt in/out of the Start Menu and Desktop shortcuts individually.
+  below (WixUI_InstallDir) lets the user change the install folder.
+
+  NOTE: this used to use WixUI_Mondo (directory chooser + optional feature
+  tree for toggling each shortcut). After repeated reports that neither the
+  directory chooser nor the shortcut toggles were appearing for the
+  installed MSI, this was simplified to WixUI_InstallDir - a much simpler,
+  far more commonly used dialog set that does ONLY one job (let the user
+  pick the install directory) with none of Mondo's extra feature-tree /
+  maintenance-mode branching, to remove variables and make the directory
+  choice - the most repeatedly requested piece - as likely as possible to
+  actually work. Both shortcuts (Start Menu + Desktop) are always created;
+  they are no longer individually toggleable during install.
 
   IMPORTANT: UpgradeCode below must NEVER change across future versions.
   It is what lets Windows Installer recognize a new .msi as an upgrade
@@ -48,7 +58,7 @@
     <Property Id="ARPHELPLINK" Value="https://github.com/stiandammen/SystemMonitor" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/stiandammen/SystemMonitor" />
 
-    <!-- Lets the WixUI_Mondo wizard's directory-chooser page edit INSTALLFOLDER -->
+    <!-- Lets the WixUI_InstallDir wizard's directory-chooser page edit INSTALLFOLDER -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
@@ -122,26 +132,19 @@
       </Component>
     </DirectoryRef>
 
-    <!--
-      Top-level feature (the app itself) is always installed - Absent="disallow"
-      prevents it from being unchecked in the feature tree. The two shortcut
-      features are independent and optional, so the user can turn either or
-      both off during install.
-    -->
+    <!-- Everything installs together as one feature - no optional feature tree with WixUI_InstallDir -->
     <Feature Id="ProductFeature" Title="System Monitor" Level="1" Absent="disallow" AllowAdvertise="no">
       <ComponentRef Id="MainExecutable" />
-      <Feature Id="StartMenuShortcutFeature" Title="Start Menu Shortcut" Description="Adds a shortcut to the Start Menu." Level="1">
-        <ComponentRef Id="ApplicationShortcut" />
-      </Feature>
-      <Feature Id="DesktopShortcutFeature" Title="Desktop Shortcut" Description="Adds a shortcut to the Desktop." Level="1">
-        <ComponentRef Id="DesktopShortcut" />
-      </Feature>
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
     <!--
       "Launch System Monitor" checkbox on the finish page - WixShellExec
       comes from WixUtilExtension (see -ext WixUtilExtension in
       release.yml). Only fires on a fresh install/upgrade, not on repair.
+      This mechanism is shared across all WixUI_* dialog sets, not specific
+      to Mondo, so it stays as-is with the simplified WixUI_InstallDir.
     -->
     <Property Id="WixShellExecTarget" Value="[#SystemMonitorEXE]" />
     <CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
@@ -151,9 +154,9 @@
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
     </UI>
 
-    <!-- Full wizard: welcome/license -> feature selection (shortcuts on/off) -> install directory -> install -> finish -->
+    <!-- Wizard: welcome/license -> choose install directory -> install -> finish -->
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
-    <UIRef Id="WixUI_Mondo" />
+    <UIRef Id="WixUI_InstallDir" />
     <UIRef Id="WixUI_ErrorProgressText" />
 
   </Product>
