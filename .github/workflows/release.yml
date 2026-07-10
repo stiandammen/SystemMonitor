@@ -37,6 +37,18 @@ jobs:
         run: |
           pyinstaller SystemMonitorSetup.spec
 
+      - name: Zip raw portable build (diagnostic - no installer involved)
+        run: |
+          # Lets a technician download and run SystemMonitor.exe directly,
+          # with no MSI/installer step at all, by just extracting this zip
+          # and double-clicking the exe inside. This isolates whether a
+          # "won't start" report is caused by something in the MSI
+          # install process itself (permissions, install path, Config.Msi,
+          # etc.) or by the exe/build itself - if it doesn't run from here
+          # either, the problem is not installer-related at all.
+          Compress-Archive -Path "dist\SystemMonitor\*" -DestinationPath "dist\SystemMonitor-portable.zip" -Force
+        shell: pwsh
+
       - name: Install WiX Toolset
         run: choco install wixtoolset -y --no-progress
         shell: pwsh
@@ -144,6 +156,7 @@ jobs:
           files: |
             dist/SystemMonitor.msi
             dist/SystemMonitorSetup.exe
+            dist/SystemMonitor-portable.zip
           draft: false
           prerelease: false
         env:
