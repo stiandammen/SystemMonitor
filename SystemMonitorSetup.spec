@@ -27,18 +27,28 @@ if sys.platform == 'win32':
 base_dir = os.getcwd()
 src_dir = os.path.join(base_dir, 'src')
 
-# This installer embeds a copy of the already-built SystemMonitor.exe and
+# This installer embeds a copy of the already-built SystemMonitor app and
 # copies it out to the user's chosen install folder at runtime (see
-# InstallWorker in setup_installer.py, which looks for "SystemMonitor.exe"
-# and "icon.png" next to itself via sys._MEIPASS). This spec therefore MUST
-# be built AFTER "pyinstaller SystemMonitor.spec" has produced dist/SystemMonitor.exe
-# (see .github/workflows/release.yml step ordering).
-main_exe_path = os.path.join(base_dir, 'dist', 'SystemMonitor.exe')
+# InstallWorker in setup_installer.py, which looks for a "SystemMonitor"
+# folder and "icon.png" next to itself via sys._MEIPASS). This spec
+# therefore MUST be built AFTER "pyinstaller SystemMonitor.spec" has
+# produced dist/SystemMonitor/ (see .github/workflows/release.yml step
+# ordering).
+#
+# SystemMonitor.spec builds in "onedir" mode (a folder: SystemMonitor.exe
+# plus its _internal\ support files), not "onefile" mode - see that spec
+# for why (onefile's self-extraction pattern was triggering AppLocker/AV
+# blocks that made the installed app silently refuse to start). So there
+# is no longer a single standalone SystemMonitor.exe to embed here - the
+# whole dist/SystemMonitor/ folder is embedded (as a "SystemMonitor"
+# subfolder inside this installer's own bundle) so InstallWorker can copy
+# it out completely, with all its supporting files, at install time.
+main_exe_dir = os.path.join(base_dir, 'dist', 'SystemMonitor')
 icon_png_path = os.path.join(src_dir, 'systemmonitor', 'assets', 'icon.png')
 
 datas = []
-if os.path.exists(main_exe_path):
-    datas.append((main_exe_path, '.'))
+if os.path.isdir(main_exe_dir):
+    datas.append((main_exe_dir, 'SystemMonitor'))
 if os.path.exists(icon_png_path):
     datas.append((icon_png_path, '.'))
 

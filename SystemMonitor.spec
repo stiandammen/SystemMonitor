@@ -100,13 +100,34 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
+# --------------------------------------------------------------------------
+# --onedir instead of --onefile.
+#
+# Root cause (confirmed via research + elimination): a --onefile Windows
+# EXE self-extracts to a fresh %TEMP%\_MEIxxxxxx folder and re-launches
+# itself on every start. That extraction-then-relaunch pattern is exactly
+# what malware "packers" do, so it is one of the most common triggers for
+# antivirus/EDR heuristics AND for AppLocker / Windows Defender Application
+# Control (WDAC) default rule sets, which deny execution of unrecognized/
+# unsigned binaries from user-writable locations like %LocalAppData% - and
+# they do so completely silently (no error, no window, nothing - process
+# creation itself is refused by the OS before any Python code, including
+# our own ctypes MessageBoxW fallback, ever gets to run). This matches the
+# exact symptom reported after ruling out a Python-level crash (the
+# fallback error dialog added in __main__.py did NOT appear either).
+#
+# --onedir ships a plain folder (SystemMonitor.exe next to its DLLs/data)
+# with no runtime self-extraction step, which is both less suspicious to
+# AV heuristics and the officially recommended PyInstaller mode for
+# exactly this kind of "won't start on a locked-down Windows machine"
+# problem. installer.wxs and the CI workflow now harvest this whole
+# folder with WiX's heat.exe instead of shipping a single onefile exe.
+# --------------------------------------------------------------------------
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='SystemMonitor',
     debug=False,
     bootloader_ignore_signals=False,
@@ -144,4 +165,19 @@ exe = EXE(
     # same icon.ico that installer.wxs already uses for the MSI/ARP icon, so
     # the .exe and the installer show a consistent icon.
     icon=os.path.join(src_dir, 'systemmonitor', 'assets', 'icon.ico') if os.path.exists(os.path.join(src_dir, 'systemmonitor', 'assets', 'icon.ico')) else None,
+)
+
+# Collects the exe + all its binaries/data into dist/SystemMonitor/ (a
+# folder), rather than bundling everything into the single exe. This is
+# what makes it --onedir. The folder name matches the exe name so the
+# final layout is dist/SystemMonitor/SystemMonitor.exe plus its DLLs.
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='SystemMonitor',
 )

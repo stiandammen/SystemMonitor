@@ -80,19 +80,33 @@ class InstallWorker(QThread):
             self.progress.emit(10, "Creating directory...")
             os.makedirs(self.install_dir, exist_ok=True)
             
-            # Locate embedded resources unpacked by PyInstaller
+            # Locate embedded resources unpacked by PyInstaller.
+            # SystemMonitor ships as a "onedir" build (a folder containing
+            # SystemMonitor.exe plus its _internal\ support files), not a
+            # single onefile exe - see SystemMonitor.spec for why (onefile's
+            # self-extraction pattern was triggering AppLocker/AV blocks
+            # that made the installed app silently refuse to start). This
+            # installer embeds that whole folder (see SystemMonitorSetup.spec)
+            # and copies all of it out here, not just one file.
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-            source_exe = os.path.join(base_path, "SystemMonitor.exe")
-            
+            source_dir = os.path.join(base_path, "SystemMonitor")
+            source_exe = os.path.join(source_dir, "SystemMonitor.exe")
+
             if not os.path.exists(source_exe):
                 self.finished.emit(False, f"Source executable not found in installer assets:\n{source_exe}")
                 return
-                
+
             dest_exe = os.path.join(self.install_dir, "SystemMonitor.exe")
-            
-            # 2. Copy the main executable
-            self.progress.emit(30, "Copying application file...")
-            shutil.copy2(source_exe, dest_exe)
+
+            # 2. Copy the whole application folder (exe + its supporting files)
+            self.progress.emit(30, "Copying application files...")
+            for item in os.listdir(source_dir):
+                src_item = os.path.join(source_dir, item)
+                dest_item = os.path.join(self.install_dir, item)
+                if os.path.isdir(src_item):
+                    shutil.copytree(src_item, dest_item, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(src_item, dest_item)
             
             # 3. Create uninstaller (copy of this installer executable itself)
             self.progress.emit(50, "Creating uninstaller...")

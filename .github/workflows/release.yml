@@ -69,10 +69,73 @@ jobs:
           echo "version=$ver" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
+      - name: Harvest onedir output with heat.exe
+        run: |
+          # SystemMonitor.spec now builds --onedir (a folder: SystemMonitor.exe
+          # plus its _internal\ support files) instead of --onefile, because
+          # --onefile's runtime self-extraction pattern was silently triggering
+          # AppLocker / Windows Defender Application Control blocks on managed
+          # Windows machines (process creation refused with zero error/output -
+          # see SystemMonitor.spec for the full write-up).
+          #
+          # WiX can't just point a single <File> at a folder, so heat.exe
+          # (part of WiX Toolset, same bin dir as candle/light) auto-generates
+          # a WXS fragment listing every file in dist\SystemMonitor as its own
+          # Component, rooted under our existing INSTALLFOLDER directory.
+          #
+          # -srd  : don't wrap the harvested files in an extra "SystemMonitor"
+          #         subfolder - they land directly in INSTALLFOLDER.
+          # -dr   : root the harvest under our INSTALLFOLDER Id from installer.wxs.
+          # -var  : use $(var.HarvestSourceDir) instead of a baked-in absolute
+          #         path, so candle can supply it with -d at compile time.
+          # -sfrag/-sreg/-scom : keep the output to one plain fragment; we don't
+          #         need heat's COM/registry harvesting for plain data/DLL files.
+          heat dir "dist\SystemMonitor" -cg HarvestedFiles -dr INSTALLFOLDER -gg -sfrag -srd -sreg -scom -var var.HarvestSourceDir -out HarvestedFiles.wxs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "heat.exe failed to harvest dist\SystemMonitor"
+            exit 1
+          }
+
+          # SystemMonitor.exe itself is authored BY HAND in installer.wxs
+          # (Component Id="MainExecutable", File Id="SystemMonitorEXE") so
+          # that the Start Menu/Desktop shortcuts and the "Launch System
+          # Monitor" finish-page action have a stable File Id to target.
+          # Remove heat's auto-harvested copy of that same file so the MSI
+          # doesn't try to install it twice under two different components
+          # (which WiX would reject as a duplicate target path).
+          [xml]$xml = Get-Content HarvestedFiles.wxs
+          $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+          $ns.AddNamespace("wix", "http://schemas.microsoft.com/wix/2006/wi")
+          $fileNode = $xml.SelectSingleNode("//wix:File[contains(@Source,'SystemMonitor.exe')]", $ns)
+          if ($fileNode) {
+            $componentNode = $fileNode.ParentNode
+            $componentId = $componentNode.GetAttribute("Id")
+            $componentNode.ParentNode.RemoveChild($componentNode) | Out-Null
+            $compRef = $xml.SelectSingleNode("//wix:ComponentRef[@Id='$componentId']", $ns)
+            if ($compRef) {
+              $compRef.ParentNode.RemoveChild($compRef) | Out-Null
+            }
+            $xml.Save("HarvestedFiles.wxs")
+            Write-Host "Removed harvested duplicate of SystemMonitor.exe (component $componentId) - it is hand-authored in installer.wxs instead."
+          } else {
+            Write-Error "Could not find SystemMonitor.exe in heat.exe's harvested output - dist\SystemMonitor may be empty or the build failed silently."
+            exit 1
+          }
+        shell: pwsh
+
       - name: Build MSI Installer with WiX Toolset
         run: |
-          candle -ext WixUIExtension -ext WixUtilExtension -dProductVersion=${{ steps.appversion.outputs.version }} installer.wxs
-          light installer.wixobj -ext WixUIExtension -ext WixUtilExtension -cultures:en-us -out dist/SystemMonitor.msi
+          candle -ext WixUIExtension -ext WixUtilExtension -dProductVersion=${{ steps.appversion.outputs.version }} -dHarvestSourceDir="dist\SystemMonitor" installer.wxs HarvestedFiles.wxs
+          REM -sice:ICE38/-sice:ICE64 suppress two validations that assume every
+          REM per-user component needs its own HKCU registry keypath / RemoveFolder
+          REM entry. That is done correctly by hand for the 3 hand-authored
+          REM components (exe, Start Menu shortcut, Desktop shortcut) - see
+          REM installer.wxs. Applying it to every one of the ~hundreds of
+          REM heat-harvested Qt6/DLL files individually is impractical, and the
+          REM real cleanup problem it protects against is already solved here by
+          REM util:RemoveFolderEx, which recursively deletes the whole install
+          REM folder on uninstall regardless of per-file component tracking.
+          light installer.wixobj HarvestedFiles.wixobj -ext WixUIExtension -ext WixUtilExtension -sice:ICE38 -sice:ICE64 -cultures:en-us -out dist/SystemMonitor.msi
         shell: cmd
 
       - name: Create GitHub Release and Upload Installers

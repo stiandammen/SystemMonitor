@@ -18,6 +18,33 @@
   actually work. Both shortcuts (Start Menu + Desktop) are always created;
   they are no longer individually toggleable during install.
 
+  ONEDIR CHANGE: SystemMonitor.spec now builds in "onedir" mode instead
+  of "onefile" mode (see that file for the full write-up - in short, the
+  onefile mode's self-extraction pattern was matching AppLocker/Windows Defender
+  Application Control's default "block unsigned exe in a user-writable
+  folder" behavior, causing the installed app to silently refuse to start
+  with zero error output on managed/professional Windows machines). This
+  MSI now installs a whole folder of files instead of one exe:
+    - SystemMonitor.exe itself is still hand-authored below (Component
+      Id="MainExecutable", File Id="SystemMonitorEXE") so the shortcuts
+      and the "Launch System Monitor" finish-page action keep a stable,
+      known File Id to target.
+    - Everything else in dist\SystemMonitor\ (the _internal\ folder with
+      Qt6 DLLs, etc.) is auto-harvested at build time by WiX's heat.exe
+      into HarvestedFiles.wxs (see .github/workflows/release.yml), which
+      defines the "HarvestedFiles" ComponentGroup referenced below.
+    - Full recursive cleanup on uninstall (including nested subfolders
+      heat.exe creates, which don't each get their own RemoveFolder
+      entry) is handled by util:RemoveFolderEx instead of per-directory
+      RemoveFolder bookkeeping - see the MainExecutable component.
+    - light.exe is invoked with -sice:ICE38 -sice:ICE64 because those two
+      validations expect every per-user component to carry its own HKCU
+      registry keypath/RemoveFolder entry; that's done correctly here for
+      the 3 hand-authored components, but doing it for every one of the
+      many individual harvested DLL/data file components isn't practical
+      and isn't needed - util:RemoveFolderEx already guarantees complete
+      cleanup regardless of per-file component bookkeeping.
+
   IMPORTANT: UpgradeCode below must NEVER change across future versions.
   It is what lets Windows Installer recognize a new .msi as an upgrade
   of this same product instead of a separate, side-by-side install.
@@ -36,7 +63,8 @@
   below) automatically appears in Windows Settings > Apps, where it can
   be uninstalled through the normal Windows Installer uninstall flow.
 -->
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Product Id="*"
            Name="System Monitor"
            Language="1033"
@@ -51,7 +79,7 @@
              Manufacturer="System Monitor Team" />
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
-    <MediaTemplate EmbedCab="yes" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Icon Id="icon.ico" SourceFile="src\systemmonitor\assets\icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="icon.ico" />
@@ -76,18 +104,19 @@
 
     <!--
       Per-user (HKCU-scoped) components require a registry KeyPath rather
-      than a file KeyPath (ICE38), and every custom directory under the
-      user profile that this MSI creates must have a matching RemoveFolder
-      entry so uninstall cleans it up (ICE64). RemoveFolder only deletes a
-      directory if it ends up empty, so removing "Programs" here is safe
-      even if other per-user apps also use %LocalAppData%\Programs.
+      than a file KeyPath (ICE38). util:RemoveFolderEx recursively deletes
+      INSTALLFOLDER and everything under it (including the _internal\ tree
+      heat.exe harvests into HarvestedFiles.wxs) on uninstall, so individual
+      RemoveFolder/ICE64 bookkeeping for every harvested subfolder is not
+      needed - see the top-of-file comment for the full explanation.
     -->
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="MainExecutable" Guid="13CCD789-918A-4511-A6D4-CE033AFCC1DF">
         <File Id="SystemMonitorEXE"
-              Source="dist\SystemMonitor.exe" />
+              Source="dist\SystemMonitor\SystemMonitor.exe" />
         <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
         <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+        <util:RemoveFolderEx On="uninstall" Property="INSTALLFOLDER" />
         <RegistryValue Root="HKCU"
                         Key="Software\SystemMonitor"
                         Name="InstallPath"
@@ -132,11 +161,19 @@
       </Component>
     </DirectoryRef>
 
-    <!-- Everything installs together as one feature - no optional feature tree with WixUI_InstallDir -->
+    <!--
+      Everything installs together as one feature - no optional feature tree
+      with WixUI_InstallDir. HarvestedFiles is the ComponentGroup that
+      heat.exe generates at build time from dist\SystemMonitor\ (see
+      .github/workflows/release.yml) - it is defined in HarvestedFiles.wxs,
+      not in this file, and is only resolved when candle compiles both
+      files together.
+    -->
     <Feature Id="ProductFeature" Title="System Monitor" Level="1" Absent="disallow" AllowAdvertise="no">
       <ComponentRef Id="MainExecutable" />
       <ComponentRef Id="ApplicationShortcut" />
       <ComponentRef Id="DesktopShortcut" />
+      <ComponentGroupRef Id="HarvestedFiles" />
     </Feature>
 
     <!--
