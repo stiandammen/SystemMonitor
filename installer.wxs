@@ -106,8 +106,20 @@
       entirely regardless of that drive's ACL configuration. The
       trade-off (no automatic rollback if the install is interrupted) is
       an acceptable cost for actually completing a real install reliably.
+
+      In practice this error has been confirmed NON-FATAL when it does
+      still occur (observed specifically during MAJOR UPGRADE installs,
+      not fresh installs - the old product's uninstall phase appears to
+      touch Config.Msi through a path MSIFASTINSTALL alone doesn't fully
+      suppress): clicking through it lets Windows Installer continue and
+      finish the real file installation correctly regardless. DISABLEROLLBACK
+      below is a second, more direct property aimed at the same mechanism,
+      to reduce how often this warning appears further - but even if it
+      still shows up occasionally on machines with unusual drive-root
+      ACLs, it does not block the install from completing.
     -->
     <Property Id="MSIFASTINSTALL" Value="7" />
+    <Property Id="DISABLEROLLBACK" Value="1" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="LocalAppDataFolder">
