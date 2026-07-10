@@ -223,6 +223,45 @@
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
     </UI>
 
+    <!--
+      Belt-and-suspenders uninstall cleanup: forcibly deletes INSTALLFOLDER
+      and everything left in it, independent of MSI's own per-file
+      component tracking/rollback machinery. util:RemoveFolderEx above
+      already does this the "proper" MSI way, but on machines that hit
+      the Config.Msi drive-root permission issue (see the MSIFASTINSTALL/
+      DISABLEROLLBACK comment further up), the uninstall transaction can
+      end up interrupted partway through by repeated security-warning
+      dialogs, leaving files behind (confirmed by real-world testing:
+      SystemMonitor.exe was left on disk after an uninstall on a non-C:
+      drive). This runs as a deferred, error-ignoring action so it can
+      never itself cause the uninstall to fail, and cleans up whatever
+      is left regardless of how the rest of the uninstall went.
+
+      "REMOVE=ALL AND NOT UPGRADINGPRODUCTCODE" is the standard WiX
+      condition for "this is a genuine, standalone uninstall" - it must
+      NOT fire during a MajorUpgrade's internal removal of the OLD
+      product, which would otherwise delete the NEW version's
+      just-installed files immediately after an update.
+
+      Deferred custom actions cannot read arbitrary properties directly
+      (a WiX/MSI security restriction), so the resolved INSTALLFOLDER
+      path is captured into CustomActionData by an immediate action
+      first, then read back via [CustomActionData] in the deferred one -
+      this is the standard, documented pattern for this situation.
+    -->
+    <CustomAction Id="SetForceCleanupInstallFolder" Property="ForceCleanupInstallFolder" Value="[INSTALLFOLDER]" />
+    <CustomAction Id="ForceCleanupInstallFolder"
+                  ExeCommand="cmd.exe /c rmdir /s /q &quot;[CustomActionData]&quot;"
+                  Directory="TARGETDIR"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="yes" />
+
+    <InstallExecuteSequence>
+      <Custom Action="SetForceCleanupInstallFolder" Before="ForceCleanupInstallFolder">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+      <Custom Action="ForceCleanupInstallFolder" After="RemoveFiles">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+
     <!-- Wizard: welcome/license -> choose install directory -> install -> finish -->
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
     <UIRef Id="WixUI_InstallDir" />
