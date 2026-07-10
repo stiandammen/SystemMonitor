@@ -2,7 +2,7 @@
 Settings View — Professional rebuild
 Card-based sections, scroll support, consistent with the rest of the GUI theme.
 """
-from systemmonitor.paths_ext import Path
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QSlider, QSpinBox, QFileDialog, QMessageBox,

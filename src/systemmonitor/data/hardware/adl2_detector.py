@@ -10,7 +10,7 @@ import platform
 import time
 import logging
 from ctypes import c_int, c_void_p, CFUNCTYPE, Structure, POINTER
-from systemmonitor.typing_ext import Dict, List, Optional
+from typing import Dict, List, Optional
 
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType

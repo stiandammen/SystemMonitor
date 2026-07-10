@@ -8,9 +8,9 @@ import os
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
-from systemmonitor.paths_ext import Path
-from systemmonitor.enums import Enum
-from systemmonitor.typing_ext import Optional
+from pathlib import Path
+from enum import Enum
+from typing import Optional
 
 class LogLevel(Enum):
     DEBUG = "DEBUG"

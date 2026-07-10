@@ -2,7 +2,7 @@
 Utility for detecting VRAM via OpenCL
 """
 import logging
-from systemmonitor.typing_ext import Optional
+from typing import Optional
 
 logger = logging.getLogger("OpenCLVRAM")
 

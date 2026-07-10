@@ -2,9 +2,9 @@
 Alert Manager - System monitoring alerts
 """
 import time
-from systemmonitor.typing_ext import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, field
-from systemmonitor.enums import Enum
+from enum import Enum
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from systemmonitor.utils.constants import AlertLevel

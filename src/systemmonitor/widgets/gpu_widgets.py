@@ -4,7 +4,7 @@ the colour palette, circular gauges, the realtime chart, info rows/section
 cards and the per-GPU detail views (GPUSingleView / GPUInfoView).
 """
 from __future__ import annotations
-from systemmonitor.typing_ext import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,

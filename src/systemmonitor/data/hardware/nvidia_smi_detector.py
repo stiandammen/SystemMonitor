@@ -6,7 +6,7 @@ Provides clocks, temperatures, utilisation, VRAM, power and fan data.
 import subprocess
 import time
 import logging
-from systemmonitor.typing_ext import List, Optional
+from typing import List, Optional
 
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType

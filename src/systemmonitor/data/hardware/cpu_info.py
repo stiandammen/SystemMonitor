@@ -4,8 +4,8 @@ Holds the static facts CPUManager derives about the installed processor
 """
 import dataclasses
 from dataclasses import dataclass
-from systemmonitor.typing_ext import Optional, Dict, Any
-from systemmonitor.enums import Enum
+from typing import Optional, Dict, Any
+from enum import Enum
 
 
 class CPUVendor(Enum):

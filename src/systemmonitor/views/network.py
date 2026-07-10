@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor
 import socket
 import time
-from systemmonitor.typing_ext import Dict, List, Optional
+from typing import Dict, List, Optional
 import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager

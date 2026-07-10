@@ -3,7 +3,7 @@ Provides resource path helper and several Enum definitions used across the proje
 """
 import os
 import sys
-from systemmonitor.enums import Enum, auto
+from enum import Enum, auto
 
 def get_resource_path(relative_path: str) -> str:
     """Return absolute path to a resource file.

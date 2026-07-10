@@ -13,7 +13,7 @@ import logging
 import platform
 import subprocess
 
-from systemmonitor.typing_ext import Optional
+from typing import Optional
 from .cpu_info import CPUInfo, CPUVendor
 
 

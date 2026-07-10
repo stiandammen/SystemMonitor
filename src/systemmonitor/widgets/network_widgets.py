@@ -20,7 +20,7 @@ import qtawesome as qta
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.i18n import tr, I18nMixin
 from systemmonitor.scaler import S, ScaleMixin
-from systemmonitor.typing_ext import Dict, List
+from typing import Dict, List
 
 
 def _qcolor(color_str: str) -> QColor:

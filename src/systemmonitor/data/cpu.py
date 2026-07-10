@@ -3,7 +3,7 @@ CPU Data Collector
 """
 import platform
 import subprocess
-from systemmonitor.typing_ext import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional
 
 
 class CPUCollector:

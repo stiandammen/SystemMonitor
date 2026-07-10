@@ -7,7 +7,7 @@ import time
 import ctypes
 import struct
 import random
-from systemmonitor.typing_ext import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_warning, log_error, log_exception

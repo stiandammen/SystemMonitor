@@ -3,7 +3,7 @@ Memory Data Collector
 """
 import subprocess
 import re
-from systemmonitor.typing_ext import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional
 
 _SMBIOS_TYPES = {
     20: "DDR",

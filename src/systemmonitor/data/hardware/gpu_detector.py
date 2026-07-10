@@ -5,7 +5,7 @@ Abstract base class for all GPU detection methods
 import time
 import logging
 from abc import ABC, abstractmethod
-from systemmonitor.typing_ext import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from .gpu_info import GPUInfo, GPUVendor, GPUType
 
 

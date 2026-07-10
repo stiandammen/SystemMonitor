@@ -7,7 +7,7 @@ import logging
 import platform
 import ctypes
 import os
-from systemmonitor.typing_ext import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from .gpu_detector import GPUDetector
 from .gpu_info import GPUInfo, GPUVendor, GPUType
 from systemmonitor.utils.opencl_vram import get_vram_via_opencl

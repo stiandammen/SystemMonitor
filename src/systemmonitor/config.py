@@ -4,7 +4,7 @@ Application settings, colors, fonts, and constants with responsive defaults
 """
 import json
 import os
-from systemmonitor.paths_ext import Path
+from pathlib import Path
 from typing import Dict, Any, Optional
 from PyQt6.QtGui import QFont
 
