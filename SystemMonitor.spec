@@ -111,7 +111,16 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX-compressing the bundled Qt6 DLLs is a known cause of PyQt/PySide
+    # apps silently failing to launch at all on Windows (the process starts
+    # and exits, or never even shows a window - no traceback possible since
+    # the failure can happen before Python itself is fully initialized).
+    # UPX-packed unsigned executables are also flagged far more aggressively
+    # by Windows Defender/SmartScreen heuristics, which can silently block
+    # or quarantine the exe. Both symptoms match exactly what was reported
+    # ("nothing happens" after a successful MSI install, no error dialog).
+    # UPX only saves disk space; it is not worth this risk for a GUI app.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

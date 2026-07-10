@@ -86,7 +86,12 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # Same reasoning as SystemMonitor.spec: UPX-compressing PyQt6 Qt DLLs is
+    # a known cause of "app silently fails to launch, no window, no error"
+    # on Windows, and UPX-packed unsigned exes get flagged more aggressively
+    # by Defender/SmartScreen. This matches the exact symptom reported for
+    # SystemMonitorSetup.exe ("kjører like vel" -> nothing happens).
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

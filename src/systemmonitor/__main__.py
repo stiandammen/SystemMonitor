@@ -49,11 +49,34 @@ else:
         sys.path.insert(0, parent_dir)
 
 
-# Setup logging
-from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception
-from systemmonitor.i18n import tr, language_manager
+def _show_fatal_startup_error(text: str) -> None:
+    """Last-resort error display for failures that happen before logging
+    itself is available. Uses ctypes directly (no PyQt6/logging dependency)
+    so the app can never fail with literally no visible window and no error,
+    which is otherwise indistinguishable from a working-but-silent process.
+    """
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, text, "System Monitor - Error", 0x10)
+    except Exception:
+        pass
 
-_log = get_logger()
+
+# Setup logging - guarded because this runs at import time, before main()'s
+# own try/except blocks exist. A failure here (e.g. the log/i18n directories
+# not being writable at the installed location) would otherwise propagate as
+# a bare, unhandled exception with nothing to catch or report it.
+try:
+    from systemmonitor.utils.logger import get_logger, LogCategory, log_info, log_error, log_warning, log_exception
+    from systemmonitor.i18n import tr, language_manager
+
+    _log = get_logger()
+except Exception:
+    import traceback as _tb
+    _show_fatal_startup_error(
+        "System Monitor failed to initialize logging/translations:\n\n" + _tb.format_exc()
+    )
+    sys.exit(1)
 
 
 def main():
