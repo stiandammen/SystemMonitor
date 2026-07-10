@@ -33,6 +33,10 @@ jobs:
         run: |
           pyinstaller SystemMonitor.spec
 
+      - name: Build Setup.exe (standalone installer/uninstaller)
+        run: |
+          pyinstaller SystemMonitorSetup.spec
+
       - name: Install WiX Toolset
         run: choco install wixtoolset -y --no-progress
         shell: pwsh
@@ -71,10 +75,12 @@ jobs:
           light installer.wixobj -ext WixUIExtension -ext WixUtilExtension -cultures:en-us -out dist/SystemMonitor.msi
         shell: cmd
 
-      - name: Create GitHub Release and Upload MSI
+      - name: Create GitHub Release and Upload Installers
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/SystemMonitor.msi
+          files: |
+            dist/SystemMonitor.msi
+            dist/SystemMonitorSetup.exe
           draft: false
           prerelease: false
         env:

@@ -2,6 +2,7 @@ PyQt6>=6.0.0
 psutil>=5.9.0
 qtawesome>=1.0.0
 wmi>=1.0.0; sys_platform == 'win32'
+pywin32>=305; sys_platform == 'win32'
 GPUtil>=1.0.0
 nvidia-ml-py>=11.0.0
 
