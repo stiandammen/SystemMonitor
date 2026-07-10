@@ -181,7 +181,8 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
 
         layout.addStretch()
 
-        badge = QLabel("v1.0.0")
+        from systemmonitor import __version__ as _app_version
+        badge = QLabel(f"v{_app_version}")
         badge.setFont(QFont("Segoe UI", S.font_pt(9)))
         badge.setStyleSheet(f"""
             color: {c.TEXT_MUTED};
