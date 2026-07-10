@@ -9,6 +9,17 @@ on:
 permissions:
   contents: write
 
+# If a tag gets deleted and re-pushed (e.g. to force a rebuild after a fix)
+# while an earlier run for that same tag is still in progress, cancel the
+# older run instead of letting both finish and race to upload release
+# assets - whichever one finishes LAST would otherwise silently win and
+# overwrite the release with stale/wrong build output, with no error or
+# warning anywhere. This bit us for real: v2.2.1 briefly pointed at a build
+# from many commits earlier because of exactly this race.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-release:
     runs-on: windows-latest
