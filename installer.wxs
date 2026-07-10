@@ -89,6 +89,26 @@
     <!-- Lets the WixUI_InstallDir wizard's directory-chooser page edit INSTALLFOLDER -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
+    <!--
+      Disables Windows Installer's rollback + checkpointing (1+2) and full
+      file-cost calculation (4) = 7. Without this, MSI creates a hidden
+      "Config.Msi" staging folder at the ROOT of whichever drive the
+      install target lives on (e.g. "E:\Config.Msi\") to hold rollback
+      data, and tries to set NTFS security descriptors on the files in it.
+      On machines where that drive root's ACLs don't grant the (non-admin,
+      per-user-scope) current user permission to do that, this fails with
+      the well-documented Windows Installer error "Could not set file
+      security for file '...\Config.Msi\....rbf'. Error: 5." - a known
+      issue independent of anything authored in this file (see e.g.
+      Microsoft/IBM support articles and the PowerToys project hitting the
+      identical error). MSIFASTINSTALL=7 stops MSI from ever creating or
+      touching Config.Msi in the first place, which avoids the failure
+      entirely regardless of that drive's ACL configuration. The
+      trade-off (no automatic rollback if the install is interrupted) is
+      an acceptable cost for actually completing a real install reliably.
+    -->
+    <Property Id="MSIFASTINSTALL" Value="7" />
+
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="LocalAppDataFolder">
         <Directory Id="ProgramsFolder" Name="Programs">
