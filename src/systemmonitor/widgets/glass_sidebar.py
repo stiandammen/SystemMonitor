@@ -17,7 +17,7 @@ from systemmonitor.config import settings
 LOGO_PATH = get_resource_path("assets/hacker.png")
 
 
-HOME_ITEM = {"key": "home", "label": "Home", "icon": "mdi.home-variant"}
+HOME_ITEM = {"key": "home", "label": "Home", "icon": "ph.squares-four"}
 
 NAV_STRUCTURE = {
     "main": {
@@ -226,6 +226,10 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._items: Dict[str, GlassNavItem] = {}
         self._current_view: str = ""
         self._collapsed = S.is_compact()
+        self._launcher_mode = self._home_screen_enabled()
+        self._pre_launcher_collapsed = False
+        if self._launcher_mode:
+            self._collapsed = True
         self._expanded_width = S.px(220)
         self._collapsed_width = S.px(58)
         self._setup_ui()
@@ -246,13 +250,14 @@ class GlassSidebar(QFrame, ScaleMixin):
     def set_home_screen_enabled(self, enabled: bool):
         """Live add/remove of the 'Home' nav item when the user changes the
         Home screen setting, without needing a full sidebar rebuild."""
+        self._launcher_mode = enabled
         has_home = HOME_ITEM["key"] in self._items
         if enabled and not has_home:
             home_item = GlassNavItem(
                 key=HOME_ITEM["key"], label=HOME_ITEM["label"], icon_name=HOME_ITEM["icon"]
             )
             home_item.clicked_with_name.connect(self._on_item_clicked)
-            home_item.set_collapsed(self._collapsed)
+            home_item.set_collapsed(True)
             self._nav_container.layout().insertWidget(0, home_item)
             self._items[HOME_ITEM["key"]] = home_item
         elif not enabled and has_home:
@@ -260,6 +265,26 @@ class GlassSidebar(QFrame, ScaleMixin):
             self._nav_container.layout().removeWidget(item)
             item.hide()
             item.deleteLater()
+
+        for key, item in self._items.items():
+            if key != HOME_ITEM["key"]:
+                item.setVisible(not enabled)
+
+        if hasattr(self, '_home_separator'):
+            self._home_separator.setVisible(enabled)
+        if hasattr(self, '_collapse_btn'):
+            self._collapse_btn.setVisible(not enabled)
+
+        if enabled:
+            self._pre_launcher_collapsed = self._collapsed
+            self._collapsed = True
+            self.setFixedWidth(self._collapsed_width)
+            self._update_header_collapse_state()
+        else:
+            self._collapsed = self._pre_launcher_collapsed
+            target = self._collapsed_width if self._collapsed else self._expanded_width
+            self.setFixedWidth(target)
+            self._update_collapse_state()
 
     def on_scale_changed(self, factor: float):
         self._expanded_width = S.px(220)
@@ -401,8 +426,17 @@ class GlassSidebar(QFrame, ScaleMixin):
                 key=HOME_ITEM["key"], label=HOME_ITEM["label"], icon_name=HOME_ITEM["icon"]
             )
             home_item.clicked_with_name.connect(self._on_item_clicked)
+            home_item.set_collapsed(True)
             nav_layout.addWidget(home_item)
             self._items[HOME_ITEM["key"]] = home_item
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background: rgba(255,255,255,0.07); border: none;")
+        sep.setVisible(self._launcher_mode)
+        nav_layout.addWidget(sep)
+        self._home_separator = sep
 
         for section_key, section_data in NAV_STRUCTURE.items():
             title = section_data.get("title")
@@ -428,6 +462,11 @@ class GlassSidebar(QFrame, ScaleMixin):
                 nav_layout.addWidget(item)
                 self._items[item_data["key"]] = item
 
+        if self._launcher_mode:
+            for key, item in self._items.items():
+                if key != HOME_ITEM["key"]:
+                    item.setVisible(False)
+
         layout.addWidget(nav_container, stretch=1)
 
         collapse_btn = QPushButton()
@@ -451,6 +490,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._collapse_btn = collapse_btn
         layout.addWidget(collapse_btn)
         self._update_collapse_btn_icon()
+        collapse_btn.setVisible(not self._launcher_mode)
 
         self._setup_footer()
         self._footer.setVisible(not self._collapsed)
@@ -630,6 +670,8 @@ class GlassSidebar(QFrame, ScaleMixin):
         """Show/hide nav items based on the user's "hidden views" feature toggle.
         Hidden items are simply not visible — Qt's layout reflows around them,
         so the sidebar stays compact without needing a full rebuild."""
+        if self._launcher_mode:
+            return
         hidden = set(hidden_keys or [])
         for key, item in self._items.items():
             item.setVisible(key not in hidden)
