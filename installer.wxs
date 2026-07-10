@@ -249,6 +249,24 @@
       first, then read back via [CustomActionData] in the deferred one -
       this is the standard, documented pattern for this situation.
     -->
+    <!--
+      Also confirmed by real-world testing on a plain C: install (no
+      Config.Msi permission issue involved at all): SystemMonitor.exe was
+      STILL left behind after uninstall. The far more likely cause there
+      is simply that the app was still running (e.g. minimized to the
+      system tray via the single-instance-mutex/tray feature in
+      __main__.py) at the moment of uninstall - Windows cannot delete a
+      loaded EXE, so it silently defers the deletion to the next reboot
+      instead of failing loudly. Force-closing it before file removal
+      guarantees the file is actually unlocked and deletable immediately.
+    -->
+    <CustomAction Id="KillRunningApp"
+                  ExeCommand="cmd.exe /c taskkill /f /im SystemMonitor.exe"
+                  Directory="TARGETDIR"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="yes" />
+
     <CustomAction Id="SetForceCleanupInstallFolder" Property="ForceCleanupInstallFolder" Value="[INSTALLFOLDER]" />
     <CustomAction Id="ForceCleanupInstallFolder"
                   ExeCommand="cmd.exe /c rmdir /s /q &quot;[CustomActionData]&quot;"
@@ -258,6 +276,7 @@
                   Impersonate="yes" />
 
     <InstallExecuteSequence>
+      <Custom Action="KillRunningApp" Before="RemoveFiles">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
       <Custom Action="SetForceCleanupInstallFolder" Before="ForceCleanupInstallFolder">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
       <Custom Action="ForceCleanupInstallFolder" After="RemoveFiles">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
     </InstallExecuteSequence>
