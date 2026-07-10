@@ -48,6 +48,35 @@ jobs:
         run: |
           pyinstaller SystemMonitorSetup.spec
 
+      - name: Set up MSVC dev tools (for editbin.exe)
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Increase bootloader stack size (fixes STATUS_STACK_OVERFLOW)
+        run: |
+          # Root cause of the app crashing on every single launch attempt
+          # this whole session, confirmed via Windows Event Viewer:
+          # exception 0xc00000fd (STATUS_STACK_OVERFLOW) inside python312.dll,
+          # at the exact same code offset regardless of what application code
+          # ran - meaning it happens during low-level interpreter/extension
+          # startup, before any of our own code is reached.
+          #
+          # This is a known, documented PyInstaller issue: the bootloader.exe
+          # PyInstaller compiles has a much smaller default stack reserve
+          # than a normal python.exe, and an app with many native extensions
+          # to initialize (PyQt6 + all its submodules, psutil, wmi/pywin32,
+          # GPUtil, qtawesome, NVML) can exceed it during startup even though
+          # it would run fine under a normal, unfrozen Python interpreter.
+          # See https://github.com/pyinstaller/pyinstaller/issues/6459.
+          #
+          # editbin.exe (from the MSVC toolchain, set up via msvc-dev-cmd
+          # above) can raise the stack RESERVE recorded in an EXE's PE header
+          # after the fact, without needing to rebuild PyInstaller's
+          # bootloader from source. 16 MiB is generous headroom over the
+          # default ~1 MiB reserve.
+          editbin /STACK:16777216 "dist\SystemMonitor\SystemMonitor.exe"
+          editbin /STACK:16777216 "dist\SystemMonitorSetup.exe"
+        shell: cmd
+
       - name: Zip raw portable build (diagnostic - no installer involved)
         run: |
           # Lets a technician download and run SystemMonitor.exe directly,
