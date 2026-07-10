@@ -46,6 +46,8 @@ binaries = []
 hiddenimports = [
     'win32com',
     'win32com.client',
+    'win32com.client.util',
+    'win32timezone',   # common PyInstaller+pywin32 gotcha if omitted
     'pythoncom',
     'pywintypes',
     'winreg',
