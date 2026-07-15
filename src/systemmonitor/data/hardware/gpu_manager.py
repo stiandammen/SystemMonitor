@@ -194,6 +194,7 @@ class GPUManager:
             'name', 'vram_total_mb', 'vram_used_mb', 'vram_free_mb', 'vram_percent',
             'memory_clock_mhz', 'core_clock_mhz', 'core_clock_boost_mhz',
             'gpu_utilization_percent', 'memory_utilization_percent',
+            'encoder_utilization_percent', 'decoder_utilization_percent',
             'temperature_celsius', 'hotspot_temp_celsius', 'memory_temp_celsius',
             'power_draw_watts', 'power_limit_watts', 'fan_speed_percent', 'fan_speed_rpm',
             'driver_version', 'driver_date', 'bios_version',
@@ -293,6 +294,11 @@ class GPUManager:
                 gpu.memory_utilization_percent = 0
             elif gpu.memory_utilization_percent > 100:
                 gpu.memory_utilization_percent = 100
+
+            for engine_field in ('encoder_utilization_percent', 'decoder_utilization_percent'):
+                val = getattr(gpu, engine_field)
+                if val is not None:
+                    setattr(gpu, engine_field, max(0.0, min(100.0, val)))
 
             # Set last updated timestamp
             if gpu.last_updated == 0:

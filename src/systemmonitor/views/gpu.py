@@ -3,18 +3,20 @@ GPU View - Rik GPU-overvåking med klokker, temperaturer og sanntidsdata.
 Støtter NVIDIA, AMD, Intel. Faner per GPU. Bærbar/integrert GPU-bevisst.
 """
 from __future__ import annotations
+import time
 from typing import Optional, List
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QTabWidget
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSize
 from PyQt6.QtGui import QFont
+import qtawesome as qta
 
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.i18n import tr, language_manager, I18nMixin
 from systemmonitor.scaler import S, ScaleMixin
-from systemmonitor.widgets.gpu_widgets import COLORS, sync_colors, GPUSingleView, GPUInfoView
+from systemmonitor.widgets.gpu_widgets import COLORS, sync_colors, GPUSingleView, GPUInfoView, GlowCard
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +29,8 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         self._gpu_names:  List[str]           = []
         self._pending_data: Optional[dict]    = None
         self._update_sched = False
+        self._last_update_ts: Optional[float] = None
+        self._live_ok = True
 
         self.scale_connect()
         self.i18n_connect()
@@ -34,14 +38,21 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         self._setup_ui()
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
+        self._live_timer = QTimer(self)
+        self._live_timer.timeout.connect(self._refresh_updated_label)
+        self._live_timer.start(1000)
+
     def retranslate_ui(self):
         if hasattr(self, '_hdr_title_lbl'):
             self._hdr_title_lbl.setText(tr("GPU Monitor"))
+        if hasattr(self, '_live_lbl'):
+            self._live_lbl.setText(tr("LIVE") if self._live_ok else tr("Offline"))
         if hasattr(self, '_no_gpu'):
             self._no_gpu.setText(
                 tr("No GPU found.\nCheck that NVIDIA/AMD/Intel drivers are installed."))
         if hasattr(self, '_badge') and self._badge.isVisible():
             self._badge.setText(tr(self._badge_key) if hasattr(self, '_badge_key') else self._badge.text())
+        self._refresh_updated_label()
 
     # ------------------------------------------------------------------
     # Layout
@@ -93,19 +104,38 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         root.addWidget(self._no_gpu)
 
     def _make_header(self) -> QFrame:
-        hdr = QFrame()
+        hdr = GlowCard(glow=COLORS['accent_cyan'], radius=S.px(12))
         self._hdr_frame = hdr
-        hdr.setFixedHeight(S.px(52))
-        hdr.setStyleSheet(f"""
-            QFrame {{
-                background: {COLORS['bg_card']};
-                border-radius: 10px;
-                border: none;
-            }}
-        """)
+        hdr.setFixedHeight(S.px(60))
         hl = QHBoxLayout(hdr)
-        hl.setContentsMargins(S.px(14), 0, S.px(14), 0)
-        hl.setSpacing(S.px(8))
+        hl.setContentsMargins(S.px(14), S.px(8), S.px(14), S.px(8))
+        hl.setSpacing(S.px(10))
+
+        icon_box = QLabel()
+        self._icon_box = icon_box
+        icon_box.setFixedSize(S.px(36), S.px(36))
+        icon_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hl.addWidget(icon_box)
+
+        title_col = QVBoxLayout()
+        title_col.setContentsMargins(0, 0, 0, 0)
+        title_col.setSpacing(0)
+
+        title = QLabel(tr("GPU Monitor"))
+        self._hdr_title_lbl = title
+        title.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        title_col.addWidget(title)
+
+        self._gpu_name_lbl = QLabel("–")
+        self._gpu_name_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._gpu_name_lbl.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; background: transparent;"
+        )
+        title_col.addWidget(self._gpu_name_lbl)
+
+        hl.addLayout(title_col)
+        hl.addStretch()
 
         self._status_dot = QLabel("●")
         self._status_dot.setStyleSheet(
@@ -113,20 +143,15 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         )
         hl.addWidget(self._status_dot)
 
-        title = QLabel(tr("GPU Monitor"))
-        self._hdr_title_lbl = title
-        title.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
-        hl.addWidget(title)
+        self._live_lbl = QLabel(tr("LIVE"))
+        self._live_lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        self._live_lbl.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent;")
+        hl.addWidget(self._live_lbl)
 
-        self._gpu_name_lbl = QLabel("–")
-        self._gpu_name_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
-        self._gpu_name_lbl.setStyleSheet(
-            f"color: {COLORS['accent_cyan']}; background: transparent;"
-        )
-        hl.addWidget(self._gpu_name_lbl)
-
-        hl.addStretch()
+        self._updated_lbl = QLabel("")
+        self._updated_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        self._updated_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        hl.addWidget(self._updated_lbl)
 
         self._badge = QLabel("")
         self._badge.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
@@ -137,7 +162,36 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         self._badge.setVisible(False)
         hl.addWidget(self._badge)
 
+        self._apply_icon_box_style()
         return hdr
+
+    def _apply_icon_box_style(self):
+        if not hasattr(self, '_icon_box'):
+            return
+        self._icon_box.setStyleSheet(f"""
+            QLabel {{
+                background: {COLORS['bg_hover']};
+                border: 1px solid {COLORS['accent_cyan']};
+                border-radius: {S.px(8)}px;
+            }}
+        """)
+        try:
+            px = qta.icon('ph.cpu', color=COLORS['accent_cyan']).pixmap(QSize(S.px(18), S.px(18)))
+            self._icon_box.setPixmap(px)
+        except Exception:
+            pass
+
+    def _refresh_updated_label(self):
+        if not hasattr(self, '_updated_lbl'):
+            return
+        if self._last_update_ts is None:
+            self._updated_lbl.setText("")
+            return
+        elapsed = int(time.time() - self._last_update_ts)
+        if elapsed < 1:
+            self._updated_lbl.setText(tr("Updated just now"))
+        else:
+            self._updated_lbl.setText(tr("Updated {0}s ago", elapsed))
 
     def _tab_css(self) -> str:
         return f"""
@@ -188,6 +242,8 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
             return
 
         self._set_status_ok()
+        self._last_update_ts = time.time()
+        self._refresh_updated_label()
 
         # Hent liste over GPU-dicts (GPUInfo.to_dict() format)
         gpus: List[dict] = gpu_data.get('gpus', [])
@@ -289,14 +345,22 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         self._no_gpu.setVisible(v)
 
     def _set_status_ok(self):
+        self._live_ok = True
         self._status_dot.setStyleSheet(
             f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
         )
+        if hasattr(self, '_live_lbl'):
+            self._live_lbl.setText(tr("LIVE"))
+            self._live_lbl.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent;")
 
     def _set_status_bad(self):
+        self._live_ok = False
         self._status_dot.setStyleSheet(
             f"color: {COLORS['accent_red']}; font-size: {S.font_pt(13)}px; background: transparent;"
         )
+        if hasattr(self, '_live_lbl'):
+            self._live_lbl.setText(tr("Offline"))
+            self._live_lbl.setStyleSheet(f"color: {COLORS['accent_red']}; background: transparent;")
 
     def on_scale_changed(self, _):
         self._setup_ui()
@@ -308,13 +372,9 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
     def _apply_theme(self):
         """Update colors on existing widgets without rebuilding the layout."""
         if hasattr(self, '_hdr_frame'):
-            self._hdr_frame.setStyleSheet(f"""
-                QFrame {{
-                    background: {COLORS['bg_card']};
-                    border-radius: 10px;
-                    border: none;
-                }}
-            """)
+            self._hdr_frame.set_glow(COLORS['accent_cyan'])
+            self._hdr_frame.apply_theme()
+        self._apply_icon_box_style()
         if hasattr(self, '_hdr_title_lbl'):
             self._hdr_title_lbl.setStyleSheet(
                 f"color: {COLORS['text_primary']}; background: transparent;")
@@ -325,12 +385,18 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
                 f"color: {COLORS['text_muted']}; background: transparent;"
             )
         if hasattr(self, '_status_dot'):
+            live_color = COLORS['accent_green'] if self._live_ok else COLORS['accent_red']
             self._status_dot.setStyleSheet(
-                f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
+                f"color: {live_color}; font-size: {S.font_pt(13)}px; background: transparent;"
             )
+        if hasattr(self, '_live_lbl'):
+            live_color = COLORS['accent_green'] if self._live_ok else COLORS['accent_red']
+            self._live_lbl.setStyleSheet(f"color: {live_color}; background: transparent;")
+        if hasattr(self, '_updated_lbl'):
+            self._updated_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
         if hasattr(self, '_gpu_name_lbl'):
             self._gpu_name_lbl.setStyleSheet(
-                f"color: {COLORS['accent_cyan']}; background: transparent;"
+                f"color: {COLORS['text_secondary']}; background: transparent;"
             )
         if hasattr(self, '_badge'):
             self._badge.setStyleSheet(

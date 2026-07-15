@@ -101,6 +101,18 @@ class NVMLDetector(GPUDetector):
                 gpu_util = 0.0
                 memory_util = 0.0
 
+            # Get video encoder/decoder engine utilization (NVENC/NVDEC)
+            try:
+                encoder_util, _ = self._nvml.nvmlDeviceGetEncoderUtilization(handle)
+                encoder_util = float(encoder_util)
+            except:
+                encoder_util = None
+            try:
+                decoder_util, _ = self._nvml.nvmlDeviceGetDecoderUtilization(handle)
+                decoder_util = float(decoder_util)
+            except:
+                decoder_util = None
+
             # Get memory information
             try:
                 mem_info = self._nvml.nvmlDeviceGetMemoryInfo(handle)
@@ -209,6 +221,8 @@ class NVMLDetector(GPUDetector):
                 core_clock_boost_mhz=sm_clock,  # Approximation
                 gpu_utilization_percent=gpu_util,
                 memory_utilization_percent=memory_util,
+                encoder_utilization_percent=encoder_util,
+                decoder_utilization_percent=decoder_util,
                 temperature_celsius=temp,
                 power_draw_watts=power,
                 power_limit_watts=power_limit_watts,

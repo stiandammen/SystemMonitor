@@ -63,6 +63,8 @@ class GPUInfo:
     # Usage Information
     gpu_utilization_percent: float = 0.0
     memory_utilization_percent: float = 0.0
+    encoder_utilization_percent: Optional[float] = None
+    decoder_utilization_percent: Optional[float] = None
 
     # Temperature Information
     temperature_celsius: Optional[float] = None
