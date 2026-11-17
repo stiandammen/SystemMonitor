@@ -62,3 +62,13 @@ Logg over endringer, forslag og dokumentasjon i SystemMonitor-prosjektet. Nyeste
 - Skal sidepanelet fjernes helt, eller leve videre som en smal ikon-rad inne i modulvisningene?
 - Hvordan skal ekte "glass"/blur løses i PyQt6 (QGraphicsBlurEffect vs. lag av halvtransparente QFrame)?
 - Skal denne startskjermen være en egen "hjem"-visning man kan navigere tilbake til, eller kun vises ved oppstart?
+
+---
+
+## 2026-11 — GUI-redesign (referansedesign)
+
+- Nytt delt komponentsett i `widgets/ref_design.py` (Panel, BigGauge, Donut, AreaChart + RangeTabs, ReflowGrid m.fl.) med QSS-stiler i `styles/theme.py` slik at temabytte virker automatisk.
+- Skjermene Dashbord, Grafikk, Minne, Nettverk, Lagring og Innstillinger er bygget om; `widgets/network_panels.py` inneholder adapterkort, rangeringslister og topologi.
+- `home_screen_style`/modulvelger og Prosessor-visningen er fjernet (se `docs/release-notes.md`).
+- Skrift: `utils/fonts.py` laster `assets/fonts/Cutive-Regular.ttf` ved oppstart.
+- Merk: avsnittene over om modulvelgeren (2026-07-09) beskriver en funksjon som siden er fjernet.

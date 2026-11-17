@@ -4,6 +4,30 @@ Brukervendt endringslogg — nyeste versjon øverst. Ment til å limes inn som r
 
 ---
 
+## Ikke utgitt ennå — GUI-redesign (nyeste på `main`)
+
+### Nytt
+
+- **Helt nytt design** (svart/koksgrå, oransje hovedaksent, grønt for LIVE/OK, cyan for sekundærserier) med store buemålere, ringer, områdegrafer og tidsvalg (1 min / 5 min / 15 min / 1 time / 6 timer). Nytt standardtema **Ember**; de andre temaene fungerer som før.
+- **Dashbord** er nå hovedsiden (tidligere «Oversikt»): CPU-, GPU- og minnemålere, historikkgrafer, CPU-kjerner, lagringsdisker, nettverk og systemstatus.
+- **Nettverk bygget om:** målere mot reell linkhastighet, adapterkort med live fart og historikk, virtuelle adaptere listet separat, topologi tegnet fra egne adaptere, tilkoblingsanalyse (protokoller, statuser, vanligste porter og verter) og søkbar tilkoblingstabell.
+- **Responsivt** for høye og brede skjermer og smale vinduer: kolonner tilpasses faktisk bredde, grafer fyller ledig høyde, sidemenyen kollapser automatisk, innstillingsmenyen blir en stripe på smale vinduer.
+- **Skrift:** Cutive Regular (SIL OFL) følger med i `assets/fonts` og brukes i hele programmet.
+- Grafikk-fanen slår sammen like GPU-oppføringer fra ulike detektorer til én fane med live-data (og viser VRAM/klokke også på Dashbord).
+
+### Fjernet
+
+- Prosessor-siden (CPU-kjernene ligger på Dashbord) og «Velg en modul»-startskjermen med tilhørende innstilling (`home_screen_style`).
+- Gamle engangsskript (`fix_imports.py`, `final_fix.py`, `fix_ext_ext.py`) og en gammel `dist/SystemMonitor.exe` som lå i repoet.
+
+### Feilrettinger
+
+- Nedlastingsfarten på Dashbord ble regnet ut fra feil verdipar.
+- Diskhastighet på Dashbord leste feil nøkkel (`read_speed`) og viste alltid 0.
+- «Oppdater»-valget på Nettverk hadde ingen virkning; det styrer nå oppdateringen av tilkoblingslisten.
+
+---
+
 ## v2.2.0 — 2026-07-09
 
 ### Nytt

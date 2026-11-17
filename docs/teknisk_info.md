@@ -108,4 +108,4 @@ For å sikre optimal visning på alt fra kompakte bærbare datamaskiner til stor
 ## 6. Konfigurasjon & Persistens
 
 *   **SettingsManager**: Lagrer brukerinnstillinger (språk, tema, oppdateringsfrekvens, terskler) som en JSON-fil (`settings.json`) i brukerens lokalt lagrede appdata (`%APPDATA%/SystemMonitor`).
-*   **Tema-styring (`theme.py`)**: CSS (QSS) genereres dynamisk basert på gjeldende fargetema (f.eks. `cyber-cyan` eller `heimdal`), og påføres alle widgets via en global `theme_manager`.
+*   **Tema-styring (`theme.py`)**: CSS (QSS) genereres dynamisk basert på gjeldende fargetema (`ember` som standard, i tillegg til `cyber-cyan`, `premium`, `cyberpunk` og `heimdal`), og påføres alle widgets via en global `theme_manager`.

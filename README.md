@@ -43,6 +43,11 @@ Systemmonitor – profesjonell oversikt for IT‑personell
   - **Stat‑fliser**: Kompakte tall for CPU‑load, minne‑bruk, nettverk, GPU‑temp.
   - **Dynamisk temastøtte**: Automatisk tilpasning til lys/mørk modus via `theme_manager`.
 
+**Brukergrensesnitt**
+- Dashbord som hovedside, samt egne sider for Grafikk, Nettverk, Minne, Lagring, Logger og Innstillinger.
+- Mørkt «Ember»-design (oransje aksent) med buemålere, ringer og historikkgrafer med tidsvalg (1 min – 6 timer).
+- Responsivt oppsett for liggende, stående og smale vinduer; skriften Cutive Regular følger med programmet.
+
 **Pålitelighet og kvalitet**
 - Omfattende feilhåndtering og logging (kategorisert per komponent).
 - Throttling av signal‑utsendelse for å unngå UI‑overbelastning.
