@@ -4,6 +4,7 @@ Card-based sections, scroll support, consistent with the rest of the GUI theme.
 """
 from pathlib import Path
 from PyQt6.QtWidgets import (
+    QStackedWidget, QButtonGroup, QBoxLayout,
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QSlider, QSpinBox, QFileDialog, QMessageBox,
     QSizePolicy, QFrame, QScrollArea, QDialog
@@ -32,7 +33,6 @@ def _c():
 # Dashboard and Settings stay out of this list — they must always remain
 # reachable (Settings is the only way back to re-enable a hidden tab).
 HIDEABLE_VIEWS = [
-    ("cpu", "Processor"),
     ("gpu", "Graphics"),
     ("network", "Network"),
     ("memory", "Memory"),
@@ -90,108 +90,172 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
             tmp.deleteLater()
 
         c = _c()
-        self.setStyleSheet(f"background-color: {c.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         root = QVBoxLayout()
-        root.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
-        root.setSpacing(S.px(12))
+        root.setContentsMargins(S.px(14), S.px(10), S.px(14), S.px(10))
+        root.setSpacing(S.px(10))
         self.setLayout(root)
 
         root.addWidget(self._build_header())
 
-        # Scroll area wraps all sections
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(f"""
+        body = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        body.setSpacing(S.px(12))
+        root.addLayout(body, stretch=1)
+
+        # Left: category navigation (reference design)
+        categories = [
+            ("ph.gear", "General", [self._build_general_section, self._build_maintenance_section]),
+            ("ph.eye", "Display", [self._build_appearance_section, self._build_units_section]),
+            ("ph.squares-four", "Modules", [self._build_visibility_section]),
+            ("ph.bell", "Alerts", [self._build_alerts_section]),
+            ("ph.lightning", "Performance", [self._build_performance_section]),
+            ("ph.database", "Data", [self._build_data_section, self._build_export_server_section]),
+            ("ph.info", "Information", [self._build_information_section]),
+        ]
+        nav = QFrame()
+        nav.setObjectName("RefPanel")
+        nav.setFixedWidth(S.px(190))
+        nav_l = QBoxLayout(QBoxLayout.Direction.TopToBottom, nav)
+        nav_l.setContentsMargins(S.px(8), S.px(10), S.px(8), S.px(10))
+        nav_l.setSpacing(S.px(4))
+        body.addWidget(nav)
+
+        stack = QStackedWidget()
+        body.addWidget(stack, stretch=1)
+
+        scroll_css = f"""
             QScrollArea {{ background: transparent; border: none; }}
-            QScrollBar:vertical {{
-                width: {S.px(6)}px;
-                background: transparent;
-                margin: 0;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {c.BORDER};
-                border-radius: {S.px(3)}px;
-                min-height: {S.px(30)}px;
-            }}
-            QScrollBar::handle:vertical:hover {{
-                background: {c.TEXT_MUTED};
-            }}
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {{ height: 0; }}
-        """)
+            QScrollArea > QWidget > QWidget {{ background: transparent; }}
+            QScrollBar:vertical {{ width: {S.px(6)}px; background: transparent; margin: 0; }}
+            QScrollBar::handle:vertical {{ background: {c.BORDER}; border-radius: {S.px(3)}px; min-height: {S.px(30)}px; }}
+            QScrollBar::handle:vertical:hover {{ background: {c.TEXT_MUTED}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+        """
+        group = QButtonGroup(nav)
+        group.setExclusive(True)
+        self._nav_group = group
+        current = getattr(self, '_cat_index', 0)
+        for idx, (icon, label, builders) in enumerate(categories):
+            btn = QPushButton("  " + tr(label))
+            btn.setObjectName("RefNavBtn")
+            btn.setProperty('label', tr(label))
+            btn.setCheckable(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFont(QFont("Cutive", S.font_pt(10)))
+            try:
+                btn.setIcon(qta.icon(icon, color=c.TEXT_SECONDARY, color_active=c.BG_PRIMARY,
+                                     color_selected=c.BG_PRIMARY))
+            except Exception:
+                pass
+            btn.setMinimumHeight(S.px(36))
+            group.addButton(btn, idx)
+            nav_l.addWidget(btn)
 
-        content = QWidget()
-        content.setStyleSheet("background: transparent;")
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, S.px(4), 0)
-        content_layout.setSpacing(S.px(12))
-        content.setLayout(content_layout)
-        scroll.setWidget(content)
-        root.addWidget(scroll, stretch=1)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setStyleSheet(scroll_css)
+            content = QWidget()
+            content.setObjectName("RefContent")
+            content.setStyleSheet("QWidget#RefContent { background: transparent; }")
+            content_layout = QVBoxLayout()
+            content_layout.setContentsMargins(0, 0, S.px(4), 0)
+            content_layout.setSpacing(S.px(12))
+            content.setLayout(content_layout)
+            scroll.setWidget(content)
+            for builder in builders:
+                builder(content_layout)
+            content_layout.addStretch(1)
+            stack.addWidget(scroll)
+        nav_l.addStretch()
 
-        self._build_general_section(content_layout)
-        self._build_visibility_section(content_layout)
-        self._build_performance_section(content_layout)
-        self._build_appearance_section(content_layout)
-        self._build_units_section(content_layout)
-        self._build_alerts_section(content_layout)
-        self._build_data_section(content_layout)
-        self._build_export_server_section(content_layout)
-        self._build_information_section(content_layout)
-        self._build_maintenance_section(content_layout)
-        content_layout.addStretch()
+        icon_names = [cat[0] for cat in categories]
+
+        def _refresh_icons():
+            for i, b in enumerate(group.buttons()):
+                idx = group.id(b)
+                col = c.BG_PRIMARY if b.isChecked() else c.TEXT_SECONDARY
+                try:
+                    b.setIcon(qta.icon(icon_names[idx], color=col))
+                except Exception:
+                    pass
+
+        self._nav_parts = (body, nav, nav_l)
+        self._apply_nav_mode()
+
+        def _select(i: int):
+            self._cat_index = i
+            stack.setCurrentIndex(i)
+            _refresh_icons()
+        group.idClicked.connect(_select)
+        current = min(current, len(categories) - 1)
+        group.button(current).setChecked(True)
+        stack.setCurrentIndex(current)
+        _refresh_icons()
+
+    def _apply_nav_mode(self):
+        """Wide: vertical category list on the left. Narrow: horizontal strip on top."""
+        parts = getattr(self, '_nav_parts', None)
+        if not parts:
+            return
+        body, nav, nav_l = parts
+        narrow = self.width() < S.px(760)
+        if getattr(self, '_nav_narrow', None) == narrow:
+            return
+        self._nav_narrow = narrow
+        if narrow:
+            body.setDirection(QBoxLayout.Direction.TopToBottom)
+            nav_l.setDirection(QBoxLayout.Direction.LeftToRight)
+            nav.setMaximumWidth(16777215)
+            nav.setMinimumWidth(0)
+            nav.setFixedHeight(S.px(52))
+        else:
+            body.setDirection(QBoxLayout.Direction.LeftToRight)
+            nav_l.setDirection(QBoxLayout.Direction.TopToBottom)
+            nav.setMinimumHeight(0)
+            nav.setMaximumHeight(16777215)
+            nav.setFixedWidth(S.px(190))
+        for b in nav.findChildren(QPushButton):
+            b.setIconSize(QSize(S.px(16), S.px(16)))
+        self._fit_nav_labels()
+
+    def _fit_nav_labels(self):
+        """Narrow strip: show icon-only buttons when the labels would not fit."""
+        parts = getattr(self, '_nav_parts', None)
+        if not parts or not getattr(self, '_nav_narrow', False):
+            for b in (parts[1].findChildren(QPushButton) if parts else []):
+                if b.property('label'):
+                    b.setText("  " + b.property('label'))
+                    b.setToolTip("")
+            return
+        nav = parts[1]
+        buttons = nav.findChildren(QPushButton)
+        for b in buttons:
+            b.setText("  " + b.property('label'))
+        need = sum(b.sizeHint().width() for b in buttons) + S.px(16) * 2
+        if need > self.width() - S.px(40):
+            for b in buttons:
+                b.setToolTip(b.property('label'))
+                b.setText("")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_nav_mode()
+        self._fit_nav_labels()
 
     # ── Header ─────────────────────────────────────────────────────────────
 
     def _build_header(self) -> QFrame:
-        c = _c()
-        header = QFrame()
-        header.setMinimumHeight(S.px(52))
-        header.setMaximumHeight(S.px(62))
-        header.setStyleSheet(f"""
-            QFrame {{
-                background-color: {c.BG_CARD};
-                border: none;
-                border-radius: {S.px(10)}px;
-            }}
-        """)
-        layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(20), 0, S.px(20), 0)
-        layout.setSpacing(S.px(12))
-        header.setLayout(layout)
-
-        title = QLabel(tr("Settings"))
-        title.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
-        layout.addWidget(title)
-
-        sep = QLabel("·")
-        sep.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-        sep.setFont(QFont("Segoe UI", S.font_pt(14)))
-        layout.addWidget(sep)
-
-        subtitle = QLabel(tr("Application preferences"))
-        subtitle.setFont(QFont("Segoe UI", S.font_pt(11)))
-        subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-        layout.addWidget(subtitle)
-
-        layout.addStretch()
-
+        from systemmonitor.widgets.ref_design import PageHeader
+        hdr = PageHeader(tr("Settings"), tr("Application preferences"), "ph.gear", pill="")
         from systemmonitor import __version__ as _app_version
         badge = QLabel(f"v{_app_version}")
-        badge.setFont(QFont("Segoe UI", S.font_pt(9)))
-        badge.setStyleSheet(f"""
-            color: {c.TEXT_MUTED};
-            background: {c.BG_SECONDARY};
-            border-radius: {S.px(10)}px;
-            padding: {S.px(3)}px {S.px(10)}px;
-        """)
-        layout.addWidget(badge)
-        return header
+        badge.setObjectName("RefMuted")
+        badge.setFont(QFont("Cutive", S.font_pt(9)))
+        hdr.extra.addWidget(badge)
+        return hdr
 
     # ── Information Section ────────────────────────────────────────────────
 
@@ -231,13 +295,13 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         title = QLabel("System Monitor")
-        title.setFont(QFont("Segoe UI", S.font_pt(20), QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", S.font_pt(20), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
         header_layout.addWidget(title)
 
         from systemmonitor import __version__ as _app_version
         version = QLabel(f"v{_app_version}")
-        version.setFont(QFont("Segoe UI", S.font_pt(9.5), QFont.Weight.Bold))
+        version.setFont(QFont("Cutive", S.font_pt(9.5), QFont.Weight.Bold))
         version.setStyleSheet(f"""
             color: {c.TEXT_SECONDARY};
             background-color: {c.BG_SECONDARY};
@@ -250,7 +314,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
 
         desc = QLabel(tr("Advanced system diagnostics and hardware telemetry in real-time."))
         desc.setWordWrap(True)
-        desc.setFont(QFont("Segoe UI", S.font_pt(10.5), QFont.Weight.Medium))
+        desc.setFont(QFont("Cutive", S.font_pt(10.5), QFont.Weight.Medium))
         desc.setStyleSheet(f"color: {c.TEXT_PRIMARY}; border: none; margin-bottom: 2px;")
         desc.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(desc)
@@ -262,7 +326,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         layout.addWidget(sep)
 
         features_title = QLabel(tr("Key Features:"))
-        features_title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        features_title.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.Bold))
         features_title.setStyleSheet(f"color: {c.ACCENT_BLUE}; border: none; margin-top: 5px; margin-bottom: 2px;")
         layout.addWidget(features_title)
 
@@ -291,12 +355,12 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
             feat_layout.setSpacing(S.px(2))
 
             name_label = QLabel(tr(title_str))
-            name_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+            name_label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
             name_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
             
             desc_label = QLabel(tr(desc_str))
             desc_label.setWordWrap(True)
-            desc_label.setFont(QFont("Segoe UI", S.font_pt(9.5)))
+            desc_label.setFont(QFont("Cutive", S.font_pt(9.5)))
             desc_label.setStyleSheet(f"color: {c.TEXT_SECONDARY}; border: none;")
             
             feat_layout.addWidget(name_label)
@@ -312,12 +376,12 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         feat_layout.setSpacing(S.px(2))
 
         name_label = QLabel(tr(title_str))
-        name_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        name_label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
         name_label.setStyleSheet(f"color: {c.ACCENT_GREEN}; border: none;")
         
         desc_label = QLabel(tr(desc_str))
         desc_label.setWordWrap(True)
-        desc_label.setFont(QFont("Segoe UI", S.font_pt(9.5)))
+        desc_label.setFont(QFont("Cutive", S.font_pt(9.5)))
         desc_label.setStyleSheet(f"color: {c.TEXT_SECONDARY}; border: none;")
         
         feat_layout.addWidget(name_label)
@@ -372,13 +436,13 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
 
         for topic, text in help_topics:
             topic_lbl = QLabel(tr(topic))
-            topic_lbl.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+            topic_lbl.setFont(QFont("Cutive", S.font_pt(12), QFont.Weight.Bold))
             topic_lbl.setStyleSheet(f"color: {c.ACCENT_BLUE}; border: none;")
             layout.addWidget(topic_lbl)
 
             text_lbl = QLabel(tr(text))
             text_lbl.setWordWrap(True)
-            text_lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
+            text_lbl.setFont(QFont("Cutive", S.font_pt(10)))
             text_lbl.setStyleSheet(f"color: {c.TEXT_PRIMARY}; border: none;")
             layout.addWidget(text_lbl)
 
@@ -426,13 +490,13 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         left.setLayout(ll)
 
         lbl = QLabel(label)
-        lbl.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+        lbl.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.Medium))
         lbl.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent; border: none;")
         ll.addWidget(lbl)
 
         if desc:
             d = QLabel(desc)
-            d.setFont(QFont("Segoe UI", S.font_pt(9)))
+            d.setFont(QFont("Cutive", S.font_pt(9)))
             d.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent; border: none;")
             d.setWordWrap(True)
             ll.addWidget(d)
@@ -456,7 +520,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         combo.setCursor(Qt.CursorShape.PointingHandCursor)
         combo.setFixedWidth(S.px(210))
         combo.setFixedHeight(S.px(34))
-        combo.setFont(QFont("Segoe UI", S.font_pt(10)))
+        combo.setFont(QFont("Cutive", S.font_pt(10)))
         combo.setStyleSheet(f"""
             QComboBox {{
                 background-color: {c.BG_SECONDARY};
@@ -496,7 +560,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         c = _c()
         btn = QPushButton(text)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
+        btn.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Medium))
         btn.setFixedHeight(S.px(34))
 
         if danger:
@@ -574,7 +638,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         """)
 
         val_lbl = QLabel(f"{value}{unit}")
-        val_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        val_lbl.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
         val_lbl.setFixedWidth(S.px(48))
         val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         val_lbl.setStyleSheet(f"""
@@ -720,31 +784,19 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         card = Card(title=tr("Appearance"), icon="ph.palette")
 
         theme_keys  = [
-            "cyber-cyan", "premium", "cyberpunk", "heimdal",
+            "ember", "cyber-cyan", "premium", "cyberpunk", "heimdal",
         ]
         theme_names = [
-            tr("Cyber Cyan (Default)"), tr("Premium Dark"), tr("Cyberpunk"), tr("Heimdal"),
+            tr("Ember (Default)"), tr("Cyber Cyan"), tr("Premium Dark"), tr("Cyberpunk"), tr("Heimdal"),
         ]
         theme_combo = self._combo(theme_names, theme_keys,
-                                  settings.get('theme', 'cyber-cyan'))
+                                  settings.get('theme', 'ember'))
         theme_combo.currentIndexChanged.connect(
             lambda _: self._on_theme_selected(theme_combo.currentData()))
         card.add_widget(self._row(
             tr("Theme"),
             tr("Overall visual appearance of the application"),
             theme_combo
-        ))
-
-        home_keys  = ["sidebar", "launcher"]
-        home_names = [tr("Sidebar navigation (Default)"), tr("Module launcher")]
-        home_combo = self._combo(home_names, home_keys,
-                                 settings.get('home_screen_style', 'sidebar'))
-        home_combo.currentIndexChanged.connect(
-            lambda i: self._on_home_screen_style_changed(home_keys[i]))
-        card.add_widget(self._row(
-            tr("Home screen"),
-            tr("Choose between the classic sidebar or a centered grid of module tiles as your start screen"),
-            home_combo
         ))
 
         scale_vals  = [0.75, 0.90, 1.0, 1.10, 1.25, 1.50]
@@ -898,7 +950,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
 
         self._path_label = QLabel(
             settings.get('export_directory', str(Path.home() / 'Documents')))
-        self._path_label.setFont(QFont("Consolas", S.font_pt(9)))
+        self._path_label.setFont(QFont("Cutive", S.font_pt(9)))
         self._path_label.setStyleSheet(f"""
             color: {c.TEXT_SECONDARY};
             background: {c.BG_SECONDARY};
@@ -954,7 +1006,7 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         ))
 
         url_label = QLabel(f"http://localhost:{settings.get('prometheus_port', 9090)}/metrics")
-        url_label.setFont(QFont("Consolas", S.font_pt(9)))
+        url_label.setFont(QFont("Cutive", S.font_pt(9)))
         url_label.setStyleSheet(f"""
             color: {c.TEXT_SECONDARY};
             background: {c.BG_SECONDARY};
@@ -993,10 +1045,6 @@ class SettingsView(QWidget, ScaleMixin, I18nMixin):
         self.signals_changed.emit('theme', theme)
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, lambda: theme_manager.set_theme(theme))
-
-    def _on_home_screen_style_changed(self, style: str):
-        settings.set('home_screen_style', style)
-        self.signals_changed.emit('home_screen_style', style)
 
     def _on_language_selected(self, language: str):
         self.signals_changed.emit('language', language)

@@ -326,6 +326,57 @@ class CyberCyanTheme:
 
 
 
+class EmberTheme:
+    """Ember: black/charcoal surfaces, orange primary accent, green OK/LIVE, cyan secondary series"""
+    BG_PRIMARY = "#0b0b0d"
+    BG_SECONDARY = "#111113"
+    BG_CARD = "#151517"
+    BG_CARD_SOLID = "#151517"
+    BG_HOVER = "#1f1f22"
+    BG_INPUT = "#101012"
+    BG_ACTIVE = "#ff8a00"
+    GLASS_BG = "rgba(21, 21, 23, 0.85)"
+    GLASS_BORDER = "rgba(255, 138, 0, 0.22)"
+    GLASS_SHADOW = "rgba(0, 0, 0, 0.5)"
+    TEXT_PRIMARY = "#f5f5f4"
+    TEXT_SECONDARY = "#a1a1a6"
+    TEXT_MUTED = "#6b6b72"
+    TEXT_DISABLED = "#3b3b40"
+    ACCENT_GREEN = "#ff8a00"  # primary accent (orange) - name kept for compatibility
+    ACCENT_GREEN_BRIGHT = "#ffa733"
+    ACCENT_GREEN_DIM = "rgba(255, 138, 0, 0.16)"
+    ACCENT_GREEN_GLOW = "rgba(255, 138, 0, 0.4)"
+    ACCENT_GREEN_PULSE = "rgba(255, 138, 0, 0.6)"
+    ACCENT_BLUE = "#00d4e6"
+    ACCENT_ORANGE = "#ff8a00"
+    ACCENT_RED = "#ef4444"
+    ACCENT_YELLOW = "#fbbf24"
+    ACCENT_CYAN = "#00d4e6"
+    ACCENT_PURPLE = "#a371f7"
+    ACCENT_PINK = "#ec4899"
+    STATUS_RED = "#ef4444"
+    STATUS_ORANGE = "#ff8a00"
+    STATUS_YELLOW = "#fbbf24"
+    STATUS_GREEN = "#22c55e"
+    BORDER = "#2a2a2e"
+    BORDER_SUBTLE = "#1d1d20"
+    BORDER_FOCUS = "#ff8a00"
+    BORDER_GLOW = "rgba(255, 138, 0, 0.4)"
+    GAUGE_BG = "#26262a"
+    GAUGE_FILL = "#ff8a00"
+    CHART_FILL = "rgba(255, 138, 0, 0.18)"
+    CHART_LINE = "#ff8a00"
+    CHART_GRID = "rgba(255, 255, 255, 0.06)"
+    SHADOW = "rgba(0, 0, 0, 0.6)"
+    OVERLAY = "rgba(11, 11, 13, 0.92)"
+    GLOW = "0 0 20px rgba(255, 138, 0, 0.18)"
+    GLOW_STRONG = "0 0 30px rgba(255, 138, 0, 0.3)"
+    SUCCESS_BG = "rgba(34, 197, 94, 0.12)"
+    WARNING_BG = "rgba(255, 138, 0, 0.12)"
+    ERROR_BG = "rgba(239, 68, 68, 0.12)"
+    INFO_BG = "rgba(0, 212, 230, 0.10)"
+
+
 class ThemeManager(QObject):
     """Manages application theme (singleton)"""
     theme_changed = pyqtSignal(str)  # Emits theme name
@@ -333,6 +384,7 @@ class ThemeManager(QObject):
     _instance = None
 
     _themes = {
+        "ember": EmberTheme,
         "cyber-cyan": CyberCyanTheme,
         "premium": PremiumDarkTheme,
         "cyberpunk": CyberpunkTheme,
@@ -340,6 +392,7 @@ class ThemeManager(QObject):
     }
 
     _theme_names = {
+        "ember": "Ember",
         "cyber-cyan": "Cyber Cyan",
         "premium": "Premium Dark",
         "cyberpunk": "Cyberpunk",
@@ -357,8 +410,8 @@ class ThemeManager(QObject):
             return
         super().__init__()
         self._initialized = True
-        self._current_theme = "cyber-cyan"
-        self._colors = CyberCyanTheme()
+        self._current_theme = "ember"
+        self._colors = EmberTheme()
 
     @property
     def current_theme(self) -> str:
@@ -379,7 +432,7 @@ class ThemeManager(QObject):
     def set_theme(self, theme_name: str):
         """Switch between themes"""
         if theme_name not in self._themes:
-            theme_name = "cyber-cyan"
+            theme_name = "ember"
 
         if theme_name == self._current_theme:
             return
@@ -444,7 +497,7 @@ class ThemeManager(QObject):
             border: 1px solid {c.BORDER};
             border-radius: 6px;
             padding: 8px 16px;
-            font-family: "Segoe UI", "Inter", sans-serif;
+            font-family: "Cutive", sans-serif;
             font-size: 12px;
         }}
 
@@ -471,7 +524,7 @@ class ThemeManager(QObject):
             border: 1px solid {glass_border};
             border-radius: 6px;
             padding: 8px 12px;
-            font-family: "Segoe UI", "Inter", sans-serif;
+            font-family: "Cutive", sans-serif;
             font-size: 12px;
         }}
 
@@ -485,7 +538,7 @@ class ThemeManager(QObject):
             border: 1px solid {glass_border};
             border-radius: 6px;
             padding: 8px 12px;
-            font-family: "Segoe UI", "Inter", sans-serif;
+            font-family: "Cutive", sans-serif;
             font-size: 12px;
         }}
 
@@ -635,7 +688,7 @@ class ThemeManager(QObject):
             border: 1px solid {c.BORDER};
             border-radius: 6px;
             padding: 8px;
-            font-family: "Segoe UI", sans-serif;
+            font-family: "Cutive", sans-serif;
         }}
 
         QSplitter::handle {{
@@ -646,6 +699,89 @@ class ThemeManager(QObject):
 
         QSplitter::handle:hover {{
             background-color: {c.ACCENT_GREEN};
+        }}
+
+        /* ---- Reference redesign components (widgets/ref_design.py) ---- */
+        QFrame#RefPanel {{
+            background-color: {c.BG_CARD};
+            border: 1px solid {c.BORDER};
+            border-radius: 10px;
+        }}
+        QFrame#RefHeader {{
+            background: transparent;
+            border: none;
+        }}
+        QLabel#RefTitle {{
+            color: {c.TEXT_PRIMARY};
+            background: transparent;
+            border: none;
+            font-weight: 700;
+        }}
+        QLabel#RefMuted {{
+            color: {c.TEXT_MUTED};
+            background: transparent;
+            border: none;
+        }}
+        QLabel#RefSub {{
+            color: {c.TEXT_SECONDARY};
+            background: transparent;
+            border: none;
+        }}
+        QLabel#RefValue {{
+            color: {c.TEXT_PRIMARY};
+            background: transparent;
+            border: none;
+            font-weight: 700;
+        }}
+        QLabel#RefPill {{
+            color: {c.STATUS_GREEN};
+            background-color: rgba(34, 197, 94, 0.10);
+            border: 1px solid {c.STATUS_GREEN};
+            border-radius: 15px;
+            padding: 4px 14px;
+        }}
+        QLabel#RefPill[state="warn"] {{
+            color: {c.STATUS_ORANGE};
+            background-color: {c.WARNING_BG};
+            border: 1px solid {c.STATUS_ORANGE};
+        }}
+        QLabel#RefPill[state="bad"] {{
+            color: {c.STATUS_RED};
+            background-color: {c.ERROR_BG};
+            border: 1px solid {c.STATUS_RED};
+        }}
+        QPushButton#RefNavBtn {{
+            background-color: transparent;
+            color: {c.TEXT_SECONDARY};
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            text-align: left;
+        }}
+        QPushButton#RefNavBtn:hover {{
+            background-color: {c.BG_HOVER};
+            color: {c.TEXT_PRIMARY};
+        }}
+        QPushButton#RefNavBtn:checked {{
+            background-color: {c.ACCENT_GREEN};
+            color: {c.BG_PRIMARY};
+            font-weight: 700;
+        }}
+        QPushButton#RefTab {{
+            background-color: {c.BG_SECONDARY};
+            color: {c.TEXT_SECONDARY};
+            border: none;
+            border-radius: 4px;
+            padding: 2px 7px;
+        }}
+        QPushButton#RefTab:hover {{
+            background-color: {c.BG_HOVER};
+            color: {c.TEXT_PRIMARY};
+        }}
+        QPushButton#RefTab:checked {{
+            background-color: {c.ACCENT_GREEN};
+            color: {c.BG_PRIMARY};
+            font-weight: 700;
         }}
         """
 

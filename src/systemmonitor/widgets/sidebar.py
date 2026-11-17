@@ -18,7 +18,6 @@ NAV_STRUCTURE = {
         "title": None,
         "items": [
             {"key": "overview", "label": "Dashboard", "icon": "mdi.view-dashboard"},
-            {"key": "cpu", "label": "Processor", "icon": "ph.cpu"},
             {"key": "gpu", "label": "Graphics", "icon": "ph.monitor"},
             {"key": "network", "label": "Network", "icon": "ph.wifi-high"},
             {"key": "memory", "label": "Memory", "icon": "mdi.memory"},
@@ -55,7 +54,7 @@ class PremiumNavItem(QPushButton, ScaleMixin):
         self.setMinimumWidth(S.px(280))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
-        font = S.font("Segoe UI", 13)
+        font = S.font("Cutive", 13)
         self.setFont(font)
 
         self._setup_icon()
@@ -111,7 +110,7 @@ class PremiumNavItem(QPushButton, ScaleMixin):
                     padding: {S.px(12)}px {S.px(16)}px;
                     text-align: left;
                     border-radius: {S.px(6)}px;
-                    font-family: "Segoe UI", sans-serif;
+                    font-family: "Cutive", sans-serif;
                     font-size: {S.px(13)}px;
                     font-weight: 500;
                 }}
@@ -149,7 +148,7 @@ class PremiumNavItem(QPushButton, ScaleMixin):
                     padding: {S.px(12)}px {S.px(16)}px;
                     text-align: left;
                     border-radius: {S.px(6)}px;
-                    font-family: "Segoe UI", sans-serif;
+                    font-family: "Cutive", sans-serif;
                     font-size: {S.px(13)}px;
                     font-weight: 500;
                 }}
@@ -244,7 +243,7 @@ class PremiumSidebar(QFrame, ScaleMixin):
             title = section_data.get("title")
             if title:
                 section_label = QLabel(title)
-                section_label.setFont(QFont("Segoe UI", 10, QFont.Medium))
+                section_label.setFont(QFont("Cutive", 10, QFont.Medium))
                 section_label.setStyleSheet(f"""
                     color: {theme_manager.colors.TEXT_MUTED};
                     letter-spacing: 1.5px;
@@ -326,7 +325,7 @@ class PremiumSidebar(QFrame, ScaleMixin):
             icon_layout.addWidget(icon_label)
         except Exception:
             icon_label = QLabel("SM")
-            icon_label.setFont(QFont("Segoe UI", 14, QFont.Bold))
+            icon_label.setFont(QFont("Cutive", 14, QFont.Bold))
             icon_label.setStyleSheet(f"color: {c.TEXT_PRIMARY};")
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_layout.addWidget(icon_label)
@@ -339,12 +338,12 @@ class PremiumSidebar(QFrame, ScaleMixin):
         title_container.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         title = QLabel("System Monitor")
-        title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", 13, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         title_container.addWidget(title)
 
         version = QLabel("v2.0")
-        version.setFont(QFont("Segoe UI", 9))
+        version.setFont(QFont("Cutive", 9))
         version.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         title_container.addWidget(version)
 
@@ -387,7 +386,7 @@ class PremiumSidebar(QFrame, ScaleMixin):
         status_layout.addWidget(status_indicator)
 
         status_text = QLabel("All systems operational")
-        status_text.setFont(QFont("Segoe UI", 10))
+        status_text.setFont(QFont("Cutive", 10))
         status_text.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         status_layout.addWidget(status_text)
         status_layout.addStretch()

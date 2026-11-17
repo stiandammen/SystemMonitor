@@ -126,6 +126,8 @@ def main():
 
     try:
         app = QApplication(sys.argv)
+        from systemmonitor.utils.fonts import load_app_font
+        load_app_font(app)
         app.setApplicationName("SystemMonitor")
         app.setApplicationVersion("2.0")
 
@@ -137,7 +139,7 @@ def main():
             app.setFont(default_font)
         else:
             from PyQt6.QtGui import QFont  # type: ignore[no-redef]
-            default_font = QFont("Segoe UI", 10)
+            default_font = QFont("Cutive", 10)
             default_font.setStyleHint(QFont.StyleHint.SansSerif)
             app.setFont(default_font)
         log_info(LogCategory.APP, "QApplication created OK")
@@ -219,7 +221,7 @@ def main():
                 title_grad.setColorAt(1.0, QColor(79, 172, 254, alpha)) # Deep sky blue
                 
                 painter.setPen(QPen(title_grad, 1))
-                font_title = _SplashFont("Segoe UI", 26, _SplashFont.Weight.Black)
+                font_title = _SplashFont("Cutive", 26, _SplashFont.Weight.Black)
                 painter.setFont(font_title)
                 painter.drawText(self.rect().adjusted(0, 35, 0, 0),
                                  _SplashQt.AlignmentFlag.AlignHCenter | _SplashQt.AlignmentFlag.AlignTop,
@@ -227,7 +229,7 @@ def main():
                                  
                 # Subtitle (Small uppercase tracked out tech text)
                 painter.setPen(QColor(148, 163, 184, int(alpha * 0.7)))
-                font_sub = _SplashFont("Segoe UI", 7, _SplashFont.Weight.Bold)
+                font_sub = _SplashFont("Cutive", 7, _SplashFont.Weight.Bold)
                 painter.setFont(font_sub)
                 painter.drawText(self.rect().adjusted(0, 75, 0, 0),
                                  _SplashQt.AlignmentFlag.AlignHCenter | _SplashQt.AlignmentFlag.AlignTop,
@@ -268,7 +270,7 @@ def main():
                 
                 # 5. Technical Terminal-Style Loading status log
                 painter.setPen(QColor(165, 243, 252)) # Light cyan
-                font_text = _SplashFont("Consolas", 9)  # Code terminal font
+                font_text = _SplashFont("Cutive", 9)  # Code terminal font
                 painter.setFont(font_text)
                 
                 # Format text: e.g. ":: LOADING CORE ENGINE..."
@@ -332,8 +334,8 @@ def main():
         from systemmonitor.config import settings as app_settings
         log_info(LogCategory.APP, "core modules imported OK")
 
-        # Apply saved theme (or fall back to cyber-cyan) before building the window
-        saved_theme = app_settings.get('theme', 'cyber-cyan')
+        # Apply saved theme (or fall back to ember) before building the window
+        saved_theme = app_settings.get('theme', 'ember')
         theme_manager.set_theme(saved_theme)
         app.setStyleSheet(theme_manager.get_stylesheet())
         log_info(LogCategory.APP, "Theme applied OK")

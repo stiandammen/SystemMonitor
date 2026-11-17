@@ -98,7 +98,7 @@ class Graph(QWidget):
             painter.drawLine(int(margin_left), int(y), int(width - margin_right), int(y))
 
         # Draw Y-axis labels with premium styling
-        painter.setFont(QFont("Segoe UI", 9))
+        painter.setFont(QFont("Cutive", 9))
         painter.setPen(QColor(c.TEXT_MUTED))
         for i in range(5):
             value = max_val * (4 - i) / 4

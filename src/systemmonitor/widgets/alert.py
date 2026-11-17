@@ -47,7 +47,7 @@ class AlertBadge(QPushButton):
         # Show count or just dot
         if self._count > 0:
             self.setText(str(min(self._count, 99)))
-            font = QFont("Segoe UI", 10, QFont.Weight.Bold)
+            font = QFont("Cutive", 10, QFont.Weight.Bold)
             self.setFont(font)
         else:
             self.setText("")

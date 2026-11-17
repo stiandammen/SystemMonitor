@@ -103,10 +103,10 @@ class Card(QFrame, ScaleMixin):
                 except Exception:
                     self._icon_label.setText("•")
             else:
-                self._icon_label.setFont(QFont("Segoe UI", S.font_pt(16)))
+                self._icon_label.setFont(QFont("Cutive", S.font_pt(16)))
             
         if self._title and hasattr(self, '_title_label'):
-            font = QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold)
+            font = QFont("Cutive", S.font_pt(13), QFont.Weight.Bold)
             self._title_label.setFont(font)
             self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
 

@@ -15,8 +15,26 @@ from systemmonitor.i18n import tr, language_manager, I18nMixin
 from systemmonitor.scaler import S, ScaleMixin
 from systemmonitor.utils.logger import LogCategory, log_info, log_exception
 from systemmonitor.data.storage import StorageCollector
-from systemmonitor.widgets.storage_widgets import StorageDiskCard, PerformanceHistoryGraph
-from systemmonitor.widgets.storage_view_widgets import StorageHeader, StorageKpiCard
+from systemmonitor.widgets.storage_widgets import StorageDiskCard
+from systemmonitor.widgets.ref_design import (
+    PageHeader, KpiTile, ReflowGrid, AreaChart, ChartPanel, BarPanel)
+
+
+class _StorageHdr(PageHeader):
+    """Reference header with the StorageHeader API (set_disk_count / set_live)."""
+
+    def __init__(self, parent=None):
+        super().__init__(tr("Storage"), tr("Disk space, performance and disk operations"),
+                         "ph.database", pill=tr("LIVE"), parent=parent)
+        self._count = 0
+
+    def set_disk_count(self, n: int):
+        if n != self._count:
+            self._count = n
+            self.sub_lbl.setText(f"{tr('Disk space, performance and disk operations')}  \u00b7  {n} {tr('disks')}")
+
+    def set_live(self, live: bool):
+        self.pill.set_state("ok" if live else "bad", tr("LIVE") if live else tr("Offline"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -31,10 +49,10 @@ class StorageView(QWidget, ScaleMixin, I18nMixin):
         self._collector = None
         self._collector_started = False
         self._update_interval_ms = 1000
-        self._perf_latency: PerformanceHistoryGraph | None = None
-        self._perf_iops: PerformanceHistoryGraph | None = None
-        self._perf_bandwidth: PerformanceHistoryGraph | None = None
-        self._perf_load: PerformanceHistoryGraph | None = None
+        self._perf_latency = None
+        self._perf_iops = None
+        self._perf_bandwidth = None
+        self._perf_load = None
         self.scale_connect()
         self.i18n_connect()
         self._setup_ui()
@@ -78,188 +96,98 @@ class StorageView(QWidget, ScaleMixin, I18nMixin):
             tmp.deleteLater()
 
         colors = theme_manager.colors
-        self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         main = QVBoxLayout()
-        main.setContentsMargins(S.px(16), S.px(16), S.px(16), S.px(16))
-        main.setSpacing(S.px(12))
+        main.setContentsMargins(S.px(14), S.px(10), S.px(14), S.px(10))
+        main.setSpacing(S.px(10))
         self.setLayout(main)
 
         # Header
-        self._header = StorageHeader()
+        self._header = _StorageHdr()
         main.addWidget(self._header)
 
         # KPI row
-        kpi_row = QHBoxLayout()
-        kpi_row.setSpacing(S.px(10))
+        self._kpi_capacity = KpiTile("Total Capacity", "ph.hard-drives", "ACCENT_CYAN")
+        self._kpi_used = KpiTile("Used", "ph.database", "ACCENT_GREEN")
+        self._kpi_free = KpiTile("Free", "ph.check-circle", "STATUS_GREEN")
+        self._kpi_read = KpiTile("Read Speed", "ph.arrow-down", "ACCENT_CYAN")
+        self._kpi_write = KpiTile("Write Speed", "ph.arrow-up", "ACCENT_GREEN")
 
-        self._kpi_capacity = StorageKpiCard(
-            "Total Capacity", "fa5s.hdd", colors.ACCENT_BLUE)
-        self._kpi_used = StorageKpiCard(
-            "Used", "mdi.database", colors.ACCENT_ORANGE)
-        self._kpi_free = StorageKpiCard(
-            "Free", "mdi.check-circle", colors.ACCENT_GREEN)
-        self._kpi_read = StorageKpiCard(
-            "Read Speed", "mdi.arrow-down-bold", colors.ACCENT_GREEN)
-        self._kpi_write = StorageKpiCard(
-            "Write Speed", "mdi.arrow-up-bold", colors.ACCENT_BLUE)
-
-        for kpi in [self._kpi_capacity, self._kpi_used, self._kpi_free,
-                    self._kpi_read, self._kpi_write]:
-            kpi_row.addWidget(kpi)
-
-        kpi_widget = QWidget()
-        kpi_widget.setLayout(kpi_row)
-        main.addWidget(kpi_widget)
+        # KPI tiles re-flow (5 across on wide windows, wrapping on narrow ones)
+        kpi_grid = ReflowGrid([(k, 1) for k in (self._kpi_capacity, self._kpi_used, self._kpi_free,
+                                                 self._kpi_read, self._kpi_write)],
+                              max_cols=5, min_col_width=170)
+        main.addWidget(kpi_grid)
 
         # ── Scroll area wraps disk cards + perf section ───────────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("background: transparent; border: none;")
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }"
+                             "QScrollArea > QWidget > QWidget { background: transparent; }")
 
         inner = QWidget()
-        inner.setStyleSheet("background: transparent;")
+        inner.setObjectName("RefContent")
+        inner.setStyleSheet("QWidget#RefContent { background: transparent; }")
         inner_lay = QVBoxLayout(inner)
-        inner_lay.setContentsMargins(0, 0, S.px(2), 0)
-        inner_lay.setSpacing(S.px(12))
+        inner_lay.setContentsMargins(0, 0, S.px(4), 0)
+        inner_lay.setSpacing(S.px(10))
 
-        # Section divider — "PHYSICAL DISKS"
-        section_row = QHBoxLayout()
-        section_row.setSpacing(0)
-        section_row.setContentsMargins(0, S.px(2), 0, 0)
+        # Disk cards (re-flow into 1..3 columns)
+        self._disk_cards_inner = ReflowGrid([], max_cols=3, min_col_width=520)
+        inner_lay.addWidget(self._disk_cards_inner)
 
-        accent_bar = QFrame()
-        accent_bar.setFixedSize(S.px(3), S.px(16))
-        accent_bar.setStyleSheet(
-            f"background-color: {colors.ACCENT_GREEN};"
-            f"border-radius: {S.px(2)}px;"
-        )
-        section_row.addWidget(accent_bar)
-        section_row.addSpacing(S.px(10))
+        # ── Performance charts ────────────────────────────────────────────────
+        def _bytes_fmt(v):
+            for unit, div in (("GB/s", 1024 ** 3), ("MB/s", 1024 ** 2), ("KB/s", 1024)):
+                if v >= div:
+                    n = v / div
+                    return (f"{n:.0f}" if n >= 10 else f"{n:.1f}") + f" {unit}"
+            return f"{v:.0f} B/s"
 
-        section_lbl = QLabel(tr("PHYSICAL DISKS"))
-        section_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
-        section_lbl.setStyleSheet(
-            f"color: {colors.TEXT_MUTED}; background: transparent;"
-        )
-        section_row.addWidget(section_lbl)
-        section_row.addSpacing(S.px(12))
+        self._perf_bandwidth = AreaChart(["ACCENT_GREEN", "ACCENT_CYAN"], None, y_fmt=_bytes_fmt)
+        p_bw = ChartPanel(tr("Disk throughput"), "ph.chart-line", self._perf_bandwidth, tabs=True,
+                          legend=[("ACCENT_GREEN", tr("Write")), ("ACCENT_CYAN", tr("Read"))])
+        p_bw.setMinimumHeight(S.px(230))
 
-        rule = QFrame()
-        rule.setFrameShape(QFrame.Shape.HLine)
-        rule.setFixedHeight(1)
-        rule.setStyleSheet(f"background-color: {colors.BORDER}; border: none;")
-        section_row.addWidget(rule, stretch=1)
+        self._perf_iops = AreaChart(["ACCENT_GREEN", "ACCENT_CYAN"], None,
+                                    y_fmt=lambda v: f"{v:.0f}", min_auto=10.0)
+        p_iops = ChartPanel(tr("Disk Operations"), "ph.activity", self._perf_iops, tabs=True,
+                            legend=[("ACCENT_GREEN", tr("Write")), ("ACCENT_CYAN", tr("Read"))])
+        p_iops.setMinimumHeight(S.px(230))
 
-        inner_lay.addLayout(section_row)
+        self._perf_latency = AreaChart(["ACCENT_GREEN", "ACCENT_CYAN"], None,
+                                       y_fmt=lambda v: f"{v:.1f} ms", min_auto=1.0)
+        p_lat = ChartPanel(tr("Disk Latency"), "ph.timer", self._perf_latency, tabs=True,
+                           legend=[("ACCENT_GREEN", tr("Write")), ("ACCENT_CYAN", tr("Read"))])
+        p_lat.setMinimumHeight(S.px(230))
 
-        # Disk card container — no stretch so cards stay compact
-        disk_container = QWidget()
-        disk_container.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
-        self._disk_cards_inner = QVBoxLayout()
-        self._disk_cards_inner.setSpacing(S.px(10))
-        self._disk_cards_inner.setContentsMargins(0, 0, 0, 0)
-        disk_container.setLayout(self._disk_cards_inner)
-        inner_lay.addWidget(disk_container)
+        self._perf_load = AreaChart(["ACCENT_GREEN"], 100.0)
+        p_load = ChartPanel(tr("Disk Load"), "ph.gauge", self._perf_load, tabs=True)
+        p_load.setMinimumHeight(S.px(230))
 
-        # ── TOTAL PERFORMANCE section ─────────────────────────────────────────
-        perf_section_row = QHBoxLayout()
-        perf_section_row.setSpacing(0)
-        perf_section_row.setContentsMargins(0, S.px(6), 0, 0)
+        self._bw_panel = BarPanel(tr("Disk bandwidth"), "ph.arrows-down-up")
+        self._bw_panel.add_row("write", "Write", "ACCENT_GREEN")
+        self._bw_panel.add_row("read", "Read", "ACCENT_CYAN")
+        self._bw_peak = 1.0
 
-        perf_accent = QFrame()
-        perf_accent.setFixedSize(S.px(3), S.px(16))
-        perf_accent.setStyleSheet(
-            f"background-color: {colors.ACCENT_BLUE};"
-            f"border-radius: {S.px(2)}px;"
-        )
-        perf_section_row.addWidget(perf_accent)
-        perf_section_row.addSpacing(S.px(10))
-
-        perf_section_lbl = QLabel(tr("TOTAL PERFORMANCE"))
-        perf_section_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
-        perf_section_lbl.setStyleSheet(
-            f"color: {colors.TEXT_MUTED}; background: transparent;"
-        )
-        perf_section_row.addWidget(perf_section_lbl)
-        perf_section_row.addSpacing(S.px(12))
-
-        perf_rule = QFrame()
-        perf_rule.setFrameShape(QFrame.Shape.HLine)
-        perf_rule.setFixedHeight(1)
-        perf_rule.setStyleSheet(f"background-color: {colors.BORDER}; border: none;")
-        perf_section_row.addWidget(perf_rule, stretch=1)
-        inner_lay.addLayout(perf_section_row)
-
-        # Row 1: Latency + IOPS
-        perf_row1 = QHBoxLayout()
-        perf_row1.setSpacing(S.px(10))
-
-        self._perf_latency = PerformanceHistoryGraph("Disk Latency", unit='ms', max_points=90)
-        self._perf_latency.add_series("Write", colors.ACCENT_YELLOW, 'scatter')
-        self._perf_latency.add_series("Read", colors.ACCENT_ORANGE, 'scatter')
-        self._perf_latency.setMinimumHeight(S.px(190))
-        self._perf_latency.setMaximumHeight(S.px(220))
-        perf_row1.addWidget(self._perf_latency)
-
-        self._perf_iops = PerformanceHistoryGraph("Disk Operations", unit='iops', max_points=90)
-        self._perf_iops.add_series("Write", colors.TEXT_SECONDARY, 'line')
-        self._perf_iops.add_series("Read", colors.ACCENT_GREEN, 'line')
-        self._perf_iops.setMinimumHeight(S.px(190))
-        self._perf_iops.setMaximumHeight(S.px(220))
-        perf_row1.addWidget(self._perf_iops)
-
-        inner_lay.addLayout(perf_row1)
-
-        # Row 2: Bandwidth + Load
-        perf_row2 = QHBoxLayout()
-        perf_row2.setSpacing(S.px(10))
-
-        self._perf_bandwidth = PerformanceHistoryGraph("Disk Bandwidth", unit='B/s', max_points=90)
-        self._perf_bandwidth.add_series("Write", colors.ACCENT_BLUE, 'line')
-        self._perf_bandwidth.add_series("Read", colors.ACCENT_GREEN, 'line')
-        self._perf_bandwidth.setMinimumHeight(S.px(190))
-        self._perf_bandwidth.setMaximumHeight(S.px(220))
-        perf_row2.addWidget(self._perf_bandwidth)
-
-        self._perf_load = PerformanceHistoryGraph("Disk Load", unit='%', max_points=90)
-        self._perf_load.add_series("Load", colors.ACCENT_ORANGE, 'line')
-        self._perf_load.setMinimumHeight(S.px(190))
-        self._perf_load.setMaximumHeight(S.px(220))
-        perf_row2.addWidget(self._perf_load)
-
-        inner_lay.addLayout(perf_row2)
+        perf = ReflowGrid([(p_bw, 1), (p_iops, 1), (p_lat, 1), (p_load, 1), (self._bw_panel, 2)],
+                          max_cols=2, min_col_width=480)
+        inner_lay.addWidget(perf)
         inner_lay.addStretch(1)
 
         scroll.setWidget(inner)
+        perf.bind_viewport(scroll)
         main.addWidget(scroll, stretch=1)
 
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self._on_update_tick)
         self._update_timer.start(self._update_interval_ms)
 
-        self._apply_history_length()
-
     def _on_setting_changed(self, key: str, value):
-        if key in ('history_duration', 'update_interval'):
-            self._apply_history_length()
-
-    def _apply_history_length(self):
-        """Resize the performance history graph buffers based on the History Length setting"""
-        from systemmonitor.config import settings, AppConfig
-        points, stride = AppConfig.history_window(
-            settings.get('history_duration', 300),
-            settings.get('update_interval', 500))
-        for graph in (self._perf_latency, self._perf_iops,
-                      self._perf_bandwidth, self._perf_load):
-            if graph is not None:
-                graph.set_max_points(points)
-                graph.set_sample_stride(stride)
+        pass  # history length is handled by the chart range tabs
 
     # ── collector ─────────────────────────────────────────────────────────
     def start_collector(self):
@@ -293,7 +221,7 @@ class StorageView(QWidget, ScaleMixin, I18nMixin):
             if dev not in self._disk_cards:
                 card = StorageDiskCard(disk)
                 self._disk_cards[dev] = card
-                self._disk_cards_inner.addWidget(card)
+                self._disk_cards_inner.add_widget(card)
             else:
                 self._disk_cards[dev].update_disk_info(disk)
             self._disk_cards[dev].update_speeds(
@@ -302,7 +230,9 @@ class StorageView(QWidget, ScaleMixin, I18nMixin):
 
         for dev in list(self._disk_cards.keys()):
             if dev not in current:
-                self._disk_cards.pop(dev).deleteLater()
+                gone = self._disk_cards.pop(dev)
+                self._disk_cards_inner.remove_widget(gone)
+                gone.deleteLater()
 
         # KPI aggregates
         total_size  = sum(d.get("total", 0) for d in disks)
@@ -330,26 +260,28 @@ class StorageView(QWidget, ScaleMixin, I18nMixin):
         self._kpi_write.set_value(*self._fmt_speed(total_write))
         self._header.set_live(True)
 
-        # Performance history graphs
+        # Performance history graphs (same data keys as before)
         if self._perf_latency is not None:
             self._perf_latency.push(
-                Write=data.get('total_write_latency_ms', 0),
-                Read=data.get('total_read_latency_ms', 0),
+                data.get('total_write_latency_ms', 0),
+                data.get('total_read_latency_ms', 0),
             )
         if self._perf_iops is not None:
             self._perf_iops.push(
-                Write=data.get('total_write_iops', 0),
-                Read=data.get('total_read_iops', 0),
+                data.get('total_write_iops', 0),
+                data.get('total_read_iops', 0),
             )
         if self._perf_bandwidth is not None:
-            self._perf_bandwidth.push(
-                Write=total_write,
-                Read=total_read,
-            )
+            self._perf_bandwidth.push(total_write, total_read)
+            self._bw_peak = max(total_write, total_read, self._bw_peak * 0.995, 1.0)
+            self._bw_panel.set_row("write", total_write / self._bw_peak * 100,
+                                   "{} {}".format(*self._fmt_speed(total_write)))
+            self._bw_panel.set_row("read", total_read / self._bw_peak * 100,
+                                   "{} {}".format(*self._fmt_speed(total_read)))
         if self._perf_load is not None:
-            self._perf_load.push(
-                Load=data.get('total_busy_pct', 0),
-            )
+            busy = data.get('total_busy_pct', 0) or 0
+            self._perf_load.push(busy)
+            self._perf_load.set_overlay(f"{busy:.0f} %")
 
     @staticmethod
     def _fmt_speed(bps: float):

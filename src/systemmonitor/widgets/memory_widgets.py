@@ -88,7 +88,7 @@ class MemoryKpiCard(QFrame, ScaleMixin, I18nMixin):
         top_row.addWidget(icon_label)
 
         self._title_label = QLabel(self._title)
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(10)))
         self._title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         top_row.addWidget(self._title_label)
         top_row.addStretch()
@@ -97,13 +97,13 @@ class MemoryKpiCard(QFrame, ScaleMixin, I18nMixin):
 
         # Value
         self._value_label = QLabel(self._value)
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(20), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Cutive", S.font_pt(20), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
         layout.addWidget(self._value_label)
 
         # Unit
         self._unit_label = QLabel("")
-        self._unit_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._unit_label.setFont(QFont("Cutive", S.font_pt(10)))
         self._unit_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         layout.addWidget(self._unit_label)
 
@@ -208,7 +208,7 @@ class MemoryWaveChart(QWidget, ScaleMixin):
         pct = self._cur_pct
         used_hex = (colors.ACCENT_RED    if pct > 90 else
                     colors.ACCENT_ORANGE if pct > 70 else
-                    colors.ACCENT_YELLOW if pct > 40 else
+                    colors.ACCENT_GREEN  if pct > 40 else
                     colors.ACCENT_GREEN)
 
         # Background
@@ -254,7 +254,7 @@ class MemoryWaveChart(QWidget, ScaleMixin):
 
         # Side tick marks at 25 / 50 / 75%
         tick_c = QColor(colors.TEXT_MUTED); tick_c.setAlpha(70)
-        p.setFont(QFont("Segoe UI", S.font_pt(7)))
+        p.setFont(QFont("Cutive", S.font_pt(7)))
         for frac, label in ((0.25, "75%"), (0.5, "50%"), (0.75, "25%")):
             ty = int(by + bh * frac)
             p.setPen(QPen(tick_c, max(1, S.px(1))))
@@ -265,7 +265,7 @@ class MemoryWaveChart(QWidget, ScaleMixin):
         # Center text: animated % with drop shadow
         pct_str = f"{pct:.0f}%"
         cx, cy_c = bx + bw / 2, by + bh / 2
-        p.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
+        p.setFont(QFont("Cutive", S.font_pt(22), QFont.Weight.Bold))
         fm = p.fontMetrics()
         tx = int(cx - fm.horizontalAdvance(pct_str) / 2)
         ty = int(cy_c + S.px(7))
@@ -275,7 +275,7 @@ class MemoryWaveChart(QWidget, ScaleMixin):
         p.drawText(tx, ty, pct_str)
 
         # Sublabel
-        p.setFont(QFont("Segoe UI", S.font_pt(8)))
+        p.setFont(QFont("Cutive", S.font_pt(8)))
         fm2 = p.fontMetrics()
         p.setPen(QColor(colors.TEXT_MUTED))
         used_lbl = tr("Used")
@@ -347,7 +347,7 @@ class MemoryUsageGraph(QWidget, ScaleMixin):
         painter.drawRect(int(graph_x), int(graph_y), int(graph_w), int(graph_h))
 
         # Grid lines and labels
-        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
+        painter.setFont(QFont("Cutive", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_MUTED))
 
         # Horizontal grid (0%, 25%, 50%, 75%, 100%)
@@ -381,7 +381,7 @@ class MemoryUsageGraph(QWidget, ScaleMixin):
             elif current_val > 70:
                 line_color = QColor(colors.ACCENT_ORANGE)
             elif current_val > 40:
-                line_color = QColor(colors.ACCENT_YELLOW)
+                line_color = QColor(colors.ACCENT_GREEN)
             else:
                 line_color = QColor(colors.ACCENT_GREEN)
 
@@ -439,12 +439,12 @@ class MemoryUsageGraph(QWidget, ScaleMixin):
             painter.drawRoundedRect(int(badge_x), int(badge_y), S.px(55), S.px(22), S.px(4), S.px(4))
 
             # Badge text
-            painter.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+            painter.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
             painter.setPen(QColor(badge_color))
             painter.drawText(int(badge_x + S.px(8)), int(badge_y + S.px(15)), f"{val:.1f}%")
 
         # Time indicator (positioned to avoid overlapping with badge)
-        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
+        painter.setFont(QFont("Cutive", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_MUTED))
         painter.drawText(int(graph_x), int(h - S.px(5)), tr("60s ago"))
         # Position "now" text with padding from right edge
@@ -455,7 +455,7 @@ class MemoryUsageGraph(QWidget, ScaleMixin):
         painter.save()
         painter.translate(S.px(12), h / 2)
         painter.rotate(-90)
-        painter.setFont(QFont("Segoe UI", S.font_pt(8)))
+        painter.setFont(QFont("Cutive", S.font_pt(8)))
         painter.setPen(QColor(colors.TEXT_MUTED))
         painter.drawText(-S.px(15), 0, tr("Usage %"))
         painter.restore()
@@ -502,19 +502,19 @@ class ProcessRow(QFrame, ScaleMixin):
         top.setContentsMargins(0, 0, 0, 0)
 
         self._rank_lbl = QLabel()
-        self._rank_lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        self._rank_lbl.setFont(QFont("Cutive", S.font_pt(8), QFont.Weight.Bold))
         self._rank_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         self._rank_lbl.setFixedWidth(S.px(22))
         top.addWidget(self._rank_lbl)
 
         self._name_lbl = QLabel()
-        self._name_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        self._name_lbl.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
         self._name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         self._name_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         top.addWidget(self._name_lbl, stretch=1)
 
         self._pct_lbl = QLabel()
-        self._pct_lbl.setFont(QFont("Consolas", S.font_pt(9), QFont.Weight.Bold))
+        self._pct_lbl.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
         self._pct_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         self._pct_lbl.setFixedWidth(S.px(42))
         self._pct_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -534,7 +534,7 @@ class ProcessRow(QFrame, ScaleMixin):
         bot.addWidget(self._bar, stretch=1)
 
         self._mem_lbl = QLabel()
-        self._mem_lbl.setFont(QFont("Consolas", S.font_pt(8)))
+        self._mem_lbl.setFont(QFont("Cutive", S.font_pt(8)))
         self._mem_lbl.setStyleSheet(f"color: {colors.ACCENT_CYAN}; background: transparent;")
         self._mem_lbl.setFixedWidth(S.px(64))
         self._mem_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

@@ -66,7 +66,7 @@ class StorageHeader(QWidget, ScaleMixin, I18nMixin):
         self._live_dot = QFrame()
         self._live_dot.setFixedSize(S.px(9), S.px(9))
         self._live_dot.setStyleSheet(
-            f"background-color: {colors.ACCENT_GREEN};"
+            f"background-color: {colors.STATUS_GREEN};"
             f"border-radius: {S.px(4)}px;"
         )
         live_row.addWidget(self._live_dot)
@@ -95,8 +95,8 @@ class StorageHeader(QWidget, ScaleMixin, I18nMixin):
         self._pulse_anim.start()
 
         live_lbl = QLabel(tr("LIVE"))
-        live_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
-        live_lbl.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        live_lbl.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
+        live_lbl.setStyleSheet(f"color: {colors.STATUS_GREEN}; background: transparent;")
         live_row.addWidget(live_lbl)
         row.addLayout(live_row)
 
@@ -110,7 +110,7 @@ class StorageHeader(QWidget, ScaleMixin, I18nMixin):
 
         # ── Title ─────────────────────────────────────────────────────────
         title = QLabel(tr("Storage Monitor"))
-        title.setFont(QFont("Segoe UI", S.font_pt(17), QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", S.font_pt(17), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         row.addWidget(title)
         row.addStretch()
@@ -135,12 +135,12 @@ class StorageHeader(QWidget, ScaleMixin, I18nMixin):
         chip_row.addWidget(hdd_icon)
 
         self._disk_count_label = QLabel("--")
-        self._disk_count_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        self._disk_count_label.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.Bold))
         self._disk_count_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         chip_row.addWidget(self._disk_count_label)
 
         unit = QLabel(tr("disks"))
-        unit.setFont(QFont("Segoe UI", S.font_pt(9)))
+        unit.setFont(QFont("Cutive", S.font_pt(9)))
         unit.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         chip_row.addWidget(unit)
 
@@ -152,7 +152,7 @@ class StorageHeader(QWidget, ScaleMixin, I18nMixin):
     def set_live(self, live: bool):
         colors = theme_manager.colors
         self._live_state = live
-        c = colors.ACCENT_GREEN if live else colors.TEXT_MUTED
+        c = colors.STATUS_GREEN if live else colors.TEXT_MUTED
         self._live_dot.setStyleSheet(
             f"background-color: {c}; border-radius: {S.px(4)}px;"
         )
@@ -236,7 +236,7 @@ class StorageKpiCard(QFrame, ScaleMixin, I18nMixin):
         top.addWidget(icon_lbl)
 
         self._title_label = QLabel(self._title)
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(9)))
         self._title_label.setStyleSheet(
             f"color: {colors.TEXT_MUTED}; background: transparent;"
         )
@@ -248,7 +248,7 @@ class StorageKpiCard(QFrame, ScaleMixin, I18nMixin):
 
         # Value
         self._value_label = QLabel("--")
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Cutive", S.font_pt(18), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
         self._value_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
@@ -257,7 +257,7 @@ class StorageKpiCard(QFrame, ScaleMixin, I18nMixin):
 
         # Unit
         self._unit_label = QLabel(self._unit)
-        self._unit_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._unit_label.setFont(QFont("Cutive", S.font_pt(9)))
         self._unit_label.setStyleSheet(
             f"color: {colors.TEXT_MUTED}; background: transparent;"
         )

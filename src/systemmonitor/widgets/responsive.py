@@ -87,18 +87,18 @@ class CollapsiblePanel(QFrame, ScaleMixin):
 
         if self._icon:
             icon_label = QLabel(self._icon)
-            icon_label.setFont(QFont("Segoe UI", S.font_pt(14)))
+            icon_label.setFont(QFont("Cutive", S.font_pt(14)))
             icon_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
             header_layout.addWidget(icon_label)
 
         title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.DemiBold))
+        title_label.setFont(QFont("Cutive", S.font_pt(12), QFont.Weight.DemiBold))
         title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
         self._toggle_icon = QLabel("▼" if self._is_expanded else "▶")
-        self._toggle_icon.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._toggle_icon.setFont(QFont("Cutive", S.font_pt(10)))
         self._toggle_icon.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         header_layout.addWidget(self._toggle_icon)
 
@@ -231,12 +231,12 @@ class OverlayWidget(QFrame):
             container.setLayout(cl)
 
             lbl_title = QLabel(icon)
-            lbl_title.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+            lbl_title.setFont(QFont("Cutive", S.font_pt(8), QFont.Weight.Bold))
             lbl_title.setStyleSheet(f"color: {color}; background: transparent;")
             cl.addWidget(lbl_title)
 
             lbl_value = QLabel("--")
-            lbl_value.setFont(QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold))
+            lbl_value.setFont(QFont("Cutive", S.font_pt(14), QFont.Weight.Bold))
             lbl_value.setStyleSheet("color: #E8ECFF; background: transparent;")
             cl.addWidget(lbl_value)
 

@@ -68,13 +68,13 @@ class SpeedGauge(QWidget):
         painter.drawArc(write_rect.toRect(), 0 * 16, int(write_angle) * 16)
 
         # Center text - read speed
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", 9, QFont.Weight.Bold))
         painter.setPen(QColor(c.ACCENT_GREEN))
         read_text = self._format_speed(self._read_speed)
         painter.drawText(int(center - 28), int(center + 3), read_text)
 
         # Write speed below
-        painter.setFont(QFont("Segoe UI", 8))
+        painter.setFont(QFont("Cutive", 8))
         painter.setPen(QColor(c.ACCENT_BLUE))
         write_text = self._format_speed(self._write_speed)
         painter.drawText(int(center - 24), int(center + 14), write_text)
@@ -129,7 +129,7 @@ class TemperatureIndicator(QWidget):
         painter.drawRoundedRect(int(bar_x), int(bar_y), int(fill_width), bar_height, 3, 3)
 
         # Temperature label
-        painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", 10, QFont.Weight.Bold))
         painter.setPen(QColor(c.TEXT_PRIMARY))
         painter.drawText(0, int(bar_y + 15), format_temperature(self._temp))
 
@@ -189,7 +189,7 @@ class DiskCard(QFrame):
             icon_label.setFixedSize(sz, sz)
         except Exception:
             icon_label.setText("HDD")
-            icon_label.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+            icon_label.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
         top_row.addWidget(icon_label)
 
         # Drive name and mount point
@@ -198,12 +198,12 @@ class DiskCard(QFrame):
 
         drive_letter = self._drive_info.get('device', 'Unknown')[:2]
         name_label = QLabel(f"{drive_letter} {self._drive_info.get('mountpoint', '')}")
-        name_label.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        name_label.setFont(QFont("Cutive", 13, QFont.Weight.Bold))
         name_label.setStyleSheet(f"color: {c.TEXT_PRIMARY};")
         name_layout.addWidget(name_label)
 
         fs_label = QLabel(f"{self._drive_info.get('fstype', 'Unknown')} • {self._format_size(self._drive_info.get('total', 0))}")
-        fs_label.setFont(QFont("Segoe UI", 10))
+        fs_label.setFont(QFont("Cutive", 10))
         fs_label.setStyleSheet(f"color: {c.TEXT_MUTED};")
         name_layout.addWidget(fs_label)
 
@@ -213,7 +213,7 @@ class DiskCard(QFrame):
         # Usage percentage (large)
         pct = self._drive_info.get('percent', 0)
         pct_label = QLabel(f"{pct:.0f}%")
-        pct_label.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
+        pct_label.setFont(QFont("Cutive", 28, QFont.Weight.Bold))
         pct_label.setStyleSheet(f"color: {self._get_usage_color(pct)};")
         top_row.addWidget(pct_label)
 
@@ -244,15 +244,15 @@ class DiskCard(QFrame):
         total_gb = self._drive_info.get('total', 0) / (1024**3)
 
         used_label = QLabel(f"Used: {used_gb:.1f} GB")
-        used_label.setFont(QFont("Segoe UI", 10))
+        used_label.setFont(QFont("Cutive", 10))
         used_label.setStyleSheet(f"color: {c.TEXT_SECONDARY};")
         space_row.addWidget(used_label)
 
         space_row.addStretch()
 
         free_label = QLabel(f"Free: {free_gb:.1f} GB")
-        free_label.setFont(QFont("Segoe UI", 10))
-        free_label.setStyleSheet(f"color: {c.ACCENT_GREEN};")
+        free_label.setFont(QFont("Cutive", 10))
+        free_label.setStyleSheet(f"color: {c.STATUS_GREEN};")
         space_row.addWidget(free_label)
 
         main_layout.addLayout(space_row)
@@ -269,7 +269,7 @@ class DiskCard(QFrame):
 
         # Speed section
         speed_label = QLabel("Speed")
-        speed_label.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        speed_label.setFont(QFont("Cutive", 9, QFont.Weight.Bold))
         speed_label.setStyleSheet(f"color: {c.TEXT_MUTED};")
         bottom_row.addWidget(speed_label)
 
@@ -281,13 +281,13 @@ class DiskCard(QFrame):
         speed_info.setSpacing(2)
 
         read_lbl = QLabel("R: -- MB/s")
-        read_lbl.setFont(QFont("Segoe UI", 9))
+        read_lbl.setFont(QFont("Cutive", 9))
         read_lbl.setStyleSheet(f"color: {c.ACCENT_GREEN};")
         read_lbl.setObjectName("read_speed_label")
         speed_info.addWidget(read_lbl)
 
         write_lbl = QLabel("W: -- MB/s")
-        write_lbl.setFont(QFont("Segoe UI", 9))
+        write_lbl.setFont(QFont("Cutive", 9))
         write_lbl.setStyleSheet(f"color: {c.ACCENT_BLUE};")
         write_lbl.setObjectName("write_speed_label")
         speed_info.addWidget(write_lbl)
@@ -297,7 +297,7 @@ class DiskCard(QFrame):
 
         # Temperature section
         temp_label = QLabel("Temp")
-        temp_label.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        temp_label.setFont(QFont("Cutive", 9, QFont.Weight.Bold))
         temp_label.setStyleSheet(f"color: {c.TEXT_MUTED};")
         bottom_row.addWidget(temp_label)
 
@@ -412,7 +412,7 @@ class DiskMonitor(QWidget):
         # Header
         header = QHBoxLayout()
         title = QLabel("Disk Monitor")
-        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", 18, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY};")
         header.addWidget(title)
 
@@ -420,8 +420,8 @@ class DiskMonitor(QWidget):
 
         # Refresh indicator
         self._status_label = QLabel("● Live")
-        self._status_label.setFont(QFont("Segoe UI", 9))
-        self._status_label.setStyleSheet(f"color: {theme_manager.colors.ACCENT_GREEN};")
+        self._status_label.setFont(QFont("Cutive", 9))
+        self._status_label.setStyleSheet(f"color: {theme_manager.colors.STATUS_GREEN};")
         header.addWidget(self._status_label)
 
         main_layout.addLayout(header)

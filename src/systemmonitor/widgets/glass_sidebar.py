@@ -17,14 +17,11 @@ from systemmonitor.config import settings
 LOGO_PATH = get_resource_path("assets/hacker.png")
 
 
-HOME_ITEM = {"key": "home", "label": "Home", "icon": "ph.squares-four"}
-
 NAV_STRUCTURE = {
     "main": {
         "title": None,
         "items": [
             {"key": "overview", "label": "Dashboard", "icon": "mdi.view-dashboard"},
-            {"key": "cpu", "label": "Processor", "icon": "ph.cpu"},
             {"key": "gpu", "label": "Graphics", "icon": "ph.monitor"},
             {"key": "network", "label": "Network", "icon": "ph.wifi-high"},
             {"key": "memory", "label": "Memory", "icon": "mdi.memory"},
@@ -62,7 +59,7 @@ class GlassNavItem(QPushButton, ScaleMixin):
         self.setMinimumHeight(S.px(40))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
-        font = S.font("Segoe UI", 12)
+        font = S.font("Cutive", 12)
         self.setFont(font)
 
         self._setup_icon()
@@ -104,6 +101,8 @@ class GlassNavItem(QPushButton, ScaleMixin):
             c = theme_manager.colors
             normal_color = QColor(c.TEXT_MUTED)
             active_color = QColor(self._accent)
+            if self._is_active and theme_manager.current_theme == "ember":
+                normal_color = active_color = QColor(c.BG_PRIMARY)
             icon = qta.icon(
                 self._icon_name,
                 color=normal_color,
@@ -139,7 +138,7 @@ class GlassNavItem(QPushButton, ScaleMixin):
                     padding: {S.px(10)}px {S.px(14)}px;
                     text-align: left;
                     border-radius: {S.px(8)}px;
-                    font-family: "Segoe UI", sans-serif;
+                    font-family: "Cutive", sans-serif;
                     font-size: {S.font_pt(12)}px;
                     font-weight: 500;
                 }}
@@ -168,6 +167,16 @@ class GlassNavItem(QPushButton, ScaleMixin):
             """
             normal_border = "border-left: 3px solid transparent; background-color: transparent;"
 
+            filled = theme_manager.current_theme == "ember"
+            if filled:
+                # Reference design: active item is a solid accent pill with dark text
+                active_css = f"background-color: {accent}; color: {c.BG_PRIMARY}; border-left: 3px solid {accent}; font-weight: 700;"
+                hover_css = f"background-color: {c.BG_HOVER}; color: {c.TEXT_PRIMARY}; border-left: 3px solid transparent;"
+                normal_border = "border-left: 3px solid transparent; background-color: transparent;"
+            else:
+                active_css = f"background-color: {c.ACCENT_GREEN_DIM}; color: {c.TEXT_PRIMARY}; border-left: 3px solid {accent};"
+                hover_css = f"background-color: {c.BG_HOVER}; color: {c.TEXT_PRIMARY}; border-left: 3px solid {accent};"
+
             self.setStyleSheet(f"""
                 QPushButton {{
                     background-color: transparent;
@@ -177,21 +186,17 @@ class GlassNavItem(QPushButton, ScaleMixin):
                     padding: {S.px(10)}px {S.px(16)}px;
                     text-align: left;
                     border-radius: {S.px(8)}px;
-                    font-family: "Segoe UI", sans-serif;
+                    font-family: "Cutive", sans-serif;
                     font-size: {S.font_pt(12)}px;
                     font-weight: 500;
                 }}
 
                 QPushButton:hover {{
-                    background-color: {c.BG_HOVER};
-                    color: {c.TEXT_PRIMARY};
-                    border-left: 3px solid {accent};
+                    {hover_css}
                 }}
 
                 QPushButton:checked {{
-                    background-color: {c.ACCENT_GREEN_DIM};
-                    color: {c.TEXT_PRIMARY};
-                    border-left: 3px solid {accent};
+                    {active_css}
                 }}
 
                 QPushButton:pressed {{
@@ -210,7 +215,10 @@ class GlassNavItem(QPushButton, ScaleMixin):
         try:
             c = theme_manager.colors
             color = self._accent if self._is_active else c.TEXT_MUTED
-            icon = qta.icon(self._icon_name, color=color, color_active=self._accent)
+            if self._is_active and theme_manager.current_theme == "ember":
+                color = c.BG_PRIMARY  # dark icon on the solid accent pill
+            active_c = color if (self._is_active and theme_manager.current_theme == "ember") else self._accent
+            icon = qta.icon(self._icon_name, color=color, color_active=active_c)
             self.setIcon(icon)
         except Exception:
             pass
@@ -226,10 +234,6 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._items: Dict[str, GlassNavItem] = {}
         self._current_view: str = ""
         self._collapsed = S.is_compact()
-        self._launcher_mode = self._home_screen_enabled()
-        self._pre_launcher_collapsed = False
-        if self._launcher_mode:
-            self._collapsed = True
         self._expanded_width = S.px(220)
         self._collapsed_width = S.px(58)
         self._setup_ui()
@@ -243,48 +247,6 @@ class GlassSidebar(QFrame, ScaleMixin):
         shadow.setBlurRadius(20)
         shadow.setOffset(2, 0)
         self.setGraphicsEffect(shadow)
-
-    def _home_screen_enabled(self) -> bool:
-        return settings.get('home_screen_style', 'sidebar') == 'launcher'
-
-    def set_home_screen_enabled(self, enabled: bool):
-        """Live add/remove of the 'Home' nav item when the user changes the
-        Home screen setting, without needing a full sidebar rebuild."""
-        self._launcher_mode = enabled
-        has_home = HOME_ITEM["key"] in self._items
-        if enabled and not has_home:
-            home_item = GlassNavItem(
-                key=HOME_ITEM["key"], label=HOME_ITEM["label"], icon_name=HOME_ITEM["icon"]
-            )
-            home_item.clicked_with_name.connect(self._on_item_clicked)
-            home_item.set_collapsed(True)
-            self._nav_container.layout().insertWidget(0, home_item)
-            self._items[HOME_ITEM["key"]] = home_item
-        elif not enabled and has_home:
-            item = self._items.pop(HOME_ITEM["key"])
-            self._nav_container.layout().removeWidget(item)
-            item.hide()
-            item.deleteLater()
-
-        for key, item in self._items.items():
-            if key != HOME_ITEM["key"]:
-                item.setVisible(not enabled)
-
-        if hasattr(self, '_home_separator'):
-            self._home_separator.setVisible(enabled)
-        if hasattr(self, '_collapse_btn'):
-            self._collapse_btn.setVisible(not enabled)
-
-        if enabled:
-            self._pre_launcher_collapsed = self._collapsed
-            self._collapsed = True
-            self.setFixedWidth(self._collapsed_width)
-            self._update_header_collapse_state()
-        else:
-            self._collapsed = self._pre_launcher_collapsed
-            target = self._collapsed_width if self._collapsed else self._expanded_width
-            self.setFixedWidth(target)
-            self._update_collapse_state()
 
     def on_scale_changed(self, factor: float):
         self._expanded_width = S.px(220)
@@ -300,7 +262,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         if hasattr(self, '_logo_label'):
             self._logo_label.setFixedSize(S.px(28), S.px(28))
         if hasattr(self, '_title_label'):
-            self._title_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
+            self._title_label.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.DemiBold))
         if hasattr(self, '_header') and self._header.layout():
             self._header.layout().setSpacing(S.px(10))
         self._update_header_collapse_state()
@@ -353,6 +315,16 @@ class GlassSidebar(QFrame, ScaleMixin):
             title = section_data.get("title")
             if title:
                 label.setText(tr(title).upper())
+
+    def auto_collapse(self, narrow: bool):
+        """Collapse to the icon rail on narrow windows and expand again when wide.
+        Only acts when the narrow/wide state changes, so a manual toggle sticks."""
+        if getattr(self, '_auto_narrow', None) == narrow:
+            return
+        self._auto_narrow = narrow
+        if narrow != self._collapsed:
+            self._collapsed = narrow
+            self._update_collapse_state()
 
     def _toggle_collapse(self):
         self._collapsed = not self._collapsed
@@ -421,29 +393,14 @@ class GlassSidebar(QFrame, ScaleMixin):
         nav_layout.setSpacing(S.px(2))
         nav_container.setLayout(nav_layout)
 
-        if self._home_screen_enabled():
-            home_item = GlassNavItem(
-                key=HOME_ITEM["key"], label=HOME_ITEM["label"], icon_name=HOME_ITEM["icon"]
-            )
-            home_item.clicked_with_name.connect(self._on_item_clicked)
-            home_item.set_collapsed(True)
-            nav_layout.addWidget(home_item)
-            self._items[HOME_ITEM["key"]] = home_item
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setFixedHeight(1)
-        sep.setStyleSheet("background: rgba(255,255,255,0.07); border: none;")
-        sep.setVisible(self._launcher_mode)
-        nav_layout.addWidget(sep)
-        self._home_separator = sep
-
-        for section_key, section_data in NAV_STRUCTURE.items():
+        for section_idx, (section_key, section_data) in enumerate(NAV_STRUCTURE.items()):
+            if section_idx > 0:
+                nav_layout.addStretch(1)
             title = section_data.get("title")
             if title:
                 section_label = QLabel(tr(title).upper())
                 section_label.setObjectName("section_label")
-                section_label.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.DemiBold))
+                section_label.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.DemiBold))
                 section_label.setStyleSheet("""
                     color: #525A7A;
                     letter-spacing: 1.5px;
@@ -461,11 +418,6 @@ class GlassSidebar(QFrame, ScaleMixin):
                 item.clicked_with_name.connect(self._on_item_clicked)
                 nav_layout.addWidget(item)
                 self._items[item_data["key"]] = item
-
-        if self._launcher_mode:
-            for key, item in self._items.items():
-                if key != HOME_ITEM["key"]:
-                    item.setVisible(False)
 
         layout.addWidget(nav_container, stretch=1)
 
@@ -490,7 +442,6 @@ class GlassSidebar(QFrame, ScaleMixin):
         self._collapse_btn = collapse_btn
         layout.addWidget(collapse_btn)
         self._update_collapse_btn_icon()
-        collapse_btn.setVisible(not self._launcher_mode)
 
         self._setup_footer()
         self._footer.setVisible(not self._collapsed)
@@ -519,7 +470,7 @@ class GlassSidebar(QFrame, ScaleMixin):
 
         title = QLabel("System Monitor")
         title.setObjectName("sidebar_title")
-        title.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.DemiBold))
+        title.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.DemiBold))
         layout.addWidget(title)
         layout.addStretch()
         self._title_label = title
@@ -553,7 +504,7 @@ class GlassSidebar(QFrame, ScaleMixin):
         status_layout.addWidget(self._status_indicator)
 
         self._status_text = QLabel(tr("Operational"))
-        self._status_text.setFont(QFont("Segoe UI", S.font_pt(8)))
+        self._status_text.setFont(QFont("Cutive", S.font_pt(8)))
         status_layout.addWidget(self._status_text)
         status_layout.addStretch()
 
@@ -670,8 +621,6 @@ class GlassSidebar(QFrame, ScaleMixin):
         """Show/hide nav items based on the user's "hidden views" feature toggle.
         Hidden items are simply not visible — Qt's layout reflows around them,
         so the sidebar stays compact without needing a full rebuild."""
-        if self._launcher_mode:
-            return
         hidden = set(hidden_keys or [])
         for key, item in self._items.items():
             item.setVisible(key not in hidden)

@@ -190,7 +190,7 @@ class TitleBar(QWidget, ScaleMixin):
         layout.setSpacing(S.px(6))
         
         if hasattr(self, '_title_label'):
-            self._title_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Medium))
+            self._title_label.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.Medium))
             self._title_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
 
     def _create_buttons(self, layout):
@@ -309,15 +309,33 @@ class TopHeader(QWidget, ScaleMixin):
         self._icon_container.setLayout(icon_layout)
 
         icon_label = QLabel("SM")
-        icon_label.setFont(QFont("Segoe UI", _cap(S.font_pt(9), 10), QFont.Weight.Bold))
+        icon_label.setFont(QFont("Cutive", _cap(S.font_pt(9), 10), QFont.Weight.Bold))
         icon_label.setStyleSheet("color: white;")
         icon_layout.addWidget(icon_label)
         layout.addWidget(self._icon_container)
 
         self._title_label = QLabel("System Monitor")
-        self._title_label.setFont(QFont("Segoe UI", _cap(S.font_pt(10), 11), QFont.Weight.Medium))
+        self._title_label.setFont(QFont("Cutive", _cap(S.font_pt(10), 11), QFont.Weight.Medium))
         self._title_label.setCursor(Qt.CursorShape.SizeAllCursor)
         layout.addWidget(self._title_label)
+
+        # Status chips: LIVE · hostname · uptime (reference design)
+        self._live_label = QLabel("● " + tr("LIVE"))
+        self._live_label.setFont(QFont("Cutive", _cap(S.font_pt(8), 9), QFont.Weight.Bold))
+        layout.addWidget(self._live_label)
+
+        import socket
+        self._host_label = QLabel(socket.gethostname().upper())
+        self._host_label.setFont(QFont("Cutive", _cap(S.font_pt(8), 9)))
+        layout.addWidget(self._host_label)
+
+        self._uptime_label = QLabel("")
+        self._uptime_label.setFont(QFont("Cutive", _cap(S.font_pt(8), 9)))
+        layout.addWidget(self._uptime_label)
+        self._update_system_uptime()
+        self._uptime_timer = QTimer(self)
+        self._uptime_timer.timeout.connect(self._update_system_uptime)
+        self._uptime_timer.start(30000)
 
         spacer = QWidget()
         spacer.setCursor(Qt.CursorShape.SizeAllCursor)
@@ -334,6 +352,17 @@ class TopHeader(QWidget, ScaleMixin):
         self._close_btn = WinControlBtn("close")
         self._close_btn.clicked.connect(self._close_window)
         layout.addWidget(self._close_btn)
+
+    def _update_system_uptime(self):
+        try:
+            import time as _time
+            import psutil
+            secs = int(_time.time() - psutil.boot_time())
+            d, h, m = secs // 86400, (secs % 86400) // 3600, (secs % 3600) // 60
+            text = f"{d}d {h:02d}h {m:02d}m" if d else f"{h}h {m:02d}m"
+            self._uptime_label.setText(f"{tr('Uptime')}: {text}")
+        except Exception:
+            self._uptime_label.setText("")
 
     def _apply_theme(self):
         colors = theme_manager.colors
@@ -353,7 +382,14 @@ class TopHeader(QWidget, ScaleMixin):
             """)
 
         if hasattr(self, '_title_label'):
-            self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
+            self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent; border: none;")
+
+        if hasattr(self, '_live_label'):
+            self._live_label.setStyleSheet(f"color: {colors.STATUS_GREEN}; background: transparent; border: none; padding-left: {S.px(10)}px;")
+            chip = (f"color: {colors.TEXT_SECONDARY}; background-color: {colors.BG_CARD};"
+                    f" border: 1px solid {colors.BORDER}; border-radius: {S.px(5)}px; padding: 1px {S.px(8)}px;")
+            self._host_label.setStyleSheet(chip)
+            self._uptime_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent; border: none;")
 
         if hasattr(self, '_icon_container'):
             self._icon_container.setStyleSheet(f"""
@@ -487,25 +523,21 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _get_view(self, view_name: str) -> QWidget:
         if view_name not in self._view_cache:
             from systemmonitor.views.overview_page import OverviewPage
-            from systemmonitor.views.cpu import CPUView
             from systemmonitor.views.gpu import GPUView
             from systemmonitor.views.network import NetworkView
             from systemmonitor.views.memory import MemoryView
             from systemmonitor.views.storage import StorageView
             from systemmonitor.views.logs import LogView
             from systemmonitor.views.settings import SettingsView
-            from systemmonitor.widgets.module_launcher import ModuleLauncherPage
 
             view_classes = {
                 "overview": OverviewPage,
-                "cpu": CPUView,
                 "gpu": GPUView,
                 "network": NetworkView,
                 "memory": MemoryView,
                 "storage": StorageView,
                 "logs": LogView,
                 "settings": SettingsView,
-                "home": ModuleLauncherPage,
             }
 
             if view_name in view_classes:
@@ -514,8 +546,6 @@ class MainWindow(QMainWindow, ScaleMixin):
                 self._content.addWidget(view)
                 if view_name == 'settings' and hasattr(view, 'signals_changed'):
                     view.signals_changed.connect(self._on_settings_changed)
-                if view_name == 'home' and hasattr(view, 'module_selected'):
-                    view.module_selected.connect(self._switch_view)
 
         return self._view_cache[view_name]
 
@@ -530,9 +560,6 @@ class MainWindow(QMainWindow, ScaleMixin):
             if self._active_view in hidden:
                 self._sidebar.set_active_view('overview')
                 self._switch_view('overview')
-        elif key == 'home_screen_style':
-            if hasattr(self, '_sidebar'):
-                self._sidebar.set_home_screen_enabled(value == 'launcher')
 
     def show_alert_toast(self, message: str, level: str = 'warning'):
         """Show an in-app banner for a triggered alert (the 'In-app Visuals'
@@ -675,13 +702,12 @@ class MainWindow(QMainWindow, ScaleMixin):
             """)
         content_layout.addWidget(self._content, stretch=1)
 
-        initial_view = "home" if settings.get('home_screen_style', 'sidebar') == 'launcher' else "overview"
+        initial_view = "overview"
         initial_widget = self._get_view(initial_view)
         self._content.setCurrentWidget(initial_widget)
         self._active_view = initial_view
         if hasattr(self, '_sidebar'):
             self._sidebar.set_active_view(initial_view)
-            self._sidebar.setVisible(initial_view != 'home')
 
         self._resize_corner = ResizeCorner(self)
         self._update_resize_corner_position()
@@ -705,7 +731,6 @@ class MainWindow(QMainWindow, ScaleMixin):
         self._active_view = view_name
         if hasattr(self, '_sidebar'):
             self._sidebar.set_active_view(view_name)
-            self._sidebar.setVisible(view_name != 'home')
         log_info(LogCategory.UI, f"Switched to view: {view_name}")
 
     def update_data(self, data: dict):
@@ -768,6 +793,8 @@ class MainWindow(QMainWindow, ScaleMixin):
     def _on_debounced_resize(self):
         self._resize_debounce_active = False
         self._update_resize_corner_position()
+        if hasattr(self, '_sidebar'):
+            self._sidebar.auto_collapse(self.width() < S.px(900))
         if self._alert_toast is not None:
             self._alert_toast.reposition()
 

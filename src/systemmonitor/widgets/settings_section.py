@@ -44,7 +44,7 @@ class SettingsSection(QFrame, ScaleMixin):
 
         # Section title
         self._title_label = QLabel(self._title)
-        title_font = QFont("Segoe UI", S.font_pt(14))
+        title_font = QFont("Cutive", S.font_pt(14))
         title_font.setWeight(QFont.Weight.DemiBold)
         self._title_label.setFont(title_font)
         layout.addWidget(self._title_label)

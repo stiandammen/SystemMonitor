@@ -49,7 +49,7 @@ class AppConfig:
     CARD_SPACING = 12
 
     # Font settings
-    FONT_FAMILY = "Segoe UI"
+    FONT_FAMILY = "Cutive"
     FONT_FALLBACK = ["Inter", "SF Pro Display", "Helvetica Neue", "Arial", "sans-serif"]
 
     # Responsive breakpoints (pixels)
@@ -106,11 +106,10 @@ class SettingsManager:
         'language': 'en',                   # 'en' or 'no'
 
         # Appearance
-        'theme': 'cyber-cyan',
+        'theme': 'ember',
         'accent_color': '#10b981',
         'sidebar_collapsed': False,
         'ui_scale': 1.0,
-        'home_screen_style': 'sidebar',     # 'sidebar' (classic) or 'launcher' (module grid start screen)
 
         # Performance
         'update_interval': 500,

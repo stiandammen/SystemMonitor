@@ -4,11 +4,11 @@ Extracted from views/overview_page.py to keep view files small and let these
 premium components be reused elsewhere (e.g. a future "Dashboard" overlay).
 """
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QLabel, QFrame,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QProgressBar, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize, QRectF
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 import qtawesome as qta
 
 from systemmonitor.widgets.sparkline import SparklineWidget
@@ -17,11 +17,56 @@ from systemmonitor.scaler import S
 from systemmonitor.i18n import tr, I18nMixin
 
 
-class GlassMetricCard(QFrame, I18nMixin):
-    """Premium glass metric card - responsive with minimum sizes"""
+class ArcGauge(QWidget):
+    """270-degree arc gauge (0-100 %). Painted only; no timers, repaint on value change."""
 
-    def __init__(self, title: str, icon: str, color: str | None = None, parent=None):
+    def __init__(self, color: str, parent=None, size: int = 84, show_text: bool = False):
         super().__init__(parent)
+        self._color = color
+        self._pct = 0.0
+        self._show_text = show_text
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setFixedSize(S.px(size), S.px(size))
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    def set_percent(self, pct: float):
+        pct = max(0.0, min(100.0, float(pct)))
+        if abs(pct - self._pct) >= 0.1:
+            self._pct = pct
+            self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w = S.px(8)
+        side = min(self.width(), self.height()) - w
+        rect = QRectF((self.width() - side) / 2, (self.height() - side) / 2, side, side)
+        track = QPen(QColor(theme_manager.colors.GAUGE_BG), w)
+        track.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(track)
+        p.drawArc(rect, 225 * 16, -270 * 16)
+        if self._pct > 0:
+            fill = QPen(QColor(self._color), w)
+            fill.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(fill)
+            p.drawArc(rect, 225 * 16, int(-270 * 16 * self._pct / 100.0))
+        if self._show_text:
+            p.setPen(QColor(theme_manager.colors.TEXT_PRIMARY))
+            p.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.Bold))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f"{self._pct:.0f}%")
+        p.end()
+
+
+class GlassMetricCard(QFrame, I18nMixin):
+    """Premium glass metric card - responsive with minimum sizes.
+
+    With gauge=True the card shows an arc gauge (driven by push_sparkline's
+    percentage values) beside the value text."""
+
+    def __init__(self, title: str, icon: str, color: str | None = None, parent=None, gauge: bool = False):
+        super().__init__(parent)
+        self._use_gauge = gauge
+        self._gauge = None
         self._color = color or theme_manager.colors.ACCENT_GREEN
         self._title_key = title
         self._title = tr(title)
@@ -88,12 +133,12 @@ class GlassMetricCard(QFrame, I18nMixin):
                     icon_label.setText("•")
             else:
                 icon_label.setText(self._icon)
-                icon_label.setFont(QFont("Segoe UI", S.font_pt(14)))
+                icon_label.setFont(QFont("Cutive", S.font_pt(14)))
                 icon_label.setStyleSheet(f"color: {self._color}; background: transparent;")
             header.addWidget(icon_label)
 
         self._title_label = QLabel(self._title)
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Medium))
         self._title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         header.addWidget(self._title_label)
         header.addStretch()
@@ -101,19 +146,36 @@ class GlassMetricCard(QFrame, I18nMixin):
         layout.addLayout(header)
 
         self._value_label = QLabel("--")
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(24), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Cutive", S.font_pt(24), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        layout.addWidget(self._value_label)
 
         self._subtitle_label = QLabel("")
-        self._subtitle_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._subtitle_label.setFont(QFont("Cutive", S.font_pt(9)))
         self._subtitle_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
-        layout.addWidget(self._subtitle_label)
+
+        if self._use_gauge:
+            body = QHBoxLayout()
+            body.setSpacing(S.px(14))
+            self._gauge = ArcGauge(self._color)
+            body.addWidget(self._gauge)
+            text_col = QVBoxLayout()
+            text_col.setSpacing(S.px(2))
+            text_col.addStretch()
+            text_col.addWidget(self._value_label)
+            text_col.addWidget(self._subtitle_label)
+            text_col.addStretch()
+            body.addLayout(text_col, stretch=1)
+            layout.addLayout(body, stretch=1)
+        else:
+            layout.addWidget(self._value_label)
+            layout.addWidget(self._subtitle_label)
 
         self._sparkline = SparklineWidget(colors=[self._color])
         self._sparkline.setMinimumHeight(S.px(30))
         self._sparkline.setMaximumHeight(S.px(50))
         layout.addWidget(self._sparkline)
+        if self._use_gauge:
+            self._sparkline.setVisible(False)
 
     def set_value(self, value: str, subtitle: str = ""):
         self._value_label.setText(value)
@@ -124,6 +186,8 @@ class GlassMetricCard(QFrame, I18nMixin):
 
     def push_sparkline(self, value: float):
         self._sparkline.push(value)
+        if self._gauge is not None:
+            self._gauge.set_percent(value)
 
 
 class GlassChartPanel(QFrame, I18nMixin):
@@ -178,7 +242,7 @@ class GlassChartPanel(QFrame, I18nMixin):
         self.setLayout(layout)
 
         self._title_label = QLabel(self._title)
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Medium))
         self._title_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self._title_label)
 
@@ -246,7 +310,7 @@ class GlassInfoPanel(QFrame, I18nMixin):
         self.setLayout(layout)
 
         self._title_label = QLabel(self._title)
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(12), QFont.Weight.Bold))
         self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self._title_label)
 
@@ -276,14 +340,14 @@ class GlassInfoPanel(QFrame, I18nMixin):
         row_layout.addWidget(indicator)
 
         label_widget = QLabel(tr(label))
-        label_widget.setFont(QFont("Segoe UI", S.font_pt(10)))
+        label_widget.setFont(QFont("Cutive", S.font_pt(10)))
         label_widget.setMinimumWidth(80)
         label_widget.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; background: transparent;")
         row_layout.addWidget(label_widget)
         self._row_labels.append((label_widget, label))
 
         value_widget = QLabel(value)
-        value_widget.setFont(QFont("Segoe UI", S.font_pt(10)))
+        value_widget.setFont(QFont("Cutive", S.font_pt(10)))
         value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
         value_widget.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; background: transparent;")
         row_layout.addWidget(value_widget, stretch=1)
@@ -387,7 +451,7 @@ class GlassStoragePanel(QFrame, I18nMixin):
 
         header = QHBoxLayout()
         self._title_label = QLabel(tr("Storage Drives"))
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(12), QFont.Weight.Bold))
         self._title_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         header.addWidget(self._title_label)
         header.addStretch()
@@ -437,7 +501,7 @@ class GlassStoragePanel(QFrame, I18nMixin):
 
         # Drive letter badge
         letter_lbl = QLabel(label_text)
-        letter_lbl.setFont(QFont("Segoe UI", S.font_pt(15), QFont.Weight.Bold))
+        letter_lbl.setFont(QFont("Cutive", S.font_pt(15), QFont.Weight.Bold))
         letter_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         letter_lbl.setFixedWidth(S.px(44))
         letter_lbl.setStyleSheet(
@@ -450,7 +514,7 @@ class GlassStoragePanel(QFrame, I18nMixin):
         info.setSpacing(S.px(4))
 
         name_lbl = QLabel(mountpoint if mountpoint else device)
-        name_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        name_lbl.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
         name_lbl.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         info.addWidget(name_lbl)
 
@@ -470,12 +534,12 @@ class GlassStoragePanel(QFrame, I18nMixin):
 
         stats_row = QHBoxLayout()
         used_lbl = QLabel(tr("{0:.1f} GB used").format(used_gb))
-        used_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        used_lbl.setFont(QFont("Cutive", S.font_pt(8)))
         used_lbl.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         stats_row.addWidget(used_lbl)
         stats_row.addStretch()
         free_lbl = QLabel(tr("{0:.1f} GB free").format(free_gb))
-        free_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        free_lbl.setFont(QFont("Cutive", S.font_pt(8)))
         free_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         stats_row.addWidget(free_lbl)
         info.addLayout(stats_row)
@@ -494,13 +558,13 @@ class GlassStoragePanel(QFrame, I18nMixin):
         pct_box.setLayout(pct_col)
 
         pct_lbl = QLabel(f"{pct:.0f}%")
-        pct_lbl.setFont(QFont("Segoe UI", S.font_pt(16), QFont.Weight.Bold))
+        pct_lbl.setFont(QFont("Cutive", S.font_pt(16), QFont.Weight.Bold))
         pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pct_lbl.setStyleSheet(f"color: {pct_color}; background: transparent;")
         pct_col.addWidget(pct_lbl)
 
         sub_lbl = QLabel(tr("used"))
-        sub_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        sub_lbl.setFont(QFont("Cutive", S.font_pt(8)))
         sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sub_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         pct_col.addWidget(sub_lbl)
@@ -557,7 +621,7 @@ class GlassStoragePanel(QFrame, I18nMixin):
         valid = [p for p in partitions if p.get('fstype')]
         if not valid:
             placeholder = QLabel(tr("No drives detected"))
-            placeholder.setFont(QFont("Segoe UI", S.font_pt(11)))
+            placeholder.setFont(QFont("Cutive", S.font_pt(11)))
             placeholder.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._storage_container.addWidget(placeholder)

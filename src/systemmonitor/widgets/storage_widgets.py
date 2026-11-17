@@ -107,10 +107,10 @@ class DiskUsageRing(QWidget):
     InElastic easing gives a satisfying 'snap' when value changes.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, size: int = 108):
         super().__init__(parent)
         self._ring_val: float = 0.0
-        sz = S.px(108)
+        sz = S.px(size)
         self.setFixedSize(sz, sz)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
@@ -191,7 +191,7 @@ class DiskUsageRing(QWidget):
 
         # Center: percentage text
         painter.setPen(QColor(colors.TEXT_PRIMARY))
-        font = QFont("Segoe UI", S.font_pt(14), QFont.Weight.Bold)
+        font = QFont("Cutive", S.font_pt(14), QFont.Weight.Bold)
         painter.setFont(font)
         pct_str = f"{val:.0f}%"
         fm = painter.fontMetrics()
@@ -275,7 +275,7 @@ class LiveGraphWidget(QWidget):
         painter.drawRoundedRect(0, 0, w, h, 4, 4)
 
         if not self._read_history and not self._write_history:
-            painter.setFont(QFont("Segoe UI", 9))
+            painter.setFont(QFont("Cutive", 9))
             painter.setPen(QColor(colors.TEXT_MUTED))
             painter.drawText(w // 2 - 25, h // 2 + 4, tr("Waiting for data..."))
             painter.end()
@@ -298,7 +298,7 @@ class LiveGraphWidget(QWidget):
             self._draw_graph(painter, self._write_history, step_w, h, colors.ACCENT_BLUE, False)
 
         # Current values in corner
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", 9, QFont.Weight.Bold))
         read_text = f"↓ {self._format_speed(self._read_history[-1] if self._read_history else 0)}"
         write_text = f"↑ {self._format_speed(self._write_history[-1] if self._write_history else 0)}"
 
@@ -431,14 +431,14 @@ class PerformanceHistoryGraph(QWidget):
             return
 
         # Title
-        painter.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_SECONDARY))
         painter.drawText(S.px(8), S.px(17), tr(self._title))
 
         # Gather all data for Y scale
         all_vals = [v for s in self._series.values() for v in s['data']]
         if not all_vals:
-            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
+            painter.setFont(QFont("Cutive", S.font_pt(8)))
             painter.setPen(QColor(colors.TEXT_MUTED))
             painter.drawText(ml + pw // 2 - S.px(50), mt + ph // 2 + S.px(4), tr("Waiting for data..."))
             painter.end()
@@ -455,7 +455,7 @@ class PerformanceHistoryGraph(QWidget):
             val  = y_min + y_rng * frac
             gy   = mt + ph - int(ph * frac)
             label = self._fmt_val(val)
-            painter.setFont(QFont("Segoe UI", S.font_pt(7)))
+            painter.setFont(QFont("Cutive", S.font_pt(7)))
             painter.setPen(QColor(colors.TEXT_MUTED))
             fm = painter.fontMetrics()
             lw = fm.horizontalAdvance(label)
@@ -534,7 +534,7 @@ class PerformanceHistoryGraph(QWidget):
             painter.setBrush(col)
             painter.drawRect(ml, row_y + S.px(5), S.px(14), S.px(3))
 
-            painter.setFont(QFont("Segoe UI", S.font_pt(8)))
+            painter.setFont(QFont("Cutive", S.font_pt(8)))
             fm = painter.fontMetrics()
             tx = ml + S.px(18)
             ty = row_y + fm.ascent()
@@ -642,7 +642,7 @@ class TemperatureGauge(QWidget):
             painter.drawArc(bg_rect.toRect(), 135 * 16, -int(temp_angle) * 16)
 
         # Temperature text
-        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", 11, QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
         temp_text = f"{self._temp:.0f}°"
         fm = painter.fontMetrics()
@@ -688,7 +688,7 @@ class TemperatureBar(QWidget):
         colors = c()
 
         if not self._has_data:
-            painter.setFont(QFont("Segoe UI", 10))
+            painter.setFont(QFont("Cutive", 10))
             painter.setPen(QColor(colors.TEXT_MUTED))
             painter.drawText(0, 18, "N/A")
             painter.end()
@@ -712,7 +712,7 @@ class TemperatureBar(QWidget):
             painter.drawRoundedRect(int(bar_x), int(bar_y), fill_w, bar_h, 3, 3)
 
         # Label
-        painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", 10, QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
         painter.drawText(0, int(bar_y + 14), format_temperature(self._temp))
 
@@ -754,13 +754,13 @@ class SMARTStatusWidget(QWidget):
 
         # Title
         title = QLabel("SMART Health")
-        title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", 9, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         main_layout.addWidget(title)
 
         # Health status
         self._health_label = QLabel("Unknown")
-        self._health_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        self._health_label.setFont(QFont("Cutive", 11, QFont.Weight.Bold))
         main_layout.addWidget(self._health_label)
 
         # Stats grid
@@ -778,11 +778,11 @@ class SMARTStatusWidget(QWidget):
         colors = c()
 
         label_w = QLabel(label)
-        label_w.setFont(QFont("Segoe UI", 8))
+        label_w.setFont(QFont("Cutive", 8))
         label_w.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
 
         value_w = QLabel("--" if unit else "")
-        value_w.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        value_w.setFont(QFont("Cutive", 9, QFont.Weight.Bold))
         value_w.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         value_w.setObjectName(f"smart_{key}")
 
@@ -808,7 +808,7 @@ class SMARTStatusWidget(QWidget):
         self._health_label.setText(health)
 
         if health in ['OK', 'Healthy', 'Good']:
-            health_color = colors.ACCENT_GREEN
+            health_color = colors.STATUS_GREEN
         elif health in ['Warning', 'Caution']:
             health_color = colors.ACCENT_ORANGE
         else:
@@ -965,7 +965,7 @@ class StorageDiskCard(QFrame, I18nMixin):
 
         # Disk name
         name_lbl = QLabel(self._get_disk_title())
-        name_lbl.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
+        name_lbl.setFont(QFont("Cutive", S.font_pt(11), QFont.Weight.Bold))
         name_lbl.setStyleSheet(
             f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         hdr.addWidget(name_lbl)
@@ -976,7 +976,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         tc_qc = QColor(tc)
         tc_dim = f"rgba({tc_qc.red()},{tc_qc.green()},{tc_qc.blue()},0.15)"
         badge = QLabel(f" {dtype} ")
-        badge.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        badge.setFont(QFont("Cutive", S.font_pt(8), QFont.Weight.Bold))
         badge.setStyleSheet(f"""
             QLabel {{
                 background-color: {tc_dim};
@@ -992,7 +992,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         iface = self._disk_info.get('interface_type', '')
         if iface and iface not in ('Unknown', ''):
             iface_lbl = QLabel(iface)
-            iface_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+            iface_lbl.setFont(QFont("Cutive", S.font_pt(8)))
             iface_lbl.setStyleSheet(
                 f"color: {colors.TEXT_MUTED}; background: transparent;")
             hdr.addWidget(iface_lbl)
@@ -1002,7 +1002,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         if model and model not in ('Unknown', 'Unknown Model'):
             short = (model[:26] + "…") if len(model) > 26 else model
             mdl_lbl = QLabel(short)
-            mdl_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
+            mdl_lbl.setFont(QFont("Cutive", S.font_pt(9)))
             mdl_lbl.setStyleSheet(
                 f"color: {colors.TEXT_MUTED}; background: transparent;")
             hdr.addWidget(mdl_lbl)
@@ -1011,7 +1011,7 @@ class StorageDiskCard(QFrame, I18nMixin):
 
         # Total capacity
         cap_lbl = QLabel(self._get_total_capacity())
-        cap_lbl.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        cap_lbl.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
         cap_lbl.setStyleSheet(
             f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         hdr.addWidget(cap_lbl)
@@ -1020,7 +1020,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         status = self._disk_info.get('status', 'OK')
         dot = QFrame()
         dot.setFixedSize(S.px(8), S.px(8))
-        dot_col = colors.ACCENT_GREEN if status in ('OK', '', 'Unknown') else colors.ACCENT_ORANGE
+        dot_col = colors.STATUS_GREEN if status in ('OK', '', 'Unknown') else colors.ACCENT_ORANGE
         dot.setStyleSheet(
             f"background-color: {dot_col}; border-radius: {S.px(4)}px; border: none;")
         hdr.addWidget(dot)
@@ -1068,7 +1068,7 @@ class StorageDiskCard(QFrame, I18nMixin):
             self._agg_pct_lbl = QLabel(f"{pct:.0f}%")
             self._agg_pct_lbl.setFixedWidth(S.px(34))
             self._agg_pct_lbl.setFont(
-                QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+                QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
             self._agg_pct_lbl.setAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._agg_pct_lbl.setStyleSheet(
@@ -1078,7 +1078,7 @@ class StorageDiskCard(QFrame, I18nMixin):
             sz_lbl = QLabel(
                 f"{self._fmt_size(self._disk_info.get('used', 0))} / "
                 f"{self._fmt_size(self._disk_info.get('total', 0))}")
-            sz_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+            sz_lbl.setFont(QFont("Cutive", S.font_pt(8)))
             sz_lbl.setStyleSheet(
                 f"color: {colors.TEXT_SECONDARY}; background: transparent;")
             row_lay.addWidget(sz_lbl)
@@ -1086,23 +1086,28 @@ class StorageDiskCard(QFrame, I18nMixin):
 
             part_col.addLayout(row_lay)
 
+        # Usage ring (reference design)
+        self._usage_ring = DiskUsageRing(size=92)
+        self._usage_ring.set_usage(self._get_usage_percent())
+        body.addWidget(self._usage_ring, alignment=Qt.AlignmentFlag.AlignVCenter)
+
         body.addLayout(part_col, stretch=1)
 
         # Right column: compact IO graph
         io_frame = QWidget()
-        io_frame.setFixedWidth(S.px(170))
         io_frame.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         io_lay = QVBoxLayout(io_frame)
         io_lay.setContentsMargins(0, 0, 0, 0)
         io_lay.setSpacing(0)
 
         self._io_graph = LiveGraphWidget(max_points=40)
-        self._io_graph.setMinimumHeight(S.px(52))
-        self._io_graph.setMaximumHeight(S.px(64))
+        self._io_graph.setMinimumHeight(S.px(56))
+        self._io_graph.setMaximumHeight(S.px(72))
         io_lay.addWidget(self._io_graph)
 
-        body.addWidget(io_frame)
         main.addLayout(body)
+        main.addSpacing(S.px(8))
+        main.addWidget(io_frame)
         main.addSpacing(S.px(7))
 
         # ── FOOTER: fstype · serial ───────────────────────────────────────────
@@ -1119,7 +1124,7 @@ class StorageDiskCard(QFrame, I18nMixin):
 
         if footer_parts:
             foot_lbl = QLabel("    ·    ".join(footer_parts))
-            foot_lbl.setFont(QFont("Segoe UI", S.font_pt(7)))
+            foot_lbl.setFont(QFont("Cutive", S.font_pt(7)))
             foot_lbl.setStyleSheet(
                 f"color: {colors.TEXT_MUTED}; background: transparent;")
             main.addWidget(foot_lbl)
@@ -1139,7 +1144,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         letter = mp[-2:] if len(mp) >= 2 else mp
         letter_lbl = QLabel(letter)
         letter_lbl.setFixedWidth(S.px(24))
-        letter_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        letter_lbl.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
         letter_lbl.setStyleSheet(f"color: {col}; background: transparent;")
         row.addWidget(letter_lbl)
 
@@ -1152,7 +1157,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         # Percentage label
         pct_lbl = QLabel(f"{pct:.0f}%")
         pct_lbl.setFixedWidth(S.px(34))
-        pct_lbl.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Bold))
+        pct_lbl.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Bold))
         pct_lbl.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         pct_lbl.setStyleSheet(f"color: {col}; background: transparent;")
@@ -1162,7 +1167,7 @@ class StorageDiskCard(QFrame, I18nMixin):
         sz_lbl = QLabel(
             f"{self._fmt_size(part.get('used', 0))} / "
             f"{self._fmt_size(part.get('total', 0))}")
-        sz_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
+        sz_lbl.setFont(QFont("Cutive", S.font_pt(8)))
         sz_lbl.setStyleSheet(
             f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         sz_lbl.setMinimumWidth(S.px(92))
@@ -1250,6 +1255,9 @@ class StorageDiskCard(QFrame, I18nMixin):
         old_parts = self._disk_info.get('partitions', [])
         new_parts = disk_info.get('partitions', [])
         self._disk_info = disk_info
+        ring = getattr(self, '_usage_ring', None)
+        if ring is not None and len(new_parts) == len(old_parts):
+            ring.set_usage(self._get_usage_percent())
 
         if len(new_parts) != len(old_parts):
             self._setup_ui()
@@ -1342,7 +1350,7 @@ class StorageOverviewCard(QFrame):
         title_row.addWidget(icon_label)
 
         title = QLabel("Storage Overview")
-        title.setFont(QFont("Segoe UI", S.font_pt(12), QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", S.font_pt(12), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         title_row.addWidget(title)
 
@@ -1371,15 +1379,15 @@ class StorageOverviewCard(QFrame):
         stats_row.setSpacing(S.px(16))
 
         self._used_label = QLabel("Used: -- GB")
-        self._used_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._used_label.setFont(QFont("Cutive", S.font_pt(10)))
         self._used_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         stats_row.addWidget(self._used_label)
 
         stats_row.addStretch()
 
         self._free_label = QLabel("Free: -- GB")
-        self._free_label.setFont(QFont("Segoe UI", S.font_pt(10)))
-        self._free_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
+        self._free_label.setFont(QFont("Cutive", S.font_pt(10)))
+        self._free_label.setStyleSheet(f"color: {colors.STATUS_GREEN}; background: transparent;")
         stats_row.addWidget(self._free_label)
 
         main_layout.addLayout(stats_row)
@@ -1389,12 +1397,12 @@ class StorageOverviewCard(QFrame):
         speed_row.setSpacing(S.px(16))
 
         self._read_label = QLabel("↓ -- MB/s")
-        self._read_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._read_label.setFont(QFont("Cutive", S.font_pt(10)))
         self._read_label.setStyleSheet(f"color: {colors.ACCENT_GREEN}; background: transparent;")
         speed_row.addWidget(self._read_label)
 
         self._write_label = QLabel("↑ -- MB/s")
-        self._write_label.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._write_label.setFont(QFont("Cutive", S.font_pt(10)))
         self._write_label.setStyleSheet(f"color: {colors.ACCENT_BLUE}; background: transparent;")
         speed_row.addWidget(self._write_label)
 
@@ -1481,14 +1489,14 @@ class StatTile(QFrame):
 
         # Value with accent color
         self._value_label = QLabel(self._value)
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Cutive", S.font_pt(18), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
         self._value_label.setObjectName("value_label")
         main_layout.addWidget(self._value_label)
 
         # Label
         label_text = QLabel(self._label)
-        label_text.setFont(QFont("Segoe UI", S.font_pt(9)))
+        label_text.setFont(QFont("Cutive", S.font_pt(9)))
         label_text.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         main_layout.addWidget(label_text)
 

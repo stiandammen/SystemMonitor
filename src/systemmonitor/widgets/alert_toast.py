@@ -31,7 +31,7 @@ class AlertToast(QWidget):
 
         self._label = QLabel(self)
         self._label.setWordWrap(True)
-        self._label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Bold))
+        self._label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Bold))
         self._label.setStyleSheet("color: #ffffff; background: transparent;")
         layout.addWidget(self._label)
 

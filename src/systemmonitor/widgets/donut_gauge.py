@@ -118,7 +118,7 @@ class DonutGauge(QWidget, ScaleMixin):
         center_x = size / 2
         center_y = size / 2
 
-        painter.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
+        painter.setFont(QFont("Cutive", S.font_pt(18), QFont.Weight.Bold))
         painter.setPen(QColor(colors.TEXT_PRIMARY))
         value_text = f"{self._animated_value:.0f}%"
         fm = painter.fontMetrics()
@@ -129,7 +129,7 @@ class DonutGauge(QWidget, ScaleMixin):
 
         # Label text (positioned below value)
         if self._label:
-            painter.setFont(QFont("Segoe UI", S.font_pt(9)))
+            painter.setFont(QFont("Cutive", S.font_pt(9)))
             painter.setPen(QColor(colors.TEXT_MUTED))
             label_width = fm.horizontalAdvance(self._label)
             # Position label below value, not overlapping

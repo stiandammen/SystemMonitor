@@ -7,7 +7,7 @@ the English source text — see ``LanguageManager.tr``.
 
 TRANSLATIONS_NO = {
     # ── Sidebar navigation ──────────────────────────────────────────────
-    "Dashboard": "Oversikt",
+    "Dashboard": "Dashbord",
     "Processor": "Prosessor",
     "Graphics": "Grafikk",
     "Network": "Nettverk",
@@ -163,6 +163,8 @@ TRANSLATIONS_NO = {
     # ── Settings — Appearance ────────────────────────────────────────────
     "Appearance": "Utseende",
     "Cyber Cyan (Default)": "Cyber Cyan (Standard)",
+    "Cyber Cyan": "Cyber Cyan",
+    "Ember (Default)": "Ember (Standard)",
     "Premium Dark": "Premium mørk",
     "Cyberpunk": "Cyberpunk",
     "Heimdal": "Heimdal",
@@ -378,7 +380,7 @@ TRANSLATIONS_NO = {
     "Down": "Nede",
 
     # ── Overview / Dashboard page ────────────────────────────────────────
-    "Dashboard": "Oversikt",
+    "Dashboard": "Dashbord",
     "System performance overview": "Oversikt over systemytelse",
     "OS": "OS",
     "Battery": "Batteri",
@@ -471,3 +473,84 @@ TRANSLATIONS_NO = {
         "Eksport av JSON/CSV og innebygd Prometheus-endepunkt (/metrics).",
 }
 
+
+
+# ── Reference redesign strings (added without overriding existing keys) ──────
+_REDESIGN_NO = {
+    "1 min": "1 min", "5 min": "5 min", "15 min": "15 min",
+    "1 hour": "1 time", "6 hours": "6 timer",
+    "CPU load history": "CPU-belastning",
+    "GPU load history": "GPU-belastning",
+    "Current frequency": "Aktuell frekvens",
+    "Cores / threads": "Kjerner / tråder",
+    "Core clock": "Kjernefrekvens",
+    "In use": "I bruk",
+    "Available": "Tilgjengelig",
+    "Swap": "Vekslefil",
+    "CPU cores": "CPU-kjerner",
+    "Core": "Kjerne",
+    "Read": "Lesing",
+    "Write": "Skriving",
+    "Normal": "Normal",
+    "Connected": "Tilkoblet",
+    "Not detected": "Ikke funnet",
+    "System Status": "Systemstatus",
+    "Storage Disks": "Lagringsdisker",
+    "Network Traffic": "Nettverkstrafikk",
+    "Download": "Nedlasting",
+    "Upload": "Opplasting",
+    "Healthy": "Sunn",
+    "Warning": "Advarsel",
+    "Critical": "Kritisk",
+    "Temperature": "Temperatur",
+    "Battery": "Batteri",
+}
+for _k, _v in _REDESIGN_NO.items():
+    TRANSLATIONS_NO.setdefault(_k, _v)
+
+_REDESIGN_NO2 = {
+    "Graphics": "Grafikk", "GPU Load": "GPU-belastning", "Power draw": "Strømforbruk",
+    "Utilization": "Utnyttelse", "GPU performance over time": "GPU-ytelse over tid",
+    "Frequencies": "Frekvenser", "Temperatures": "Temperaturer", "Fan speed": "Vifteturtall",
+    "Status": "Status", "System information": "Systeminformasjon", "Free": "Ledig", "Total": "Totalt",
+    "Load": "Belastning", "Temp": "Temp",
+}
+for _k, _v in _REDESIGN_NO2.items():
+    TRANSLATIONS_NO.setdefault(_k, _v)
+
+
+_REDESIGN_NO3 = {
+    "General": "Generelt", "Display": "Visning", "Modules": "Moduler", "Alerts": "Varsler",
+    "Performance": "Ytelse", "Data": "Data", "Information": "Informasjon",
+    "Monitoring of system memory, distribution and usage over time": "Overvåking av systemminne, fordeling og minnebruk over tid",
+    "Memory usage": "Minnebruk", "Memory distribution": "Minnefordeling",
+    "Memory usage over time": "Minnebruk over tid", "Memory information": "Minneinformasjon",
+    "Cached": "Bufret", "Used": "Brukt",
+    "Network traffic, connections and protocol distribution": "Nettverkstrafikk, tilkoblinger og protokollfordeling",
+    "Disk space, performance and disk operations": "Diskplass, ytelse og diskoperasjoner",
+    "Disk throughput": "Diskytelse - hastighet", "Disk bandwidth": "Diskbåndbredde",
+    "disks": "disker",
+}
+for _k, _v in _REDESIGN_NO3.items():
+    TRANSLATIONS_NO.setdefault(_k, _v)
+
+_REDESIGN_NO4 = {
+    "Link speed": "Linkhastighet", "Total": "Totalt", "Virtual adapters": "Virtuelle adaptere",
+    "No data": "Ingen data", "Loopback": "Loopback", "Virtual": "Virtuell", "No address": "Ingen adresse",
+    "Disconnected": "Frakoblet", "Connection states": "Tilkoblingsstatuser",
+    "Network adapters": "Nettverksadaptere", "No adapters found": "Ingen adaptere funnet",
+    "Local network": "Lokalt nett", "Virtual network": "Virtuelt nett", "This PC": "Denne PC-en",
+    "Network": "Nettverk", "Top remote ports": "Vanligste eksterne porter",
+    "Top remote hosts": "Vanligste eksterne verter", "Peak download": "Toppfart ned",
+    "Peak upload": "Toppfart opp", "Search connections...": "Søk i tilkoblinger ...",
+    "Active interface": "Aktivt grensesnitt", "of": "av", "connections": "tilkoblinger",
+    "Offline": "Frakoblet", "Good": "God", "Other": "Annet", "Uptime": "Oppetid",
+    "Total Recv": "Totalt mottatt", "Total Sent": "Totalt sendt", "Interfaces Up": "Grensesnitt oppe",
+    "Health": "Helse", "Network Topology": "Nettverkstopologi", "Active Connections": "Aktive tilkoblinger",
+}
+for _k, _v in _REDESIGN_NO4.items():
+    TRANSLATIONS_NO.setdefault(_k, _v)
+
+_k5 = {"Adapters up": "Adaptere oppe"}
+for _k, _v in _k5.items():
+    TRANSLATIONS_NO.setdefault(_k, _v)

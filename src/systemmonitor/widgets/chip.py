@@ -32,20 +32,20 @@ class StatChip(QFrame, ScaleMixin):
 
         # Label
         self._label = QLabel(self._label_text)
-        label_font = QFont("Segoe UI", 10)
+        label_font = QFont("Cutive", 10)
         self._label.setFont(label_font)
         layout.addWidget(self._label)
 
         # Value
         self._value = QLabel(self._value_text)
-        value_font = QFont("Segoe UI", 11, QFont.Weight.Bold)
+        value_font = QFont("Cutive", 11, QFont.Weight.Bold)
         self._value.setFont(value_font)
         layout.addWidget(self._value)
 
         # Trend (optional)
         if self._trend_text:
             self._trend = QLabel(self._trend_text)
-            trend_font = QFont("Segoe UI", 9)
+            trend_font = QFont("Cutive", 9)
             self._trend.setFont(trend_font)
             layout.addWidget(self._trend)
 
@@ -102,7 +102,7 @@ class StatusChip(QFrame, ScaleMixin):
         # Label
         if self._label_text:
             self._label = QLabel(self._label_text)
-            label_font = QFont("Segoe UI", 10)
+            label_font = QFont("Cutive", 10)
             self._label.setFont(label_font)
             layout.addWidget(self._label)
 

@@ -50,14 +50,14 @@ class SettingsRow(QFrame, ScaleMixin):
         layout.addWidget(left_widget, 1)
 
         self._label = QLabel(self._label_text)
-        label_font = QFont("Segoe UI", S.font_pt(13))
+        label_font = QFont("Cutive", S.font_pt(13))
         label_font.setWeight(QFont.Weight.Medium)
         self._label.setFont(label_font)
         left_layout.addWidget(self._label)
 
         if self._description_text:
             self._description = QLabel(self._description_text)
-            desc_font = QFont("Segoe UI", S.font_pt(11))
+            desc_font = QFont("Cutive", S.font_pt(11))
             self._description.setFont(desc_font)
             left_layout.addWidget(self._description)
 
@@ -174,7 +174,7 @@ class SettingsButton(QPushButton):
                 border: none;
                 border-radius: {S.px(6)}px;
                 padding: {S.px(8)}px {S.px(16)}px;
-                font-family: "Segoe UI", sans-serif;
+                font-family: "Cutive", sans-serif;
                 font-size: {S.font_pt(13)}pt;
                 font-weight: 600;
                 min-width: {S.px(80)}px;
@@ -210,7 +210,7 @@ class DangerButton(QPushButton):
                 border: none;
                 border-radius: {S.px(6)}px;
                 padding: {S.px(8)}px {S.px(16)}px;
-                font-family: "Segoe UI", sans-serif;
+                font-family: "Cutive", sans-serif;
                 font-size: {S.font_pt(13)}pt;
                 font-weight: 600;
                 min-width: {S.px(80)}px;
@@ -246,7 +246,7 @@ class SettingsComboBox(QComboBox):
                 border: none;
                 border-radius: {S.px(6)}px;
                 padding: {S.px(8)}px {S.px(12)}px;
-                font-family: "Segoe UI", "Segoe UI Variable", sans-serif;
+                font-family: "Cutive", "Cutive Variable", sans-serif;
                 font-size: {S.px(13)}px;
                 min-width: {S.px(120)}px;
             }}
@@ -296,7 +296,7 @@ class SettingsSlider(QSlider):
         self._value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._value_label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._value_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        font = QFont("Segoe UI", S.font_pt(11))
+        font = QFont("Cutive", S.font_pt(11))
         font.setWeight(QFont.Weight.DemiBold)
         self._value_label.setFont(font)
         self._update_value_label_position()

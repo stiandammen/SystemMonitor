@@ -174,7 +174,7 @@ class InstallerWindow(QMainWindow):
             }
             QLabel {
                 color: #c9d1d9;
-                font-family: 'Segoe UI';
+                font-family: 'Cutive';
             }
             QLineEdit {
                 background-color: #161b22;
@@ -182,7 +182,7 @@ class InstallerWindow(QMainWindow):
                 border-radius: 6px;
                 color: #c9d1d9;
                 padding: 6px 12px;
-                font-family: 'Segoe UI';
+                font-family: 'Cutive';
             }
             QPushButton {
                 background-color: #21262d;
@@ -190,7 +190,7 @@ class InstallerWindow(QMainWindow):
                 border-radius: 6px;
                 color: #c9d1d9;
                 padding: 6px 16px;
-                font-family: 'Segoe UI';
+                font-family: 'Cutive';
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -220,7 +220,7 @@ class InstallerWindow(QMainWindow):
             }
             QCheckBox {
                 color: #c9d1d9;
-                font-family: 'Segoe UI';
+                font-family: 'Cutive';
             }
         """)
 
@@ -242,7 +242,7 @@ class InstallerWindow(QMainWindow):
         layout.setSpacing(14)
 
         # Title Label
-        title_font = QFont("Segoe UI", 16, QFont.Weight.Bold)
+        title_font = QFont("Cutive", 16, QFont.Weight.Bold)
         self.title_lbl = QLabel(f"Install {APP_NAME}")
         self.title_lbl.setFont(title_font)
         self.title_lbl.setStyleSheet("color: #10b981;")

@@ -107,7 +107,7 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
         self._text = QTextEdit()
         self._text.setReadOnly(True)
         self._text.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        self._text.setFont(QFont("Consolas", S.font_pt(10)))
+        self._text.setFont(QFont("Cutive", S.font_pt(10)))
         self._text.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {c.BG_SECONDARY};
@@ -159,17 +159,17 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
         layout.addWidget(icon_lbl)
 
         title = QLabel(tr("Log Viewer"))
-        title.setFont(QFont("Segoe UI", S.font_pt(18), QFont.Weight.Bold))
+        title.setFont(QFont("Cutive", S.font_pt(18), QFont.Weight.Bold))
         title.setStyleSheet(f"color: {c.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         sep = QLabel("·")
         sep.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
-        sep.setFont(QFont("Segoe UI", S.font_pt(14)))
+        sep.setFont(QFont("Cutive", S.font_pt(14)))
         layout.addWidget(sep)
 
         subtitle = QLabel(tr("Inspect application log files in real time"))
-        subtitle.setFont(QFont("Segoe UI", S.font_pt(11)))
+        subtitle.setFont(QFont("Cutive", S.font_pt(11)))
         subtitle.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         layout.addWidget(subtitle)
 
@@ -209,7 +209,7 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
         self._search_edit.setText(self._search_text)
         self._search_edit.setPlaceholderText(tr("Search log..."))
         self._search_edit.setFixedHeight(S.px(34))
-        self._search_edit.setFont(QFont("Segoe UI", S.font_pt(10)))
+        self._search_edit.setFont(QFont("Cutive", S.font_pt(10)))
         self._search_edit.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {c.BG_SECONDARY};
@@ -245,7 +245,7 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
     def _field_label(self, text: str) -> QLabel:
         c = _c()
         lbl = QLabel(text)
-        lbl.setFont(QFont("Segoe UI", S.font_pt(10)))
+        lbl.setFont(QFont("Cutive", S.font_pt(10)))
         lbl.setStyleSheet(f"color: {c.TEXT_MUTED}; background: transparent;")
         return lbl
 
@@ -255,7 +255,7 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
         combo.setCursor(Qt.CursorShape.PointingHandCursor)
         combo.setFixedHeight(S.px(34))
         combo.setMinimumWidth(S.px(140))
-        combo.setFont(QFont("Segoe UI", S.font_pt(10)))
+        combo.setFont(QFont("Cutive", S.font_pt(10)))
         combo.setStyleSheet(f"""
             QComboBox {{
                 background-color: {c.BG_SECONDARY};
@@ -294,7 +294,7 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
         c = _c()
         btn = QPushButton(text)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
+        btn.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Medium))
         btn.setFixedHeight(S.px(34))
         btn.setStyleSheet(f"""
             QPushButton {{
@@ -453,7 +453,7 @@ class LogView(QWidget, ScaleMixin, I18nMixin):
         # Atomic UI update to prevent flickering
         self._text.setUpdatesEnabled(False)
         self._text.setHtml(
-            f'<pre style="margin:0; font-family: Consolas, monospace;">'
+            f'<pre style="margin:0; font-family: Cutive;">'
             + "<br>".join(rows) + "</pre>"
         )
 

@@ -17,6 +17,21 @@ from systemmonitor.styles.theme import theme_manager
 from systemmonitor.i18n import tr, language_manager, I18nMixin
 from systemmonitor.scaler import S, ScaleMixin
 from systemmonitor.widgets.gpu_widgets import COLORS, sync_colors, GPUSingleView, GPUInfoView, GlowCard
+from systemmonitor.widgets.ref_design import StatusPill
+
+
+class _RefHdr(QFrame):
+    """Flat header frame (API-compatible with the old GlowCard header)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('RefHeader')
+
+    def set_glow(self, _c):
+        pass
+
+    def apply_theme(self):
+        self.update()
 
 
 # ---------------------------------------------------------------------------
@@ -44,9 +59,9 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
 
     def retranslate_ui(self):
         if hasattr(self, '_hdr_title_lbl'):
-            self._hdr_title_lbl.setText(tr("GPU Monitor"))
+            self._hdr_title_lbl.setText(tr("Graphics"))
         if hasattr(self, '_live_lbl'):
-            self._live_lbl.setText(tr("LIVE") if self._live_ok else tr("Offline"))
+            self._live_lbl.set_state("ok" if self._live_ok else "bad", tr("LIVE") if self._live_ok else tr("Offline"))
         if hasattr(self, '_no_gpu'):
             self._no_gpu.setText(
                 tr("No GPU found.\nCheck that NVIDIA/AMD/Intel drivers are installed."))
@@ -98,22 +113,21 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
             tr("No GPU found.\nCheck that NVIDIA/AMD/Intel drivers are installed.")
         )
         self._no_gpu.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._no_gpu.setFont(QFont("Segoe UI", S.font_pt(11)))
+        self._no_gpu.setFont(QFont("Cutive", S.font_pt(11)))
         self._no_gpu.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
         self._no_gpu.setVisible(False)
         root.addWidget(self._no_gpu)
 
     def _make_header(self) -> QFrame:
-        hdr = GlowCard(glow=COLORS['accent_cyan'], radius=S.px(12))
+        hdr = _RefHdr()
         self._hdr_frame = hdr
-        hdr.setFixedHeight(S.px(60))
         hl = QHBoxLayout(hdr)
-        hl.setContentsMargins(S.px(14), S.px(8), S.px(14), S.px(8))
-        hl.setSpacing(S.px(10))
+        hl.setContentsMargins(S.px(4), S.px(2), S.px(4), S.px(2))
+        hl.setSpacing(S.px(12))
 
         icon_box = QLabel()
         self._icon_box = icon_box
-        icon_box.setFixedSize(S.px(36), S.px(36))
+        icon_box.setFixedSize(S.px(40), S.px(40))
         icon_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hl.addWidget(icon_box)
 
@@ -121,40 +135,31 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         title_col.setContentsMargins(0, 0, 0, 0)
         title_col.setSpacing(0)
 
-        title = QLabel(tr("GPU Monitor"))
+        title = QLabel(tr("Graphics"))
         self._hdr_title_lbl = title
-        title.setFont(QFont("Segoe UI", S.font_pt(13), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        title.setObjectName("RefTitle")
+        title.setFont(QFont("Cutive", S.font_pt(18), QFont.Weight.Bold))
         title_col.addWidget(title)
 
-        self._gpu_name_lbl = QLabel("–")
-        self._gpu_name_lbl.setFont(QFont("Segoe UI", S.font_pt(9)))
-        self._gpu_name_lbl.setStyleSheet(
-            f"color: {COLORS['text_secondary']}; background: transparent;"
-        )
+        self._gpu_name_lbl = QLabel("-")
+        self._gpu_name_lbl.setObjectName("RefMuted")
+        self._gpu_name_lbl.setFont(QFont("Cutive", S.font_pt(9)))
         title_col.addWidget(self._gpu_name_lbl)
 
         hl.addLayout(title_col)
         hl.addStretch()
 
-        self._status_dot = QLabel("●")
-        self._status_dot.setStyleSheet(
-            f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
-        )
-        hl.addWidget(self._status_dot)
-
-        self._live_lbl = QLabel(tr("LIVE"))
-        self._live_lbl.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
-        self._live_lbl.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent;")
-        hl.addWidget(self._live_lbl)
+        # kept for API compatibility; the LIVE pill replaces the dot
+        self._status_dot = QLabel("")
+        self._status_dot.setVisible(False)
 
         self._updated_lbl = QLabel("")
-        self._updated_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
-        self._updated_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        self._updated_lbl.setObjectName("RefMuted")
+        self._updated_lbl.setFont(QFont("Cutive", S.font_pt(8)))
         hl.addWidget(self._updated_lbl)
 
         self._badge = QLabel("")
-        self._badge.setFont(QFont("Segoe UI", S.font_pt(8), QFont.Weight.Bold))
+        self._badge.setFont(QFont("Cutive", S.font_pt(8), QFont.Weight.Bold))
         self._badge.setStyleSheet(
             f"color: {COLORS['bg_primary']}; background: {COLORS['accent_blue']}; "
             f"border: none; border-radius: 4px; padding: 1px 6px;"
@@ -162,21 +167,18 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
         self._badge.setVisible(False)
         hl.addWidget(self._badge)
 
+        self._live_lbl = StatusPill(tr("LIVE"))
+        hl.addWidget(self._live_lbl)
+
         self._apply_icon_box_style()
         return hdr
 
     def _apply_icon_box_style(self):
         if not hasattr(self, '_icon_box'):
             return
-        self._icon_box.setStyleSheet(f"""
-            QLabel {{
-                background: {COLORS['bg_hover']};
-                border: 1px solid {COLORS['accent_cyan']};
-                border-radius: {S.px(8)}px;
-            }}
-        """)
+        self._icon_box.setStyleSheet("background: transparent; border: none;")
         try:
-            px = qta.icon('ph.cpu', color=COLORS['accent_cyan']).pixmap(QSize(S.px(18), S.px(18)))
+            px = qta.icon('ph.monitor', color=COLORS['accent_green']).pixmap(QSize(S.px(30), S.px(30)))
             self._icon_box.setPixmap(px)
         except Exception:
             pass
@@ -256,6 +258,7 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
             self._show_no_gpu(True)
             return
 
+        gpus = self._merge_duplicate_gpus(gpus)
         self._show_no_gpu(False)
 
         # Rebuild tabs hvis GPU-sammensetning endret seg
@@ -278,6 +281,37 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
     # ------------------------------------------------------------------
     # Hjelper-metoder
     # ------------------------------------------------------------------
+    @staticmethod
+    def _merge_duplicate_gpus(gpus: List[dict]) -> List[dict]:
+        """The same physical GPU can be reported by several detectors (e.g. WMI
+        with static driver info and ADL/NVML with live metrics). Show it as ONE
+        tab: keep the entry with the most live data and fill its gaps from the
+        others."""
+        empty = (None, '', 'Unknown', 0, 0.0)
+        groups: dict = {}
+        order: list = []
+        for g in gpus:
+            key = (str(g.get('name', '')).strip().lower(), str(g.get('vendor', '')).strip().lower())
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(g)
+        merged = []
+        for key in order:
+            entries = groups[key]
+            if len(entries) == 1:
+                merged.append(entries[0])
+                continue
+            entries.sort(key=lambda e: sum(1 for k, v in e.items() if k != 'raw_data' and v not in empty),
+                         reverse=True)
+            base = dict(entries[0])
+            for other in entries[1:]:
+                for k, v in other.items():
+                    if base.get(k) in empty and v not in empty:
+                        base[k] = v
+            merged.append(base)
+        return merged
+
     def _rebuild_tabs(self, gpus: List[dict]):
         self._tabs.clear()
         self._gpu_views.clear()
@@ -346,21 +380,13 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
 
     def _set_status_ok(self):
         self._live_ok = True
-        self._status_dot.setStyleSheet(
-            f"color: {COLORS['accent_green']}; font-size: {S.font_pt(13)}px; background: transparent;"
-        )
         if hasattr(self, '_live_lbl'):
-            self._live_lbl.setText(tr("LIVE"))
-            self._live_lbl.setStyleSheet(f"color: {COLORS['accent_green']}; background: transparent;")
+            self._live_lbl.set_state("ok", tr("LIVE"))
 
     def _set_status_bad(self):
         self._live_ok = False
-        self._status_dot.setStyleSheet(
-            f"color: {COLORS['accent_red']}; font-size: {S.font_pt(13)}px; background: transparent;"
-        )
         if hasattr(self, '_live_lbl'):
-            self._live_lbl.setText(tr("Offline"))
-            self._live_lbl.setStyleSheet(f"color: {COLORS['accent_red']}; background: transparent;")
+            self._live_lbl.set_state("bad", tr("Offline"))
 
     def on_scale_changed(self, _):
         self._setup_ui()
@@ -375,28 +401,11 @@ class GPUView(QWidget, ScaleMixin, I18nMixin):
             self._hdr_frame.set_glow(COLORS['accent_cyan'])
             self._hdr_frame.apply_theme()
         self._apply_icon_box_style()
-        if hasattr(self, '_hdr_title_lbl'):
-            self._hdr_title_lbl.setStyleSheet(
-                f"color: {COLORS['text_primary']}; background: transparent;")
         if hasattr(self, '_tabs'):
             self._tabs.setStyleSheet(self._tab_css())
         if hasattr(self, '_no_gpu'):
             self._no_gpu.setStyleSheet(
                 f"color: {COLORS['text_muted']}; background: transparent;"
-            )
-        if hasattr(self, '_status_dot'):
-            live_color = COLORS['accent_green'] if self._live_ok else COLORS['accent_red']
-            self._status_dot.setStyleSheet(
-                f"color: {live_color}; font-size: {S.font_pt(13)}px; background: transparent;"
-            )
-        if hasattr(self, '_live_lbl'):
-            live_color = COLORS['accent_green'] if self._live_ok else COLORS['accent_red']
-            self._live_lbl.setStyleSheet(f"color: {live_color}; background: transparent;")
-        if hasattr(self, '_updated_lbl'):
-            self._updated_lbl.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
-        if hasattr(self, '_gpu_name_lbl'):
-            self._gpu_name_lbl.setStyleSheet(
-                f"color: {COLORS['text_secondary']}; background: transparent;"
             )
         if hasattr(self, '_badge'):
             self._badge.setStyleSheet(

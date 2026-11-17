@@ -1,35 +1,70 @@
 ﻿"""
-Overview Page - Premium Glass Dashboard
-Responsive design with adaptive grid layout, collapsible panels, and real-time data
+Overview Page - reference redesign.
+
+Layout (responsive grid, 3 / 2 / 1 columns):
+  CPU gauge panel · GPU gauge panel · Memory donut panel
+  CPU history · GPU history · Network history
+  CPU cores · Storage disks · Network gauges + system status
+All values come from the same data feed as before (update_data).
 """
 import platform
 import time
-import psutil
-import subprocess
 from collections import deque
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QGridLayout, QSizePolicy, QSplitter
+    QScrollArea, QGridLayout, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 import qtawesome as qta
 
-from systemmonitor.widgets.donut_gauge import DonutGauge
-from systemmonitor.widgets.sparkline import SparklineWidget
-from systemmonitor.widgets.responsive import CollapsiblePanel, ResponsiveGridLayout
-from systemmonitor.widgets.overview_widgets import (
-    GlassMetricCard, GlassChartPanel, GlassInfoPanel, GlassStoragePanel
-)
 from systemmonitor.styles.theme import theme_manager
 from systemmonitor.i18n import tr, I18nMixin
-from systemmonitor.scaler import S, ScaleMixin, LayoutMode
+from systemmonitor.scaler import S, ScaleMixin
 from systemmonitor.config import settings
-from systemmonitor.utils.helpers import format_temperature, temperature_unit_suffix, network_speed_value
+from systemmonitor.utils.helpers import format_temperature, network_speed_value
+from systemmonitor.widgets.ref_design import (
+    Panel, PageHeader, BigGauge, Donut, HBar, IconStat, KV, AreaChart,
+    ChartPanel, ReflowGrid, flex, _label, hexcol,
+)
+
+
+def _fmt_size(b: float) -> str:
+    b = float(b or 0)
+    for unit, div in (("TB", 1024 ** 4), ("GB", 1024 ** 3), ("MB", 1024 ** 2)):
+        if b >= div:
+            v = b / div
+            return f"{v:.2f} {unit}".replace(".", ",") if unit == "TB" else f"{v:.1f} {unit}".replace(".", ",")
+    return f"{b:.0f} B"
+
+
+class _DriveRow(QWidget):
+    """One storage row: 'C: (System)' + bar + 'used / total (pct %)'."""
+
+    def __init__(self, name: str, parent=None):
+        super().__init__(parent)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, S.px(2), 0, S.px(2))
+        lay.setSpacing(S.px(2))
+        top = QHBoxLayout()
+        self.name_lbl = _label(name, "RefValue", 9, True)
+        self.info_lbl = _label("", "RefSub", 8)
+        self.info_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        top.addWidget(self.name_lbl)
+        top.addStretch()
+        top.addWidget(self.info_lbl)
+        lay.addLayout(top)
+        self.bar = HBar("ACCENT_GREEN", 6)
+        lay.addWidget(self.bar)
+
+    def set_data(self, used: float, total: float, pct: float):
+        self.info_lbl.setText(f"{_fmt_size(used)} / {_fmt_size(total)} ({pct:.0f} %)")
+        color = "ACCENT_RED" if pct >= 90 else ("ACCENT_YELLOW" if pct >= 80 else "ACCENT_GREEN")
+        self.bar.set_value(pct, color)
 
 
 class OverviewPage(QWidget, ScaleMixin, I18nMixin):
-    """Premium glass overview dashboard - responsive with adaptive grid"""
+    """Reference-style overview dashboard - responsive grid"""
 
     def __init__(self, data_collector=None, parent=None):
         super().__init__(parent)
@@ -39,15 +74,18 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
         self._last_net = None
         self._net_down_speed = 0.0
         self._net_up_speed = 0.0
+        self._net_peak = {"down": 1.0, "up": 1.0}
         self._last_data = {}
-        self._system_info_cache = {}
-        self._system_info_cache_time = 0
-        self._system_info_cache_ttl = 30
-        self._battery_row_value = None
-        self._battery_block = None
         self._battery_val_label = None
         self._battery_icon_label = None
+        self._battery_row_value = None
+        self._battery_block = None
         self._has_battery = self._detect_battery()
+        self._core_rows = []
+        self._drive_rows = {}
+        self._drive_order = []
+        # chart history survives UI rebuilds (theme / scale / language)
+        self._stores = {k: deque(maxlen=60000) for k in ("cpu", "gpu", "net")}
 
         self.scale_connect()
         self.i18n_connect()
@@ -58,7 +96,9 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
     def set_data_collector(self, collector):
         self._data_collector = collector
 
+    # --- rebuild hooks -------------------------------------------------
     def _on_theme_changed(self, theme_name: str):
+        # QSS handles most restyling; rebuild refreshes icons/painted colours
         QTimer.singleShot(0, self._rebuild_and_restore)
 
     def retranslate_ui(self):
@@ -75,12 +115,11 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
         if self._last_data:
             self.update_data(self._last_data)
 
+    # --- UI -------------------------------------------------------------
     def _setup_ui(self):
-        self._is_rebuilding = True
-        try:
-            # Clear previous layout if this is a rebuild
-            old = self.layout()
-            if old:
+        old = self.layout()
+        if old:
+            try:
                 while old.count():
                     item = old.takeAt(0)
                     w = item.widget()
@@ -90,353 +129,238 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
                 tmp = QWidget()
                 tmp.setLayout(old)
                 tmp.deleteLater()
-        except Exception:
-            # Ignore errors during cleanup
-            pass
+            except Exception:
+                pass
 
         colors = theme_manager.colors
-        self.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        main = QVBoxLayout()
+        main.setContentsMargins(S.px(14), S.px(10), S.px(14), S.px(10))
+        main.setSpacing(S.px(10))
+        self.setLayout(main)
 
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        self.setLayout(main_layout)
-
-        self._header = self._create_header()
-        main_layout.addWidget(self._header)
+        main.addWidget(self._create_header())
 
         scroll = QScrollArea()
-        self._main_scroll = scroll
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"""
-            QScrollArea {{
-                background-color: {colors.BG_PRIMARY};
-                border: none;
-            }}
-            QScrollBar:vertical {{
-                background-color: {colors.BG_SECONDARY};
-                width: 6px;
-                border-radius: 3px;
-            }}
-            QScrollBar::handle:vertical {{
-                background-color: {colors.ACCENT_GREEN_DIM};
-                border-radius: 3px;
-                min-height: 30px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px;
-            }}
+            QScrollArea {{ background: transparent; border: none; }}
+            QScrollArea > QWidget > QWidget {{ background: transparent; }}
+            QScrollBar:vertical {{ background: transparent; width: 6px; }}
+            QScrollBar::handle:vertical {{ background-color: {colors.BORDER}; border-radius: 3px; min-height: 30px; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
         """)
-
         content = QWidget()
-        content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        content.setStyleSheet(f"background-color: {colors.BG_PRIMARY};")
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(S.px(24), S.px(16), S.px(24), S.px(24))
-        content_layout.setSpacing(S.px(16))
-        content.setLayout(content_layout)
+        content.setObjectName("RefContent")
+        content.setStyleSheet("QWidget#RefContent { background: transparent; }")
+        content_lay = QVBoxLayout(content)
+        content_lay.setContentsMargins(0, 0, S.px(4), 0)
+        content_lay.setSpacing(0)
 
-        self._metrics_row = self._create_metrics_row()
-        content_layout.addWidget(self._metrics_row)
-
-        self._charts_section = self._create_charts_section()
-        content_layout.addWidget(self._charts_section, stretch=1)
-
-        self._info_row = self._create_info_row()
-        content_layout.addWidget(self._info_row)
-
+        self._panels = [
+            flex(self._build_cpu_panel(), 340), flex(self._build_gpu_panel(), 340), flex(self._build_mem_panel(), 340),
+            self._build_chart_panel("cpu"), self._build_chart_panel("gpu"), self._build_chart_panel("net"),
+            self._build_cores_panel(), self._build_storage_panel(), self._build_net_column(),
+        ]
+        self._grid = ReflowGrid([(p, 1) for p in self._panels], max_cols=3, min_col_width=380)
+        content_lay.addWidget(self._grid)
+        content_lay.addStretch(1)
         scroll.setWidget(content)
-        main_layout.addWidget(scroll, stretch=1)
+        self._grid.bind_viewport(scroll)
+        main.addWidget(scroll, stretch=1)
+
+    # --- header ---------------------------------------------------------
+    def _chip(self, value_attr: str | None, text: str, caption: str):
+        box = QFrame()
+        box.setObjectName("RefPanel")
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(S.px(10), S.px(3), S.px(10), S.px(3))
+        lay.setSpacing(0)
+        v = _label(text, "RefValue", 10, True)
+        c = _label(caption, "RefMuted", 7)
+        lay.addWidget(v)
+        lay.addWidget(c)
+        if value_attr:
+            setattr(self, value_attr, v)
+        return box, v
 
     def _create_header(self):
         colors = theme_manager.colors
-        header = QFrame()
-        header.setMinimumHeight(S.px(60))
-        header.setMaximumHeight(S.px(90))
-        if theme_manager.current_theme == "heimdal":
-            header.setStyleSheet("""
-                background-color: #12152A;
-                border: none;
-            """)
-        else:
-            header.setStyleSheet(f"""
-                background-color: {colors.BG_PRIMARY};
-                border: none;
-            """)
-        layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(24), S.px(8), S.px(24), S.px(8))
-        layout.setSpacing(S.px(16))
-        header.setLayout(layout)
+        self._hdr = PageHeader(tr("Dashboard"), tr("System performance overview"), "mdi.view-dashboard", pill=tr("Healthy"))
+        box, _ = self._chip("_uptime_val", "0m", tr("Uptime"))
+        self._hdr.extra.addWidget(box)
+        box, _ = self._chip(None, self._short_os(), tr("OS"))
+        self._hdr.extra.addWidget(box)
 
-        title_section = QVBoxLayout()
-        title_section.setSpacing(2)
-        title_section.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-        title = QLabel(tr("Dashboard"))
-        title.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        title_section.addWidget(title)
-
-        subtitle = QLabel(tr("System performance overview"))
-        subtitle.setFont(QFont("Segoe UI", S.font_pt(10)))
-        subtitle.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        title_section.addWidget(subtitle)
-        layout.addLayout(title_section)
-
-        layout.addStretch()
-
-        status_layout = QHBoxLayout()
-        status_layout.setSpacing(S.px(12))
-        status_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-        uptime_block = QFrame()
-        uptime_block.setStyleSheet(f"""
-            background-color: {colors.BG_CARD};
-            border: none;
-            border-radius: {S.px(8)}px;
-        """)
-        uptime_layout = QVBoxLayout()
-        uptime_layout.setSpacing(0)
-        uptime_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
-        uptime_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        uptime_block.setLayout(uptime_layout)
-
-        self._uptime_val = QLabel("0m")
-        self._uptime_val.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-        self._uptime_val.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        uptime_layout.addWidget(self._uptime_val)
-
-        uptime_lbl = QLabel(tr("Uptime"))
-        uptime_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
-        uptime_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        uptime_layout.addWidget(uptime_lbl)
-        status_layout.addWidget(uptime_block)
-
-        sep = QFrame()
-        sep.setFixedWidth(1)
-        sep.setMinimumHeight(S.px(28))
-        sep.setMaximumHeight(S.px(36))
-        sep.setStyleSheet("background-color: transparent;")
-        status_layout.addWidget(sep)
-
-        os_block = QFrame()
-        os_block.setStyleSheet(f"""
-            background-color: {colors.BG_CARD};
-            border: none;
-            border-radius: {S.px(8)}px;
-        """)
-        os_layout = QVBoxLayout()
-        os_layout.setSpacing(0)
-        os_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
-        os_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        os_block.setLayout(os_layout)
-
-        os_val = QLabel(self._short_os())
-        os_val.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-        os_val.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-        os_layout.addWidget(os_val)
-
-        os_lbl = QLabel(tr("OS"))
-        os_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
-        os_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-        os_layout.addWidget(os_lbl)
-        status_layout.addWidget(os_block)
-
+        self._battery_val_label = None
+        self._battery_icon_label = None
+        self._battery_block = None
         if self._has_battery:
-            sep2 = QFrame()
-            sep2.setFixedWidth(1)
-            sep2.setMinimumHeight(S.px(28))
-            sep2.setMaximumHeight(S.px(36))
-            sep2.setStyleSheet("background-color: transparent;")
-            status_layout.addWidget(sep2)
+            bb = QFrame()
+            bb.setObjectName("RefPanel")
+            bl = QHBoxLayout(bb)
+            bl.setContentsMargins(S.px(10), S.px(3), S.px(10), S.px(3))
+            bl.setSpacing(S.px(6))
+            icon = QLabel()
+            icon.setStyleSheet("background: transparent; border: none;")
+            icon.setPixmap(qta.icon('ph.battery-charging', color=colors.STATUS_GREEN).pixmap(S.px(16), S.px(16)))
+            bl.addWidget(icon)
+            tc = QVBoxLayout()
+            tc.setSpacing(0)
+            val = _label("--%", "RefValue", 10, True)
+            tc.addWidget(val)
+            tc.addWidget(_label(tr("Battery"), "RefMuted", 7))
+            bl.addLayout(tc)
+            self._hdr.extra.addWidget(bb)
+            self._battery_block = bb
+            self._battery_icon_label = icon
+            self._battery_val_label = val
+        return self._hdr
 
-            battery_block = QFrame()
-            battery_block.setStyleSheet(f"""
-                background-color: {colors.BG_CARD};
-                border: none;
-                border-radius: {S.px(8)}px;
-            """)
-            battery_layout = QHBoxLayout()
-            battery_layout.setSpacing(S.px(6))
-            battery_layout.setContentsMargins(S.px(12), S.px(6), S.px(12), S.px(6))
-            battery_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            battery_block.setLayout(battery_layout)
+    # --- panels ---------------------------------------------------------
+    def _build_cpu_panel(self):
+        p = Panel("CPU", "ph.cpu")
+        row = QHBoxLayout()
+        row.setSpacing(S.px(10))
+        self._cpu_gauge = BigGauge("ACCENT_GREEN", "CPU")
+        row.addWidget(self._cpu_gauge, stretch=3)
+        side = QVBoxLayout()
+        side.setSpacing(S.px(6))
+        self._cpu_name = _label("", "RefValue", 8, True)
+        self._cpu_name.setWordWrap(True)
+        side.addWidget(self._cpu_name)
+        self._cpu_freq = IconStat("ph.pulse", "--", tr("Current frequency"))
+        self._cpu_cores = IconStat("ph.cpu", "--", tr("Cores / threads"))
+        self._cpu_temp = IconStat("ph.thermometer", "--", tr("Temperature"))
+        for w in (self._cpu_freq, self._cpu_cores, self._cpu_temp):
+            side.addWidget(w)
+        side.addStretch()
+        row.addLayout(side, stretch=2)
+        p.body.addLayout(row)
+        return p
 
-            battery_icon = QLabel()
-            battery_icon.setPixmap(qta.icon('ph.battery-charging', color=colors.ACCENT_GREEN).pixmap(S.px(16), S.px(16)))
-            battery_layout.addWidget(battery_icon)
-            self._battery_icon_label = battery_icon
+    def _build_gpu_panel(self):
+        p = Panel("GPU", "ph.monitor")
+        row = QHBoxLayout()
+        row.setSpacing(S.px(10))
+        self._gpu_gauge = BigGauge("ACCENT_CYAN", "GPU")
+        row.addWidget(self._gpu_gauge, stretch=3)
+        side = QVBoxLayout()
+        side.setSpacing(S.px(6))
+        self._gpu_name = _label("", "RefValue", 8, True)
+        self._gpu_name.setWordWrap(True)
+        side.addWidget(self._gpu_name)
+        self._gpu_temp = IconStat("ph.thermometer", "--", tr("Temperature"))
+        self._gpu_vram = IconStat("ph.memory", "--", tr("VRAM"))
+        self._gpu_clock = IconStat("ph.pulse", "--", tr("Core clock"))
+        for w in (self._gpu_temp, self._gpu_vram, self._gpu_clock):
+            side.addWidget(w)
+        side.addStretch()
+        row.addLayout(side, stretch=2)
+        p.body.addLayout(row)
+        return p
 
-            battery_text_layout = QVBoxLayout()
-            battery_text_layout.setSpacing(0)
-            battery_text_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    def _build_mem_panel(self):
+        p = Panel(tr("Memory"), "ph.memory")
+        row = QHBoxLayout()
+        row.setSpacing(S.px(10))
+        self._mem_donut = Donut()
+        row.addWidget(self._mem_donut, stretch=3)
+        side = QVBoxLayout()
+        side.setSpacing(S.px(8))
+        side.addStretch()
+        self._mem_used_kv = KV(tr("In use"), "--")
+        self._mem_avail_kv = KV(tr("Available"), "--")
+        self._mem_swap_kv = KV(tr("Swap"), "--")
+        for w in (self._mem_used_kv, self._mem_avail_kv, self._mem_swap_kv):
+            side.addWidget(w)
+        side.addStretch()
+        row.addLayout(side, stretch=2)
+        p.body.addLayout(row)
+        return p
 
-            self._battery_val_label = QLabel("--%")
-            self._battery_val_label.setFont(QFont("Segoe UI", S.font_pt(11), QFont.Weight.Bold))
-            self._battery_val_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
-            battery_text_layout.addWidget(self._battery_val_label)
-
-            battery_lbl = QLabel(tr("Battery"))
-            battery_lbl.setFont(QFont("Segoe UI", S.font_pt(8)))
-            battery_lbl.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
-            battery_text_layout.addWidget(battery_lbl)
-
-            battery_layout.addLayout(battery_text_layout)
-            status_layout.addWidget(battery_block)
-            self._battery_block = battery_block
+    def _build_chart_panel(self, which: str):
+        if which == "cpu":
+            ch = AreaChart(["ACCENT_GREEN"], 100.0, store=self._stores["cpu"])
+            self._cpu_chart = ch
+            panel = ChartPanel(tr("CPU load history"), "ph.chart-line", ch, tabs=True)
+        elif which == "gpu":
+            ch = AreaChart(["ACCENT_CYAN"], 100.0, store=self._stores["gpu"])
+            self._gpu_chart = ch
+            panel = ChartPanel(tr("GPU load history"), "ph.chart-line", ch, tabs=True)
         else:
-            self._battery_block = None
-            self._battery_val_label = None
-            self._battery_icon_label = None
-
-        layout.addLayout(status_layout)
-        return header
-
-    def _create_metrics_row(self):
-        colors = theme_manager.colors
-        row = QFrame()
-        row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        layout = QGridLayout()
-        layout.setSpacing(S.px(12))
-        layout.setContentsMargins(0, 0, 0, 0)
-        row.setLayout(layout)
-
-        cpu_card = GlassMetricCard("CPU Load", "ph.cpu", colors.ACCENT_GREEN)
-        cpu_card.set_value("--", tr("Loading..."))
-        self._cpu_card = cpu_card
-
-        gpu_card = GlassMetricCard("GPU Load", "ph.monitor", colors.ACCENT_PURPLE)
-        gpu_card.set_value("--", tr("Loading..."))
-        self._gpu_card = gpu_card
-
-        ram_card = GlassMetricCard("Memory", "ph.hard-drive", colors.ACCENT_BLUE)
-        ram_card.set_value("--", tr("Loading..."))
-        self._ram_card = ram_card
-
-        net_card = GlassMetricCard("Network", "ph.wifi-high", colors.ACCENT_CYAN)
-        _, _net_unit = network_speed_value(0)
-        net_card.set_value("0.0 / 0.0", tr("Down / Up {0}").format(_net_unit))
-        self._net_card = net_card
-
-        disk_card = GlassMetricCard("Disk Activity", "mdi.harddisk", colors.ACCENT_ORANGE)
-        disk_card.set_value("-- / --", tr("R/W MB/s"))
-        self._disk_card = disk_card
-
-        temp_card = GlassMetricCard("Temperature", "ph.thermometer", colors.ACCENT_RED)
-        temp_card.set_value(f"--{temperature_unit_suffix()}", tr("GPU temp"))
-        self._temp_card = temp_card
-
-        self._metric_cards = [cpu_card, gpu_card, ram_card, net_card, disk_card, temp_card]
-        self._current_metric_cols = S.grid_columns_for(max(self.width(), 100))
-        self._arrange_metric_grid(layout, self._current_metric_cols)
-
-        return row
-
-    def _arrange_metric_grid(self, layout: QGridLayout, cols: int):
-        while layout.count():
-            layout.takeAt(0)
-        for i, card in enumerate(self._metric_cards):
-            layout.addWidget(card, i // cols, i % cols)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        new_cols = S.grid_columns_for(self.width())
-        if new_cols != getattr(self, '_current_metric_cols', -1):
-            self._current_metric_cols = new_cols
-            if hasattr(self, '_metrics_row') and hasattr(self, '_metric_cards'):
-                layout = self._metrics_row.layout()
-                if isinstance(layout, QGridLayout):
-                    self._arrange_metric_grid(layout, new_cols)
-
-    def _create_charts_section(self):
-        colors = theme_manager.colors
-        section = QFrame()
-        section.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        if theme_manager.current_theme == "heimdal":
-            section.setStyleSheet(f"""
-                QFrame {{
-                    background-color: rgba(30, 35, 64, 0.85);
-                    border: none;
-                    border-radius: {S.px(12)}px;
-                }}
-            """)
-        else:
-            section.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {colors.BG_CARD};
-                    border: none;
-                    border-radius: {S.px(14)}px;
-                }}
-            """)
-        layout = QHBoxLayout()
-        layout.setContentsMargins(S.px(14), S.px(10), S.px(14), S.px(10))
-        layout.setSpacing(S.px(12))
-        section.setLayout(layout)
-
-        cpu_chart = GlassChartPanel("CPU Usage", colors.ACCENT_GREEN)
-        self._cpu_sparkline = cpu_chart._sparkline
-        layout.addWidget(cpu_chart, stretch=1)
-
-        ram_chart = GlassChartPanel("Memory Usage", colors.ACCENT_BLUE)
-        self._ram_sparkline = ram_chart._sparkline
-        layout.addWidget(ram_chart, stretch=1)
-
-        net_chart = GlassChartPanel("Network Traffic", colors.ACCENT_CYAN)
-        self._net_sparkline = net_chart._sparkline
-        layout.addWidget(net_chart, stretch=1)
-
-        gpu_chart = GlassChartPanel("GPU Load", colors.ACCENT_PURPLE)
-        self._gpu_sparkline = gpu_chart._sparkline
-        layout.addWidget(gpu_chart, stretch=1)
-
-        return section
-
-    def _create_info_row(self):
-        row = QFrame()
-        row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        row.setLayout(layout)
-
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(S.px(8))
-        splitter.setStyleSheet("QSplitter::handle { background: transparent; }")
-
-        sysinfo_panel = self._create_sysinfo_panel()
-        sysinfo_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        splitter.addWidget(sysinfo_panel)
-
-        storage_panel = GlassStoragePanel()
-        self._storage_panel = storage_panel
-        storage_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        splitter.addWidget(storage_panel)
-
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
-
-        layout.addWidget(splitter)
-        return row
-
-    def _create_sysinfo_panel(self):
-        colors = theme_manager.colors
-        panel = GlassInfoPanel("System Information")
-
-        panel.add_info_row("Processor", self._get_cpu_display(), colors.ACCENT_BLUE)
-        panel.add_info_row("Graphics", self._get_gpu_display(), colors.ACCENT_PURPLE)
-        panel.add_info_row("Memory", self._get_ram_display(), colors.ACCENT_GREEN)
-        panel.add_info_row("Operating System", self._short_os(), colors.TEXT_SECONDARY)
-        panel.add_info_row("Architecture", platform.machine(), colors.TEXT_MUTED)
-
-        if self._has_battery:
-            self._battery_row_value = panel.add_info_row("Battery", "—", colors.ACCENT_GREEN)
-        else:
-            self._battery_row_value = None
-
+            _, unit = network_speed_value(0)
+            ch = AreaChart(["ACCENT_GREEN", "ACCENT_CYAN"], None,
+                           y_fmt=lambda v: (f"{v:.1f}" if v < 10 else f"{v:.0f}") + f" {network_speed_value(0)[1]}",
+                           store=self._stores["net"], min_auto=1.0)
+            self._net_chart = ch
+            panel = ChartPanel(tr('Network Traffic'), "ph.chart-line", ch, tabs=True,
+                               legend=[("ACCENT_GREEN", tr("Download")), ("ACCENT_CYAN", tr("Upload"))])
+        panel.setMinimumHeight(S.px(190))
+        panel.setProperty("flex_max", 400)
         return panel
 
+    def _build_cores_panel(self):
+        p = Panel(tr("CPU cores"), "ph.cpu")
+        self._cores_grid = QGridLayout()
+        self._cores_grid.setHorizontalSpacing(S.px(14))
+        self._cores_grid.setVerticalSpacing(S.px(5))
+        p.body.addLayout(self._cores_grid)
+        p.body.addStretch()
+        self._core_rows = []
+        return p
+
+    def _build_storage_panel(self):
+        p = Panel(tr("Storage Disks"), "ph.database")
+        self._drives_lay = QVBoxLayout()
+        self._drives_lay.setSpacing(S.px(8))
+        p.body.addLayout(self._drives_lay)
+        p.body.addStretch()
+        self._io_kv_r = KV(tr("Read"), "--")
+        self._io_kv_w = KV(tr("Write"), "--")
+        p.body.addWidget(self._io_kv_r)
+        p.body.addWidget(self._io_kv_w)
+        self._drive_rows = {}
+        self._drive_order = []
+        return p
+
+    def _build_net_column(self):
+        wrap = QWidget()
+        wrap.setObjectName("RefContent")
+        wrap.setStyleSheet("QWidget#RefContent { background: transparent; }")
+        lay = QVBoxLayout(wrap)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(S.px(10))
+
+        net = Panel(tr("Network"), "ph.wifi-high")
+        row = QHBoxLayout()
+        self._net_down_gauge = BigGauge("ACCENT_GREEN", "", show_ends=False, value_pt=13)
+        self._net_up_gauge = BigGauge("ACCENT_CYAN", "", show_ends=False, value_pt=13)
+        for title, g in ((tr("Download"), self._net_down_gauge), (tr("Upload"), self._net_up_gauge)):
+            g.setMinimumSize(S.px(120), S.px(110))
+            cell = QVBoxLayout()
+            cell.setSpacing(0)
+            t = _label(title, "RefSub", 9)
+            t.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            cell.addWidget(t)
+            cell.addWidget(g, stretch=1)
+            row.addLayout(cell)
+        net.body.addLayout(row)
+        lay.addWidget(net, stretch=3)
+
+        st = Panel(tr("System Status"), "ph.heartbeat")
+        self._status_rows = {}
+        for key, label in (("cpu", "CPU"), ("gpu", "GPU"), ("mem", tr("Memory")),
+                           ("disk", tr("Storage")), ("net", tr("Network"))):
+            kv = KV(label, "--")
+            self._status_rows[key] = kv
+            st.body.addWidget(kv)
+        lay.addWidget(st, stretch=2)
+        return wrap
+
+    # --- helpers --------------------------------------------------------
     def _start_timers(self):
         self._uptime_timer = QTimer(self)
         self._uptime_timer.timeout.connect(self._update_uptime)
@@ -444,7 +368,11 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
 
     def _update_uptime(self):
         self._uptime_seconds = int(time.time() - self._start_time)
-        self._uptime_val.setText(self._format_uptime(self._uptime_seconds))
+        if hasattr(self, '_uptime_val') and self._uptime_val is not None:
+            try:
+                self._uptime_val.setText(self._format_uptime(self._uptime_seconds))
+            except RuntimeError:
+                pass
 
     def _format_uptime(self, seconds):
         days = seconds // 86400
@@ -482,10 +410,9 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
         elif status == "On battery" and percent <= 40:
             color = colors.ACCENT_ORANGE
         elif battery.get('power_plugged'):
-            color = colors.ACCENT_GREEN
+            color = colors.STATUS_GREEN
         else:
             color = colors.TEXT_PRIMARY
-
         return text, color
 
     def _short_os(self):
@@ -494,187 +421,209 @@ class OverviewPage(QWidget, ScaleMixin, I18nMixin):
             return "Windows " + platform.win32_ver()[0]
         return p
 
-    def _short_cpu(self):
-        cpu = platform.processor()
-        if not cpu:
-            return tr("Unknown")
-        if len(cpu) > 28:
-            return cpu[:28] + "..."
-        return cpu
+    @staticmethod
+    def _state(pct: float, warn: float = 75, crit: float = 90) -> tuple[str, str]:
+        """(text, colour key) for a usage percentage."""
+        if pct >= crit:
+            return tr("Critical"), "ACCENT_RED"
+        if pct >= warn:
+            return tr("Warning"), "ACCENT_ORANGE"
+        return tr("Normal"), "STATUS_GREEN"
 
-    def _get_cpu_name(self):
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'cpu_name' in self._system_info_cache:
-            return self._system_info_cache['cpu_name']
-        cpu = platform.processor()
-        if cpu:
-            self._system_info_cache['cpu_name'] = cpu
-            self._system_info_cache_time = now
-            return cpu
-        return None
+    def _set_status(self, key: str, pct: float | None, text: str | None = None):
+        kv = self._status_rows.get(key)
+        if kv is None:
+            return
+        if text is None:
+            if pct is None:
+                kv.set_value("--")
+                return
+            text, ckey = self._state(pct)
+        else:
+            ckey = "STATUS_GREEN"
+        kv.val_lbl.setStyleSheet(f"color: {hexcol(ckey)};")
+        kv.set_value(text)
 
-    def _short_gpu(self):
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'gpu_name' in self._system_info_cache:
-            return self._system_info_cache['gpu_name']
-        try:
-            result = subprocess.run(
-                ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command",
-                 "(Get-CimInstance Win32_VideoController).Name | Select-Object -First 1"],
-                capture_output=True, text=True, timeout=3,
-                creationflags=0x08000000
-            )
-            if result.stdout.strip():
-                name = result.stdout.strip()
-                if len(name) > 24:
-                    name = name[:24] + "..."
-                self._system_info_cache['gpu_name'] = name
-                self._system_info_cache_time = now
-                return name
-        except Exception:
-            pass
-        return "N/A"
-
-    def _get_cpu_display(self):
-        cpu = self._get_cpu_name()
-        if not cpu:
-            cpu = platform.processor()
-        if not cpu:
-            return tr("Unknown")
-        if len(cpu) > 40:
-            return cpu[:40] + "..."
-        return cpu
-
-    def _get_gpu_display(self):
-        gpu = self._short_gpu()
-        if not gpu or gpu == "N/A":
-            return tr("Not detected")
-        return gpu
-
-    def _get_ram_display(self):
-        now = time.time()
-        if now - self._system_info_cache_time < self._system_info_cache_ttl and 'ram_info' in self._system_info_cache:
-            return self._system_info_cache['ram_info']
-        try:
-            mem = psutil.virtual_memory()
-            total_gb = round(mem.total / (1024**3))
-            from systemmonitor.data.memory import get_ram_type
-            ram_type = get_ram_type()
-            result = f"{total_gb} GB {ram_type}" if ram_type else f"{total_gb} GB"
-            self._system_info_cache['ram_info'] = result
-            self._system_info_cache_time = now
-            return result
-        except Exception:
-            return tr("Unknown")
-
+    # --- data -----------------------------------------------------------
     def update_data(self, data):
         """Called by MainWindow whenever new data arrives"""
         self._last_data = data
+        worst = 0.0
 
-        if 'cpu' in data:
-            cpu = data['cpu']
-            pct = cpu.get('percent', 0)
-            self._cpu_card.set_value(f"{pct:.0f}%", tr("{0:.1f}% utilization").format(pct))
-            self._cpu_card.push_sparkline(pct)
-            self._cpu_sparkline.push(pct)
+        cpu = data.get('cpu')
+        if cpu:
+            pct = cpu.get('percent', 0) or 0
+            worst = max(worst, pct)
+            self._cpu_gauge.set_percent(pct)
+            self._cpu_chart.push(pct)
+            freq = cpu.get('frequency_current')
+            self._cpu_freq.set_value(f"{freq / 1000:.2f} GHz".replace(".", ",") if freq else "--")
+            phys, logi = cpu.get('core_count'), cpu.get('thread_count')
+            if phys and logi:
+                self._cpu_cores.set_value(f"{phys} / {logi}")
+            temp = cpu.get('temperature')
+            self._cpu_temp.set_value(format_temperature(temp) if temp else "--")
+            sysinfo = data.get('system_info') or {}
+            name = sysinfo.get('cpu_name')
+            if name:
+                self._cpu_name.setText(name)
+            elif not self._cpu_name.text():
+                self._cpu_name.setText(platform.processor() or "")
+            self._update_cores(cpu.get('per_core') or [])
+            self._set_status("cpu", pct)
 
-        if 'gpu' in data:
-            gpu = data['gpu']
+        gpu = data.get('gpu')
+        if gpu:
             if gpu.get('available'):
-                load = gpu.get('load')
-                if load is not None:
-                    self._gpu_card.set_value(f"{load:.0f}%", tr("GPU load"))
-                    self._gpu_card.push_sparkline(load)
-                    self._gpu_sparkline.push(load)
+                from systemmonitor.views.gpu import GPUView
+                g0 = (GPUView._merge_duplicate_gpus(gpu.get('gpus') or []) or [{}])[0]
+                load = g0.get('gpu_utilization_percent')
+                if load is None:
+                    load = gpu.get('load')
+                load = load or 0
+                worst = max(worst, load)
+                self._gpu_gauge.set_percent(load)
+                self._gpu_chart.push(load)
+                if g0.get('name'):
+                    self._gpu_name.setText(str(g0['name']))
+                temp = gpu.get('temperature')
+                if temp is None:
+                    temp = g0.get('temperature_celsius')
+                self._gpu_temp.set_value(format_temperature(temp) if temp else "--")
+                vt, vu = g0.get('vram_total_mb'), g0.get('vram_used_mb')
+                if vt:
+                    vp = (vu or 0) / vt * 100
+                    self._gpu_vram.set_value(f"{(vu or 0) / 1024:.1f} / {vt / 1024:.1f} GB".replace(".", ","),
+                                             f"{tr('VRAM')} ({vp:.0f} %)")
+                else:
+                    self._gpu_vram.set_value("N/A", tr("VRAM"))
+                clk = g0.get('core_clock_mhz')
+                self._gpu_clock.set_value(f"{clk:,.0f} MHz".replace(",", " ") if clk else "N/A")
+                self._set_status("gpu", load)
+            else:
+                self._gpu_gauge.set_percent(0, text="N/A")
+                self._set_status("gpu", None, tr("Not detected"))
 
-        if 'memory' in data:
-            mem = data['memory']
-            pct = mem.get('percent', 0)
-            total_gb = mem.get('total', 0) / (1024**3)
-            used_gb = mem.get('used', 0) / (1024**3)
-            self._ram_card.set_value(f"{used_gb:.1f} GB", tr("{0:.0f}% of {1:.0f} GB").format(pct, total_gb))
-            self._ram_card.push_sparkline(pct)
-            self._ram_sparkline.push(pct)
+        mem = data.get('memory')
+        if mem:
+            pct = mem.get('percent', 0) or 0
+            worst = max(worst, pct)
+            total = mem.get('total', 0) or 0
+            used = mem.get('used', 0) or 0
+            avail = mem.get('available', 0) or 0
+            gb = 1024 ** 3
+            self._mem_donut.set_data([(pct, "ACCENT_GREEN")],
+                                     f"{used / gb:.1f} GB".replace(".", ","),
+                                     f"/ {total / gb:.1f} GB".replace(".", ","))
+            self._mem_used_kv.set_value(f"{used / gb:.1f} GB ({pct:.0f} %)".replace(".", ","))
+            self._mem_avail_kv.set_value(f"{avail / gb:.1f} GB ({100 - pct:.0f} %)".replace(".", ","))
+            su, st = mem.get('swap_used'), mem.get('swap_total')
+            self._mem_swap_kv.set_value(f"{(su or 0) / gb:.1f} / {(st or 0) / gb:.1f} GB".replace(".", ","))
+            self._set_status("mem", pct)
 
-        if 'network' in data:
-            net = data['network']
+        net = data.get('network')
+        if net:
             bytes_sent = net.get('bytes_sent', 0)
             bytes_recv = net.get('bytes_recv', 0)
-
-            if self._last_net:
-                dt = 1.0
-                down_bps = max(0.0, (bytes_recv - self._last_net[0]) / dt)
-                up_bps = max(0.0, (bytes_sent - self._last_net[1]) / dt)
-
-                down_speed, speed_unit = network_speed_value(down_bps)
-                up_speed, _ = network_speed_value(up_bps)
+            down_bps = net.get('download_speed')
+            up_bps = net.get('upload_speed')
+            if down_bps is None or up_bps is None:
+                if self._last_net:
+                    down_bps = max(0.0, (bytes_recv - self._last_net[0]) / 1.0)
+                    up_bps = max(0.0, (bytes_sent - self._last_net[1]) / 1.0)
+            self._last_net = (bytes_recv, bytes_sent)
+            if down_bps is not None and up_bps is not None:
+                dn, unit = network_speed_value(down_bps)
+                up, _ = network_speed_value(up_bps)
                 precision = settings.get('decimal_places', 1)
+                self._net_down_speed, self._net_up_speed = dn, up
+                self._net_chart.push(dn, up)
+                self._net_peak["down"] = max(dn, self._net_peak["down"] * 0.995, 1.0)
+                self._net_peak["up"] = max(up, self._net_peak["up"] * 0.995, 1.0)
+                self._net_down_gauge.set_percent(dn / self._net_peak["down"] * 100,
+                                                 text=f"{dn:.{precision}f}", caption=unit)
+                self._net_up_gauge.set_percent(up / self._net_peak["up"] * 100,
+                                               text=f"{up:.{precision}f}", caption=unit)
+                self._set_status("net", None, tr("Connected"))
 
-                self._net_down_speed = down_speed
-                self._net_up_speed = up_speed
+        disk = data.get('disk')
+        if disk:
+            parts = disk.get('partitions', [])
+            if parts:
+                self._update_drives(parts)
+                self._set_status("disk", max((p.get('percent', 0) or 0) for p in parts))
+            rd = disk.get('read_rate', disk.get('read_speed', 0)) or 0
+            wr = disk.get('write_rate', disk.get('write_speed', 0)) or 0
+            self._io_kv_r.set_value(f"{_fmt_size(rd)}/s")
+            self._io_kv_w.set_value(f"{_fmt_size(wr)}/s")
 
-                self._net_card.set_value(
-                    f"{down_speed:.{precision}f} / {up_speed:.{precision}f}",
-                    tr("Down / Up {0}").format(speed_unit)
-                )
-                self._net_sparkline.push_multi([down_speed, up_speed])
-
-            self._last_net = (bytes_sent, bytes_recv)
-
-        if 'disk' in data:
-            disk = data['disk']
-            read_speed = disk.get('read_speed', 0)
-            write_speed = disk.get('write_speed', 0)
-            self._disk_card.set_value(
-                f"{read_speed:.0f} / {write_speed:.0f}",
-                tr("R/W MB/s")
-            )
-
-        if 'gpu' in data:
-            gpu = data['gpu']
-            temp = gpu.get('temperature')
-            
-            # Fallback: Search all GPUs in the list if primary temp is missing
-            if temp is None and 'gpus' in gpu:
-                for g in gpu['gpus']:
-                    g_temp = g.get('temperature_celsius')
-                    if g_temp is not None and g_temp > 0:
-                        temp = g_temp
-                        break
-            
-            if temp is not None:
-                self._temp_card.set_value(format_temperature(temp), tr("GPU temp"))
-                self._temp_card.push_sparkline(temp)
-            else:
-                # If still no temp, try to see if cpu temp is available as a system-wide fallback
-                cpu_temp = data.get('cpu', {}).get('temperature')
-                if cpu_temp:
-                    self._temp_card.set_value(format_temperature(cpu_temp), tr("System temp"))
-                    self._temp_card.push_sparkline(cpu_temp)
-
-        if 'disk' in data:
-            partitions = data['disk'].get('partitions', [])
-            if partitions:
-                self._storage_panel.update_drives(partitions)
+        if worst >= 90:
+            self._hdr.pill.set_state("bad", tr("Critical"))
+        elif worst >= 75:
+            self._hdr.pill.set_state("warn", tr("Warning"))
+        else:
+            self._hdr.pill.set_state("ok", tr("Healthy"))
 
         if self._has_battery and 'system_info' in data:
             battery = data['system_info'].get('battery')
             if battery:
                 self._update_battery_display(battery)
 
+    def _update_cores(self, per_core):
+        if len(per_core) != len(self._core_rows):
+            while self._cores_grid.count():
+                it = self._cores_grid.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            self._core_rows = []
+            two_cols = len(per_core) > 8
+            rows_per_col = (len(per_core) + 1) // 2 if two_cols else len(per_core)
+            for i in range(len(per_core)):
+                cell = QWidget()
+                cl = QHBoxLayout(cell)
+                cl.setContentsMargins(0, 0, 0, 0)
+                cl.setSpacing(S.px(6))
+                name = _label(f"{tr('Core')} {i + 1}", "RefSub", 8)
+                name.setMinimumWidth(S.px(52))
+                bar = HBar("ACCENT_GREEN", 6)
+                val = _label("0 %", "RefValue", 8, True)
+                val.setMinimumWidth(S.px(34))
+                val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                cl.addWidget(name)
+                cl.addWidget(bar, stretch=1)
+                cl.addWidget(val)
+                self._cores_grid.addWidget(cell, i % rows_per_col, i // rows_per_col)
+                self._core_rows.append((bar, val))
+        for (bar, val), pct in zip(self._core_rows, per_core):
+            bar.set_value(pct)
+            val.setText(f"{pct:.0f} %")
+
+    def _update_drives(self, partitions):
+        keys = [p.get('device', '') for p in partitions]
+        if keys != self._drive_order:
+            while self._drives_lay.count():
+                it = self._drives_lay.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            self._drive_rows = {}
+            for p in partitions:
+                dev = p.get('device', '')
+                row = _DriveRow(dev.rstrip("\\"))
+                self._drives_lay.addWidget(row)
+                self._drive_rows[dev] = row
+            self._drive_order = keys
+        for p in partitions:
+            row = self._drive_rows.get(p.get('device', ''))
+            if row:
+                row.set_data(p.get('used', 0), p.get('total', 0), p.get('percent', 0) or 0)
+
     def _update_battery_display(self, battery: dict):
         text, color = self._format_battery_display(battery)
         percent = battery.get('percent', 0)
         plugged = battery.get('power_plugged')
-
-        if self._battery_row_value is not None:
-            self._battery_row_value.setText(text)
-            self._battery_row_value.setStyleSheet(f"color: {color}; background: transparent;")
-
         if self._battery_val_label is not None:
             self._battery_val_label.setText(f"{percent:.0f}%")
-            self._battery_val_label.setStyleSheet(f"color: {color}; background: transparent;")
-
+            self._battery_val_label.setStyleSheet(f"color: {color};")
         if self._battery_icon_label is not None:
             if plugged:
                 icon_name = 'ph.battery-charging'

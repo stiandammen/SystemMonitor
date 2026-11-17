@@ -41,7 +41,7 @@ class SearchBar(QLineEdit):
                 border: 1px solid {c.BORDER};
                 border-radius: 8px;
                 padding: 8px 12px;
-                font-family: "Segoe UI";
+                font-family: "Cutive";
                 font-size: 13px;
             }}
             

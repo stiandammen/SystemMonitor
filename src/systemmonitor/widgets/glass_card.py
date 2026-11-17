@@ -55,7 +55,7 @@ class GlassCard(QFrame, ScaleMixin):
 
             if self._title:
                 self._title_label = QLabel(self._title)
-                font = QFont("Segoe UI", S.font_pt(12), QFont.Weight.DemiBold)
+                font = QFont("Cutive", S.font_pt(12), QFont.Weight.DemiBold)
                 self._title_label.setFont(font)
                 self._header.addWidget(self._title_label)
 
@@ -166,12 +166,12 @@ class PremiumMetricCard(QFrame, ScaleMixin):
 
         if self._icon:
             icon_label = QLabel(self._icon)
-            icon_label.setFont(QFont("Segoe UI", S.font_pt(14)))
+            icon_label.setFont(QFont("Cutive", S.font_pt(14)))
             icon_label.setStyleSheet(f"color: {self._accent}; background: transparent;")
             header.addWidget(icon_label)
 
         title_label = QLabel(self._title)
-        title_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
+        title_label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Medium))
         title_label.setStyleSheet(f"color: {theme_manager.colors.TEXT_MUTED}; background: transparent;")
         header.addWidget(title_label)
         header.addStretch()
@@ -179,12 +179,12 @@ class PremiumMetricCard(QFrame, ScaleMixin):
         layout.addLayout(header)
 
         self._value_label = QLabel(self._value)
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(24), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Cutive", S.font_pt(24), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {theme_manager.colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self._value_label)
 
         self._subtitle_label = QLabel(self._subtitle)
-        self._subtitle_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._subtitle_label.setFont(QFont("Cutive", S.font_pt(9)))
         self._subtitle_label.setStyleSheet(f"color: {theme_manager.colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self._subtitle_label)
 
@@ -281,18 +281,18 @@ class MetricCard(QFrame, ScaleMixin):
 
         if self._icon:
             self._icon_label = QLabel(self._icon)
-            self._icon_label.setFont(QFont("Segoe UI", S.font_pt(14)))
+            self._icon_label.setFont(QFont("Cutive", S.font_pt(14)))
             self._icon_label.setStyleSheet(f"color: {self._color}; background: transparent;")
             header.addWidget(self._icon_label)
 
         self._title_label = QLabel(self._title)
-        self._title_label.setFont(QFont("Segoe UI", S.font_pt(10), QFont.Weight.Medium))
+        self._title_label.setFont(QFont("Cutive", S.font_pt(10), QFont.Weight.Medium))
         self._title_label.setStyleSheet(f"color: {colors.TEXT_MUTED}; background: transparent;")
         header.addWidget(self._title_label)
         header.addStretch()
 
         self._trend_label = QLabel("")
-        self._trend_label.setFont(QFont("Segoe UI", S.font_pt(9), QFont.Weight.Medium))
+        self._trend_label.setFont(QFont("Cutive", S.font_pt(9), QFont.Weight.Medium))
         self._trend_label.setStyleSheet("background: transparent;")
         self._trend_label.setVisible(False)
         header.addWidget(self._trend_label)
@@ -300,12 +300,12 @@ class MetricCard(QFrame, ScaleMixin):
         layout.addLayout(header)
 
         self._value_label = QLabel(self._value)
-        self._value_label.setFont(QFont("Segoe UI", S.font_pt(22), QFont.Weight.Bold))
+        self._value_label.setFont(QFont("Cutive", S.font_pt(22), QFont.Weight.Bold))
         self._value_label.setStyleSheet(f"color: {colors.TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self._value_label)
 
         self._subtitle_label = QLabel(self._subtitle)
-        self._subtitle_label.setFont(QFont("Segoe UI", S.font_pt(9)))
+        self._subtitle_label.setFont(QFont("Cutive", S.font_pt(9)))
         self._subtitle_label.setStyleSheet(f"color: {colors.TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self._subtitle_label)
 
